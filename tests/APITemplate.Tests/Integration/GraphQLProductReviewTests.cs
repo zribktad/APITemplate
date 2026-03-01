@@ -19,7 +19,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GraphQL_CreateProductReview_ReturnsNewReview()
     {
-        // Create product first via GraphQL
         var productId = await CreateProductViaGraphQLAsync("Review Target Product", 19.99m);
 
         var mutation = new
@@ -49,11 +48,10 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var review = json.GetProperty("data").GetProperty("createProductReview");
-        review.GetProperty("reviewerName").GetString().ShouldBe("GraphQL Reviewer");
-        review.GetProperty("rating").GetInt32().ShouldBe(4);
-        review.GetProperty("productId").GetString().ShouldBe(productId.ToString());
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
+        result!.Data.CreateProductReview.ReviewerName.ShouldBe("GraphQL Reviewer");
+        result.Data.CreateProductReview.Rating.ShouldBe(4);
+        result.Data.CreateProductReview.ProductId.ShouldBe(productId);
     }
 
     [Fact]
@@ -65,9 +63,8 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var reviews = json.GetProperty("data").GetProperty("reviews");
-        reviews.GetArrayLength().ShouldBeGreaterThanOrEqualTo(0);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default);
+        result!.Data.Reviews.Count.ShouldBeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -75,7 +72,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     {
         var productId = await CreateProductViaGraphQLAsync("Product With Reviews", 29.99m);
 
-        // Create a review
         var createMutation = new
         {
             query = @"
@@ -89,7 +85,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
         };
         await PostGraphQLAsync(createMutation);
 
-        // Query by product id
         var query = new
         {
             query = $@"{{ reviewsByProductId(productId: ""{productId}"") {{ id reviewerName rating }} }}"
@@ -99,9 +94,8 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var reviews = json.GetProperty("data").GetProperty("reviewsByProductId");
-        reviews.GetArrayLength().ShouldBeGreaterThanOrEqualTo(1);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsByProductIdData>>(GraphQLJsonOptions.Default);
+        result!.Data.ReviewsByProductId.Count.ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
@@ -109,7 +103,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     {
         var productId = await CreateProductViaGraphQLAsync("Product To Review Then Delete Review", 9.99m);
 
-        // Create review
         var createMutation = new
         {
             query = @"
@@ -123,13 +116,9 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
         };
 
         var createResponse = await PostGraphQLAsync(createMutation);
-        var createJson = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var reviewId = createJson.GetProperty("data")
-            .GetProperty("createProductReview")
-            .GetProperty("id")
-            .GetString();
+        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
+        var reviewId = createResult!.Data.CreateProductReview.Id;
 
-        // Delete review
         var deleteMutation = new
         {
             query = $@"mutation {{ deleteProductReview(id: ""{reviewId}"") }}"
@@ -139,11 +128,8 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var deleteJson = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>();
-        deleteJson.GetProperty("data")
-            .GetProperty("deleteProductReview")
-            .GetBoolean()
-            .ShouldBeTrue();
+        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductReviewData>>(GraphQLJsonOptions.Default);
+        deleteResult!.Data.DeleteProductReview.ShouldBeTrue();
     }
 
     private async Task<Guid> CreateProductViaGraphQLAsync(string name, decimal price)
@@ -161,13 +147,8 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
         };
 
         var response = await PostGraphQLAsync(mutation);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var idStr = json.GetProperty("data")
-            .GetProperty("createProduct")
-            .GetProperty("id")
-            .GetString()!;
-
-        return Guid.Parse(idStr);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        return result!.Data.CreateProduct.Id;
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)

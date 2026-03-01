@@ -25,9 +25,8 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var products = json.GetProperty("data").GetProperty("products");
-        products.GetArrayLength().ShouldBeGreaterThanOrEqualTo(0);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default);
+        result!.Data.Products.Count.ShouldBeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -58,16 +57,14 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var product = json.GetProperty("data").GetProperty("createProduct");
-        product.GetProperty("name").GetString().ShouldBe("GraphQL Product");
-        product.GetProperty("price").GetDecimal().ShouldBe(49.99m);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        result!.Data.CreateProduct.Name.ShouldBe("GraphQL Product");
+        result.Data.CreateProduct.Price.ShouldBe(49.99m);
     }
 
     [Fact]
     public async Task GraphQL_GetProductById_WhenExists_ReturnsProduct()
     {
-        // Create a product first
         var createQuery = new
         {
             query = @"
@@ -81,13 +78,9 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
         };
 
         var createResponse = await PostGraphQLAsync(createQuery);
-        var createJson = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var productId = createJson.GetProperty("data")
-            .GetProperty("createProduct")
-            .GetProperty("id")
-            .GetString();
+        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        var productId = createResult!.Data.CreateProduct.Id;
 
-        // Query by ID
         var getQuery = new
         {
             query = $@"{{ productById(id: ""{productId}"") {{ id name }} }}"
@@ -97,15 +90,13 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var getJson = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var product = getJson.GetProperty("data").GetProperty("productById");
-        product.GetProperty("name").GetString().ShouldBe("Findable Product");
+        var getResult = await getResponse.Content.ReadFromJsonAsync<GraphQLResponse<ProductByIdData>>(GraphQLJsonOptions.Default);
+        getResult!.Data.ProductById!.Name.ShouldBe("Findable Product");
     }
 
     [Fact]
     public async Task GraphQL_DeleteProduct_ReturnsTrue()
     {
-        // Create a product first
         var createQuery = new
         {
             query = @"
@@ -119,13 +110,9 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
         };
 
         var createResponse = await PostGraphQLAsync(createQuery);
-        var createJson = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var productId = createJson.GetProperty("data")
-            .GetProperty("createProduct")
-            .GetProperty("id")
-            .GetString();
+        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        var productId = createResult!.Data.CreateProduct.Id;
 
-        // Delete
         var deleteQuery = new
         {
             query = $@"mutation {{ deleteProduct(id: ""{productId}"") }}"
@@ -135,11 +122,8 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var deleteJson = await deleteResponse.Content.ReadFromJsonAsync<JsonElement>();
-        deleteJson.GetProperty("data")
-            .GetProperty("deleteProduct")
-            .GetBoolean()
-            .ShouldBeTrue();
+        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductData>>(GraphQLJsonOptions.Default);
+        deleteResult!.Data.DeleteProduct.ShouldBeTrue();
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)
