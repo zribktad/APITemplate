@@ -20,7 +20,7 @@ public static class ApplicationBuilderExtensions
             return app;
 
         app.MapOpenApi();
-        app.MapScalarApiReference("/", options =>
+        app.MapScalarApiReference("/scalar", options =>
         {
             options.WithTitle("APITemplate")
                    .AddHttpAuthentication("Bearer", scheme =>
