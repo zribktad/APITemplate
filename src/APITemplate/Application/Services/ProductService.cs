@@ -1,7 +1,7 @@
 using APITemplate.Application.DTOs;
-using APITemplate.Application.Extensions;
 using APITemplate.Application.Interfaces;
 using APITemplate.Application.Mappings;
+using APITemplate.Application.Specifications;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -29,12 +29,7 @@ public sealed class ProductService : IProductService
     public async Task<IReadOnlyList<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
     {
         return await _repository.AsQueryable()
-            .WhereIf(!string.IsNullOrWhiteSpace(filter.Name),        p => p.Name.Contains(filter.Name!))
-            .WhereIf(!string.IsNullOrWhiteSpace(filter.Description), p => p.Description != null && p.Description.Contains(filter.Description!))
-            .WhereIf(filter.MinPrice.HasValue,    p => p.Price >= filter.MinPrice!.Value)
-            .WhereIf(filter.MaxPrice.HasValue,    p => p.Price <= filter.MaxPrice!.Value)
-            .WhereIf(filter.CreatedFrom.HasValue, p => p.CreatedAt >= filter.CreatedFrom!.Value)
-            .WhereIf(filter.CreatedTo.HasValue,   p => p.CreatedAt <= filter.CreatedTo!.Value)
+            .Where(new ProductSpecification(filter).Criteria)
             .OrderByDescending(p => p.CreatedAt)
             .Select(p => new ProductResponse(p.Id, p.Name, p.Description, p.Price, p.CreatedAt))
             .ToListAsync(ct);
