@@ -18,12 +18,17 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddPersistence(
         this IServiceCollection services, IConfiguration configuration)
     {
+        var connectionString = configuration.GetConnectionString("DefaultConnection")!;
+
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(connectionString));
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddHealthChecks()
+            .AddNpgSql(connectionString, name: "postgresql", tags: ["database"]);
 
         return services;
     }

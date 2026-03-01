@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <!-- OpenAPI + Scalar -->
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="15.1.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />

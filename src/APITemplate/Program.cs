@@ -1,3 +1,4 @@
+using APITemplate.Api.OpenApi;
 using APITemplate.Extensions;
 using Microsoft.OpenApi;
 using Serilog;
@@ -17,6 +18,7 @@ try
     builder.Services.AddControllers();
     builder.Services.AddOpenApi(options =>
     {
+        options.AddDocumentTransformer<HealthCheckOpenApiDocumentTransformer>();
         options.AddDocumentTransformer((document, _, _) =>
         {
             document.Components ??= new OpenApiComponents();
@@ -48,6 +50,7 @@ try
     app.MapControllers();
     app.MapGraphQL();
     app.MapNitroApp("/graphql/ui");
+    app.UseHealthChecks();
 
     app.Run();
 }
