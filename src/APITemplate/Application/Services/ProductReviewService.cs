@@ -45,13 +45,15 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {
-        var product = await _productRepository.GetByIdAsync(request.ProductId, ct)
-            ?? throw new NotFoundException(nameof(Product), request.ProductId);
+        var productExists = await _productRepository.AsQueryable()
+            .AnyAsync(p => p.Id == request.ProductId, ct);
+        if (!productExists)
+            throw new NotFoundException(nameof(Product), request.ProductId);
 
         var review = new ProductReview
         {
             Id = Guid.NewGuid(),
-            ProductId = product.Id,
+            ProductId = request.ProductId,
             ReviewerName = request.ReviewerName,
             Comment = request.Comment,
             Rating = request.Rating,
