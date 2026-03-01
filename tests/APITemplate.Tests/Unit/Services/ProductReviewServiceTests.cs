@@ -1,0 +1,143 @@
+using APITemplate.Application.DTOs;
+using APITemplate.Application.Services;
+using APITemplate.Domain.Entities;
+using APITemplate.Domain.Interfaces;
+using Moq;
+using Shouldly;
+using Xunit;
+
+namespace APITemplate.Tests.Unit.Services;
+
+public class ProductReviewServiceTests
+{
+    private readonly Mock<IProductReviewRepository> _reviewRepoMock;
+    private readonly Mock<IProductRepository> _productRepoMock;
+    private readonly ProductReviewService _sut;
+
+    public ProductReviewServiceTests()
+    {
+        _reviewRepoMock = new Mock<IProductReviewRepository>();
+        _productRepoMock = new Mock<IProductRepository>();
+        _sut = new ProductReviewService(_reviewRepoMock.Object, _productRepoMock.Object);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsAllReviews()
+    {
+        var reviews = new List<ProductReview>
+        {
+            new() { Id = Guid.NewGuid(), ProductId = Guid.NewGuid(), ReviewerName = "Alice", Rating = 5, CreatedAt = DateTime.UtcNow },
+            new() { Id = Guid.NewGuid(), ProductId = Guid.NewGuid(), ReviewerName = "Bob", Rating = 3, CreatedAt = DateTime.UtcNow }
+        };
+
+        _reviewRepoMock
+            .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reviews);
+
+        var result = await _sut.GetAllAsync();
+
+        result.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenReviewExists_ReturnsResponse()
+    {
+        var review = new ProductReview
+        {
+            Id = Guid.NewGuid(),
+            ProductId = Guid.NewGuid(),
+            ReviewerName = "Alice",
+            Rating = 4,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(review.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(review);
+
+        var result = await _sut.GetByIdAsync(review.Id);
+
+        result.ShouldNotBeNull();
+        result!.ReviewerName.ShouldBe("Alice");
+        result.Rating.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenReviewDoesNotExist_ReturnsNull()
+    {
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductReview?)null);
+
+        var result = await _sut.GetByIdAsync(Guid.NewGuid());
+
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetByProductIdAsync_ReturnsReviewsForProduct()
+    {
+        var productId = Guid.NewGuid();
+        var reviews = new List<ProductReview>
+        {
+            new() { Id = Guid.NewGuid(), ProductId = productId, ReviewerName = "Alice", Rating = 5, CreatedAt = DateTime.UtcNow }
+        };
+
+        _reviewRepoMock
+            .Setup(r => r.GetByProductIdAsync(productId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reviews);
+
+        var result = await _sut.GetByProductIdAsync(productId);
+
+        result.Count.ShouldBe(1);
+        result[0].ProductId.ShouldBe(productId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenProductExists_CreatesReview()
+    {
+        var product = new Product { Id = Guid.NewGuid(), Name = "Test", Price = 10m, CreatedAt = DateTime.UtcNow };
+        var request = new CreateProductReviewRequest(product.Id, "Alice", "Great!", 5);
+
+        _productRepoMock
+            .Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+
+        _reviewRepoMock
+            .Setup(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductReview rv, CancellationToken _) => rv);
+
+        var result = await _sut.CreateAsync(request);
+
+        result.ReviewerName.ShouldBe("Alice");
+        result.Rating.ShouldBe(5);
+        result.ProductId.ShouldBe(product.Id);
+        result.Id.ShouldNotBe(Guid.Empty);
+
+        _reviewRepoMock.Verify(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenProductNotFound_ThrowsKeyNotFoundException()
+    {
+        _productRepoMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Product?)null);
+
+        var request = new CreateProductReviewRequest(Guid.NewGuid(), "Alice", null, 3);
+
+        var act = () => _sut.CreateAsync(request);
+
+        await Should.ThrowAsync<KeyNotFoundException>(act);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_CallsRepositoryDelete()
+    {
+        var id = Guid.NewGuid();
+
+        await _sut.DeleteAsync(id);
+
+        _reviewRepoMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()), Times.Once);
+    }
+}
