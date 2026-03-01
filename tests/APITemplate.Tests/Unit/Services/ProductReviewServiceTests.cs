@@ -1,6 +1,7 @@
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Services;
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MockQueryable;
 using Moq;
@@ -13,13 +14,15 @@ public class ProductReviewServiceTests
 {
     private readonly Mock<IProductReviewRepository> _reviewRepoMock;
     private readonly Mock<IProductRepository> _productRepoMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly ProductReviewService _sut;
 
     public ProductReviewServiceTests()
     {
         _reviewRepoMock = new Mock<IProductReviewRepository>();
         _productRepoMock = new Mock<IProductRepository>();
-        _sut = new ProductReviewService(_reviewRepoMock.Object, _productRepoMock.Object);
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _sut = new ProductReviewService(_reviewRepoMock.Object, _productRepoMock.Object, _unitOfWorkMock.Object);
     }
 
     [Fact]
@@ -114,10 +117,11 @@ public class ProductReviewServiceTests
         result.Id.ShouldNotBe(Guid.Empty);
 
         _reviewRepoMock.Verify(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task CreateAsync_WhenProductNotFound_ThrowsKeyNotFoundException()
+    public async Task CreateAsync_WhenProductNotFound_ThrowsNotFoundException()
     {
         _productRepoMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -127,7 +131,7 @@ public class ProductReviewServiceTests
 
         var act = () => _sut.CreateAsync(request);
 
-        await Should.ThrowAsync<KeyNotFoundException>(act);
+        await Should.ThrowAsync<NotFoundException>(act);
     }
 
     [Fact]
@@ -138,5 +142,6 @@ public class ProductReviewServiceTests
         await _sut.DeleteAsync(id);
 
         _reviewRepoMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()), Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

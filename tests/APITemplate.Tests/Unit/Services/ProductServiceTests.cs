@@ -1,6 +1,7 @@
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Services;
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MockQueryable;
 using Moq;
@@ -12,12 +13,14 @@ namespace APITemplate.Tests.Unit.Services;
 public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly ProductService _sut;
 
     public ProductServiceTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
-        _sut = new ProductService(_repositoryMock.Object);
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _sut = new ProductService(_repositoryMock.Object, _unitOfWorkMock.Object);
     }
 
     [Fact]
@@ -73,10 +76,11 @@ public class ProductServiceTests
         _repositoryMock.Verify(
             r => r.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()),
             Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenProductNotFound_ThrowsKeyNotFoundException()
+    public async Task UpdateAsync_WhenProductNotFound_ThrowsNotFoundException()
     {
         _repositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -84,7 +88,7 @@ public class ProductServiceTests
 
         var act = () => _sut.UpdateAsync(Guid.NewGuid(), new UpdateProductRequest("Name", null, 10m));
 
-        await Should.ThrowAsync<KeyNotFoundException>(act);
+        await Should.ThrowAsync<NotFoundException>(act);
     }
 
     [Fact]
@@ -97,6 +101,7 @@ public class ProductServiceTests
         _repositoryMock.Verify(
             r => r.DeleteAsync(id, It.IsAny<CancellationToken>()),
             Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -124,6 +129,7 @@ public class ProductServiceTests
         _repositoryMock.Verify(
             r => r.UpdateAsync(product, It.IsAny<CancellationToken>()),
             Times.Once);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }
@@ -32,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
         services.AddSingleton<ITokenService, TokenService>();
+        services.AddScoped<IUserService, UserService>();
         services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
 
         return services;

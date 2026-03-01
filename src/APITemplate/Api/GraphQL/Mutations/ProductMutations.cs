@@ -1,8 +1,10 @@
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Interfaces;
+using HotChocolate.Authorization;
 
 namespace APITemplate.Api.GraphQL.Mutations;
 
+[Authorize]
 public class ProductMutations
 {
     public async Task<ProductResponse> CreateProduct(

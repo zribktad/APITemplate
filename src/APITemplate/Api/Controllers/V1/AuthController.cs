@@ -12,18 +12,20 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class AuthController : ControllerBase
 {
     private readonly ITokenService _tokenService;
+    private readonly IUserService _userService;
 
-    public AuthController(ITokenService tokenService)
+    public AuthController(ITokenService tokenService, IUserService userService)
     {
         _tokenService = tokenService;
+        _userService = userService;
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public IActionResult Login(LoginRequest request)
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
-        // Simplified demo: in production, validate against a user store
-        if (request.Username != "admin" || request.Password != "admin")
+        var isValid = await _userService.ValidateAsync(request.Username, request.Password, ct);
+        if (!isValid)
             return Unauthorized();
 
         var token = _tokenService.GenerateToken(request.Username);

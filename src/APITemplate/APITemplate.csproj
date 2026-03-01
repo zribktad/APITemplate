@@ -11,27 +11,27 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="HotChocolate.AspNetCore.Authorization" Version="15.1.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
-    <PackageReference Include="Scalar.AspNetCore" Version="*" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.12.50" />
 
     <!-- GraphQL -->
-    <PackageReference Include="HotChocolate.AspNetCore" Version="*" />
-    <PackageReference Include="HotChocolate.Data.EntityFramework" Version="*" />
+    <PackageReference Include="HotChocolate.AspNetCore" Version="15.1.12" />
+    <PackageReference Include="HotChocolate.Data.EntityFramework" Version="15.1.12" />
 
     <!-- EF Core + PostgreSQL -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="*" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 
     <!-- Authentication -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
 
     <!-- API Versioning -->
-    <PackageReference Include="Asp.Versioning.Mvc" Version="*" />
-    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="*" />
+    <PackageReference Include="Asp.Versioning.Mvc" Version="8.1.1" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
 
     <!-- Logging -->
-    <PackageReference Include="Serilog.AspNetCore" Version="*" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="*" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
   </ItemGroup>
 
 </Project>

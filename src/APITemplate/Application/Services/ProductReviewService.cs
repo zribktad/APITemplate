@@ -1,9 +1,10 @@
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Interfaces;
+using APITemplate.Application.Mappings;
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace APITemplate.Application.Services;
 
@@ -11,11 +12,16 @@ public sealed class ProductReviewService : IProductReviewService
 {
     private readonly IProductReviewRepository _reviewRepository;
     private readonly IProductRepository _productRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public ProductReviewService(IProductReviewRepository reviewRepository, IProductRepository productRepository)
+    public ProductReviewService(
+        IProductReviewRepository reviewRepository,
+        IProductRepository productRepository,
+        IUnitOfWork unitOfWork)
     {
         _reviewRepository = reviewRepository;
         _productRepository = productRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<IReadOnlyList<ProductReviewResponse>> GetAllAsync(CancellationToken ct = default)
@@ -38,13 +44,13 @@ public sealed class ProductReviewService : IProductReviewService
     public async Task<ProductReviewResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         var review = await _reviewRepository.GetByIdAsync(id, ct);
-        return review is null ? null : MapToResponse(review);
+        return review?.ToResponse();
     }
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {
         var product = await _productRepository.GetByIdAsync(request.ProductId, ct)
-            ?? throw new KeyNotFoundException($"Product with id '{request.ProductId}' not found.");
+            ?? throw new NotFoundException(nameof(Product), request.ProductId);
 
         var review = new ProductReview
         {
@@ -57,14 +63,13 @@ public sealed class ProductReviewService : IProductReviewService
         };
 
         await _reviewRepository.AddAsync(review, ct);
-        return MapToResponse(review);
+        await _unitOfWork.CommitAsync(ct);
+        return review.ToResponse();
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         await _reviewRepository.DeleteAsync(id, ct);
+        await _unitOfWork.CommitAsync(ct);
     }
-
-    private static ProductReviewResponse MapToResponse(ProductReview review) =>
-        new(review.Id, review.ProductId, review.ReviewerName, review.Comment, review.Rating, review.CreatedAt);
 }

@@ -1,4 +1,5 @@
 using System.Net;
+using APITemplate.Domain.Exceptions;
 
 namespace APITemplate.Api.Middleware;
 
@@ -26,10 +27,16 @@ public sealed class GlobalExceptionHandlerMiddleware
         {
             await _next(context);
         }
-        catch (System.Collections.Generic.KeyNotFoundException ex)
+        catch (NotFoundException ex)
         {
             _logger.LogWarning(ex, "Resource not found: {Message}", ex.Message);
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+            await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+        }
+        catch (ValidationException ex)
+        {
+            _logger.LogWarning(ex, "Validation failed: {Message}", ex.Message);
+            context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             await context.Response.WriteAsJsonAsync(new { error = ex.Message });
         }
         catch (Exception ex)

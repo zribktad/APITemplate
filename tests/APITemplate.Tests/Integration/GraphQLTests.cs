@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -32,6 +33,8 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_CreateProduct_ReturnsNewProduct()
     {
+        await AuthenticateAsync();
+
         var query = new
         {
             query = @"
@@ -65,6 +68,8 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_GetProductById_WhenExists_ReturnsProduct()
     {
+        await AuthenticateAsync();
+
         var createQuery = new
         {
             query = @"
@@ -97,6 +102,8 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_DeleteProduct_ReturnsTrue()
     {
+        await AuthenticateAsync();
+
         var createQuery = new
         {
             query = @"
@@ -124,6 +131,20 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
         var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductData>>(GraphQLJsonOptions.Default);
         deleteResult!.Data.DeleteProduct.ShouldBeTrue();
+    }
+
+    private async Task AuthenticateAsync()
+    {
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login",
+            new { Username = "admin", Password = "admin" });
+
+        loginResponse.EnsureSuccessStatusCode();
+
+        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = loginJson.GetProperty("accessToken").GetString();
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)

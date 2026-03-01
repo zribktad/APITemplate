@@ -20,6 +20,6 @@ public interface IRepository<T> where T : class
     /// <summary>Saves changes to an existing tracked or detached entity.</summary>
     Task UpdateAsync(T entity, CancellationToken ct = default);
 
-    /// <summary>Removes the entity with the given id. No-op if the entity does not exist.</summary>
+    /// <summary>Removes the entity with the given id. Throws <see cref="APITemplate.Domain.Exceptions.NotFoundException"/> if the entity does not exist.</summary>
     Task DeleteAsync(Guid id, CancellationToken ct = default);
 }

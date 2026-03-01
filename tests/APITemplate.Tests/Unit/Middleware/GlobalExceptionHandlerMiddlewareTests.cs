@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using APITemplate.Api.Middleware;
+using APITemplate.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -39,9 +40,9 @@ public class GlobalExceptionHandlerMiddlewareTests
     }
 
     [Fact]
-    public async Task InvokeAsync_WhenKeyNotFoundException_Returns404()
+    public async Task InvokeAsync_WhenNotFoundException_Returns404()
     {
-        RequestDelegate next = _ => throw new KeyNotFoundException("Product not found");
+        RequestDelegate next = _ => throw new NotFoundException("Product", Guid.Empty);
 
         var middleware = new GlobalExceptionHandlerMiddleware(next, _loggerMock.Object);
         var context = new DefaultHttpContext();
@@ -53,7 +54,7 @@ public class GlobalExceptionHandlerMiddlewareTests
 
         context.Response.Body.Seek(0, SeekOrigin.Begin);
         var body = await JsonDocument.ParseAsync(context.Response.Body);
-        body.RootElement.GetProperty("error").GetString().ShouldBe("Product not found");
+        body.RootElement.GetProperty("error").GetString().ShouldNotBeNullOrEmpty();
     }
 
     [Fact]

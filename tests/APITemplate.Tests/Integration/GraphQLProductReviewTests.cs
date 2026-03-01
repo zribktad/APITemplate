@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -19,6 +20,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GraphQL_CreateProductReview_ReturnsNewReview()
     {
+        await AuthenticateAsync();
         var productId = await CreateProductViaGraphQLAsync("Review Target Product", 19.99m);
 
         var mutation = new
@@ -70,6 +72,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GraphQL_GetReviewsByProductId_ReturnsReviewsForProduct()
     {
+        await AuthenticateAsync();
         var productId = await CreateProductViaGraphQLAsync("Product With Reviews", 29.99m);
 
         var createMutation = new
@@ -101,6 +104,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GraphQL_DeleteProductReview_ReturnsTrue()
     {
+        await AuthenticateAsync();
         var productId = await CreateProductViaGraphQLAsync("Product To Review Then Delete Review", 9.99m);
 
         var createMutation = new
@@ -130,6 +134,20 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductReviewData>>(GraphQLJsonOptions.Default);
         deleteResult!.Data.DeleteProductReview.ShouldBeTrue();
+    }
+
+    private async Task AuthenticateAsync()
+    {
+        var loginResponse = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login",
+            new { Username = "admin", Password = "admin" });
+
+        loginResponse.EnsureSuccessStatusCode();
+
+        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var token = loginJson.GetProperty("accessToken").GetString();
+
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
     private async Task<Guid> CreateProductViaGraphQLAsync(string name, decimal price)

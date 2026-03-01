@@ -1,4 +1,5 @@
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Exceptions;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -109,17 +110,18 @@ public class ProductRepositoryTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         await _sut.DeleteAsync(product.Id);
+        await _dbContext.SaveChangesAsync();
 
         var deleted = await _dbContext.Products.FindAsync(product.Id);
         deleted.ShouldBeNull();
     }
 
     [Fact]
-    public async Task DeleteAsync_WhenNotExists_DoesNotThrow()
+    public async Task DeleteAsync_WhenNotExists_ThrowsNotFoundException()
     {
         var act = () => _sut.DeleteAsync(Guid.NewGuid());
 
-        await Should.NotThrowAsync(act);
+        await Should.ThrowAsync<NotFoundException>(act);
     }
 
     private static Product CreateProduct(string name, decimal price)
