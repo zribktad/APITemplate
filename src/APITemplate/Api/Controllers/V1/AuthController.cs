@@ -22,7 +22,7 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
+    public async Task<ActionResult<TokenResponse>> Login(LoginRequest request, CancellationToken ct)
     {
         var isValid = await _userService.ValidateAsync(request.Username, request.Password, ct);
         if (!isValid)

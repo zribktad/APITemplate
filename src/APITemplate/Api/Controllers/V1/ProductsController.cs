@@ -20,21 +20,21 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<ActionResult<IEnumerable<ProductResponse>>> GetAll(CancellationToken ct)
     {
         var products = await _productService.GetAllAsync(ct);
         return Ok(products);
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ProductResponse>> GetById(Guid id, CancellationToken ct)
     {
         var product = await _productService.GetByIdAsync(id, ct);
         return product is null ? NotFound() : Ok(product);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(CreateProductRequest request, CancellationToken ct)
+    public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken ct)
     {
         var product = await _productService.CreateAsync(request, ct);
         return CreatedAtAction(nameof(GetById), new { id = product.Id, version = "1.0" }, product);
