@@ -9,13 +9,15 @@ A scalable, clean, and modern template designed to jumpstart **.NET 10** Web API
     *   **REST API:** Clean HTTP endpoints using versioned controllers (`Asp.Versioning.Mvc`).
     *   **GraphQL API:** Complex query batching via `HotChocolate`, integrated Mutations and DataLoaders to eliminate the N+1 problem.
 *   **Modern Interactive Documentation:** Native `.NET 10` OpenAPI integrations displayed smoothly in the browser using **Scalar** `/scalar`. Includes **Nitro UI** `/graphql/ui` for testing queries natively.
-*   **Data Access:** Built on **Entity Framework Core 10** paired with a **PostgreSQL** database. Uses the **Repository** pattern tied firmly with a **Unit of Work** paradigm.
+*   **Dual Database Architecture:**
+    *   **PostgreSQL + EF Core 10:** Relational entities (Products, Categories, Reviews) with the Repository + Unit of Work pattern.
+    *   **MongoDB:** Semi-structured media metadata (ProductData) with a polymorphic document model and BSON discriminators.
 *   **Domain Filtering:** Seamless filtering, sorting, and paging powered by `Ardalis.Specification` to decouple query models from infrastructural EF abstractions.
 *   **Enterprise-Grade Utilities:**
     *   **Validation:** Pipelined model validation using `FluentValidation.AspNetCore`.
     *   **Cross-Cutting Concerns:** Unified configuration via `Serilog` (Logging) and fully centralized Global Exception Management (`GlobalExceptionHandlerMiddleware`).
     *   **Authentication:** Pre-configured JWT secure endpoint access.
-    *   **Observability:** Health Checks (`/health`) natively tracking database state.
+    *   **Observability:** Health Checks (`/health`) natively tracking both PostgreSQL and MongoDB state.
 *   **Robust Testing Engine:** Provides isolated internal `Integration` tests using test containers or `UseInMemoryDatabase` combined flawlessly with WebApplicationFactory.
 
 ---
@@ -53,6 +55,7 @@ graph TD
             Repo[Concrete Repositories]
             UoW[Unit of Work]
             EF[EF Core AppDbContext]
+            Mongo[MongoDbContext]
         end
 
         %% Linkages representing Dependencies
@@ -62,7 +65,7 @@ graph TD
         GQL --> Services
         GQL -.-> DataLoaders[DataLoaders]
         DataLoaders --> Services
-        
+
         Services --> Irepo
         Services --> Spec
         Services -.-> DTO
@@ -70,17 +73,21 @@ graph TD
 
         Repo -.-> Irepo
         Repo --> EF
+        Repo --> Mongo
         UoW -.-> Irepo
         Irepo -.-> Entities
         EF -.-> Entities
-        
+        Mongo -.-> Entities
+
         PresentationLayer --> ApplicationLayer
         ApplicationLayer --> DomainLayer
         InfrastructureLayer --> DomainLayer
     end
 
     DB[(PostgreSQL)]
+    MDB[(MongoDB)]
     EF ---> DB
+    Mongo ---> MDB
 ```
 
 ---
@@ -110,7 +117,31 @@ classDiagram
         +Product Product
     }
 
+    class ProductData {
+        <<abstract>>
+        +string Id
+        +string Title
+        +string? Description
+        +DateTime CreatedAt
+    }
+
+    class ImageProductData {
+        +int Width
+        +int Height
+        +string Format
+        +long FileSizeBytes
+    }
+
+    class VideoProductData {
+        +int DurationSeconds
+        +string Resolution
+        +string Format
+        +long FileSizeBytes
+    }
+
     Product "1" *-- "0..*" ProductReview : owns
+    ProductData <|-- ImageProductData : discriminator image
+    ProductData <|-- VideoProductData : discriminator video
 ```
 
 ---
@@ -118,7 +149,8 @@ classDiagram
 ## 🛠 Technology Stack
 
 *   **Runtime:** `.NET 10.0` Web SDK
-*   **Database:** PostgreSQL (`Npgsql`)
+*   **Relational Database:** PostgreSQL (`Npgsql`)
+*   **Document Database:** MongoDB (`MongoDB.Driver`)
 *   **ORM:** Entity Framework Core (`Microsoft.EntityFrameworkCore.Design`, `10.0`)
 *   **API Toolkit:** ASP.NET Core, Asp.Versioning, `Scalar.AspNetCore`
 *   **GraphQL Core:** HotChocolate `15.1`
@@ -136,7 +168,7 @@ src/APITemplate/
 ├── Api/              # Presentation Tier (V1 REST Controllers, GraphQL Queries/Mutations, Global Middleware)
 ├── Application/      # Business Logic (Services, DTOs, FluentValidation, Ardalis Specs)
 ├── Domain/           # Core Logic (Entities, Value Objects, Domain Exceptions, Interfaces)
-├── Infrastructure/   # Outer boundaries (AppDbContext, EF Core Repositories, Unit of Work)
+├── Infrastructure/   # Outer boundaries (AppDbContext, MongoDbContext, EF Core Repositories, MongoDB Repositories, Unit of Work)
 └── Extensions/       # Startup IoC container bootstrappers
 tests/APITemplate.Tests/
 ├── Integration/      # End-to-End API endpoint testing bridging a real/in-memory DB via WebApplicationFactory
@@ -312,6 +344,121 @@ ProductCategoryStatsResponse  (DTO returned to client)
 
 ---
 
+## 🍃 MongoDB Polymorphic Pattern (ProductData)
+
+The `ProductData` feature demonstrates a **polymorphic document model** in MongoDB, where a single collection stores two distinct subtypes (`ImageProductData`, `VideoProductData`) using the BSON discriminator pattern.
+
+### When to use MongoDB vs PostgreSQL
+
+| Situation | Use PostgreSQL | Use MongoDB |
+|-----------|---------------|-------------|
+| Relational data with foreign keys | ✅ | |
+| Fixed, well-defined schema | ✅ | |
+| ACID transactions across tables | ✅ | |
+| Semi-structured or evolving schemas | | ✅ |
+| Polymorphic document hierarchies | | ✅ |
+| Media metadata, logs, events | | ✅ |
+
+### Discriminator-based inheritance
+
+```csharp
+// Domain/Entities/ProductData.cs
+[BsonDiscriminator(RootClass = true)]
+[BsonKnownTypes(typeof(ImageProductData), typeof(VideoProductData))]
+public abstract class ProductData
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; init; } = ObjectId.GenerateNewId().ToString();
+    public string Title { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+}
+
+// Domain/Entities/ImageProductData.cs
+[BsonDiscriminator("image")]
+public sealed class ImageProductData : ProductData
+{
+    public int Width { get; init; }
+    public int Height { get; init; }
+    public string Format { get; init; } = string.Empty;   // jpg | png | gif | webp
+    public long FileSizeBytes { get; init; }
+}
+
+// Domain/Entities/VideoProductData.cs
+[BsonDiscriminator("video")]
+public sealed class VideoProductData : ProductData
+{
+    public int DurationSeconds { get; init; }
+    public string Resolution { get; init; } = string.Empty; // 720p | 1080p | 4K
+    public string Format { get; init; } = string.Empty;     // mp4 | avi | mkv
+    public long FileSizeBytes { get; init; }
+}
+```
+
+MongoDB stores a `_t` discriminator field automatically, enabling polymorphic queries against the single `product_data` collection.
+
+### REST endpoints
+
+Base route: `api/v{version}/product-data` — all endpoints require JWT authorization.
+
+| Method | Endpoint | Request | Response | Purpose |
+|--------|----------|---------|----------|---------|
+| `GET` | `/` | Query: `type` (optional) | `List<ProductDataResponse>` | List all or filter by type |
+| `GET` | `/{id}` | MongoDB ObjectId string | `ProductDataResponse` / 404 | Get by ID |
+| `POST` | `/image` | `CreateImageProductDataRequest` | `ProductDataResponse` 201 | Create image metadata |
+| `POST` | `/video` | `CreateVideoProductDataRequest` | `ProductDataResponse` 201 | Create video metadata |
+| `DELETE` | `/{id}` | MongoDB ObjectId string | 204 No Content | Delete by ID |
+
+### Configuration
+
+```json
+// appsettings.json
+{
+  "MongoDB": {
+    "ConnectionString": "mongodb://localhost:27017",
+    "DatabaseName": "apitemplate"
+  }
+}
+```
+
+### Service registration
+
+```csharp
+// Extensions/ServiceCollectionExtensions.cs — AddMongoDB()
+services.Configure<MongoDbSettings>(configuration.GetSection("MongoDB"));
+services.AddSingleton<MongoDbContext>();
+services.AddScoped<IProductDataRepository, ProductDataRepository>();
+services.AddScoped<IProductDataService, ProductDataService>();
+services.AddHealthChecks().AddMongoDb(...);
+```
+
+### Full request flow
+
+```
+POST /api/v1/product-data/image
+        │
+        ▼
+ProductDataController.CreateImage()
+        │  FluentValidation auto-validates CreateImageProductDataRequest
+        ▼
+ProductDataService.CreateImageAsync()
+        │  Maps request → ImageProductData entity
+        ▼
+ProductDataRepository.CreateAsync()
+        │  InsertOneAsync into product_data collection
+        ▼
+MongoDB  →  stores { _t: "image", Title, Width, Height, Format, ... }
+        │
+        ▼
+ProductDataMappings.ToResponse()  (switch expression, polymorphic)
+        │
+        ▼
+ProductDataResponse  (Type, Id, Title, Width, Height, Format, ...)
+```
+
+---
+
 ## 🚀 CI/CD & Deployments
 
 While not natively shipped via default configuration files, this structure allows simple portability across cloud ecosystems:
@@ -323,7 +470,7 @@ While not natively shipped via default configuration files, this structure allow
 4. **Publish Container:** `docker build -t apitemplate-image:1.0 -f src/APITemplate/Dockerfile .`
 5. **Push Registry:** `docker push <registry>/apitemplate-image:1.0`
 
-Because the application encompasses the database (natively via DI) and HTTP context fully self-contained using containerization, it scales efficiently behind Kubernetes Ingress (Nginx) or any App Service / Container Apps equivalent, maintaining state natively using PostgreSQL.
+Because the application encompasses the database (natively via DI) and HTTP context fully self-contained using containerization, it scales efficiently behind Kubernetes Ingress (Nginx) or any App Service / Container Apps equivalent, maintaining state natively using PostgreSQL and MongoDB.
 
 ---
 
@@ -346,17 +493,17 @@ dotnet test
 
 ### Quick Start (Using Docker Compose)
 
-The template consists of a ready-to-use Docker environment to spool up the PostgeSQL container alongside the built API application immediately:
+The template consists of a ready-to-use Docker environment to spool up both the PostgreSQL and MongoDB containers alongside the built API application immediately:
 
 ```bash
-# Start up DB along with the API container
+# Start up databases along with the API container
 docker-compose up -d --build
 ```
 > The API will bind natively to `http://localhost:8080`.
 
 ### Running Locally without Containerization
 
-If you prefer spinning the `.NET Web API` application bare-metal, guarantee that a reachable PostgreSQL Database is available. Apply your connection string in `src/APITemplate/appsettings.Development.json`.
+If you prefer spinning the `.NET Web API` application bare-metal, guarantee that reachable PostgreSQL and MongoDB instances are available. Apply your connection strings in `src/APITemplate/appsettings.Development.json`.
 
 1. Run EF Migrations to build the default database tables:
     ```bash
