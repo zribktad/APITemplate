@@ -59,14 +59,14 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GraphQL_GetReviews_ReturnsEmptyOrPopulatedList()
     {
-        var query = new { query = "{ reviews { id reviewerName rating } }" };
+        var query = new { query = "{ reviews { nodes { id reviewerName rating } } }" };
 
         var response = await PostGraphQLAsync(query);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default);
-        result!.Data.Reviews.Count.ShouldBeGreaterThanOrEqualTo(0);
+        result!.Data.Reviews.Nodes.Count.ShouldBeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
         var query = new
         {
-            query = $@"{{ reviewsByProductId(productId: ""{productId}"") {{ id reviewerName rating }} }}"
+            query = $@"{{ reviewsByProductId(productId: ""{productId}"") {{ nodes {{ id reviewerName rating }} }} }}"
         };
 
         var response = await PostGraphQLAsync(query);
@@ -98,7 +98,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsByProductIdData>>(GraphQLJsonOptions.Default);
-        result!.Data.ReviewsByProductId.Count.ShouldBeGreaterThanOrEqualTo(1);
+        result!.Data.ReviewsByProductId.Nodes.Count.ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [Fact]

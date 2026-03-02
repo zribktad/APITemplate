@@ -1,11 +1,11 @@
-using APITemplate.Application.DTOs;
+using APITemplate.Domain.Entities;
 using HotChocolate.Types;
 
 namespace APITemplate.Api.GraphQL.Types;
 
-public sealed class ProductReviewType : ObjectType<ProductReviewResponse>
+public sealed class ProductReviewType : ObjectType<ProductReview>
 {
-    protected override void Configure(IObjectTypeDescriptor<ProductReviewResponse> descriptor)
+    protected override void Configure(IObjectTypeDescriptor<ProductReview> descriptor)
     {
         descriptor.Description("Represents a review for a product.");
 
@@ -24,5 +24,11 @@ public sealed class ProductReviewType : ObjectType<ProductReviewResponse>
         descriptor.Field(r => r.Rating)
             .Type<NonNullType<IntType>>()
             .Description("Rating from 1 to 5.");
+
+        descriptor.Field(r => r.Comment)
+            .Description("The optional review comment.");
+
+        descriptor.Field(r => r.CreatedAt)
+            .Description("The UTC timestamp of when the review was created.");
     }
 }

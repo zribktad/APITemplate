@@ -20,14 +20,14 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_GetProducts_ReturnsEmptyList()
     {
-        var query = new { query = "{ products { id name price } }" };
+        var query = new { query = "{ products { nodes { id name price } } }" };
 
         var response = await PostGraphQLAsync(query);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default);
-        result!.Data.Products.Count.ShouldBeGreaterThanOrEqualTo(0);
+        result!.Data.Products.Nodes.Count.ShouldBeGreaterThanOrEqualTo(0);
     }
 
     [Fact]

@@ -101,10 +101,18 @@ public static class ServiceCollectionExtensions
             .AddTypeExtension<Api.GraphQL.Mutations.ProductReviewMutations>()
             .AddType<Api.GraphQL.Types.ProductType>()
             .AddType<Api.GraphQL.Types.ProductReviewType>()
+            .AddDataLoader<Api.GraphQL.DataLoaders.ProductReviewsByProductDataLoader>()
             .AddAuthorization()
             .AddProjections()
             .AddFiltering()
-            .AddSorting();
+            .AddSorting()
+            .ModifyPagingOptions(o =>
+            {
+                o.MaxPageSize = 100;
+                o.DefaultPageSize = 20;
+                o.IncludeTotalCount = true;
+            })
+            .AddMaxExecutionDepthRule(5);
 
         return services;
     }

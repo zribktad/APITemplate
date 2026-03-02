@@ -1,32 +1,32 @@
-using APITemplate.Application.DTOs;
-using APITemplate.Application.Interfaces;
+using APITemplate.Domain.Entities;
+using APITemplate.Domain.Interfaces;
+using HotChocolate.Types;
 
 namespace APITemplate.Api.GraphQL.Queries;
 
 [ExtendObjectType(typeof(ProductQueries))]
 public class ProductReviewQueries
 {
-    public async Task<IReadOnlyList<ProductReviewResponse>> GetReviews(
-        ProductReviewFilter? filter,
-        [Service] IProductReviewService reviewService,
-        CancellationToken ct)
-    {
-        return await reviewService.GetAllAsync(filter ?? new ProductReviewFilter(), ct);
-    }
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 20)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<ProductReview> GetReviews([Service] IProductReviewRepository repo)
+        => repo.AsQueryable();
 
-    public async Task<ProductReviewResponse?> GetReviewById(
+    [UseFirstOrDefault]
+    [UseProjection]
+    public IQueryable<ProductReview> GetReviewById(
         Guid id,
-        [Service] IProductReviewService reviewService,
-        CancellationToken ct)
-    {
-        return await reviewService.GetByIdAsync(id, ct);
-    }
+        [Service] IProductReviewRepository repo)
+        => repo.AsQueryable().Where(r => r.Id == id);
 
-    public async Task<IReadOnlyList<ProductReviewResponse>> GetReviewsByProductId(
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 20)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<ProductReview> GetReviewsByProductId(
         Guid productId,
-        [Service] IProductReviewService reviewService,
-        CancellationToken ct)
-    {
-        return await reviewService.GetByProductIdAsync(productId, ct);
-    }
+        [Service] IProductReviewRepository repo)
+        => repo.AsQueryable().Where(r => r.ProductId == productId);
 }

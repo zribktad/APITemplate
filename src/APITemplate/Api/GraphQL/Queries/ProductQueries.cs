@@ -1,23 +1,22 @@
-using APITemplate.Application.DTOs;
-using APITemplate.Application.Interfaces;
+using APITemplate.Domain.Entities;
+using APITemplate.Domain.Interfaces;
+using HotChocolate.Types;
 
 namespace APITemplate.Api.GraphQL.Queries;
 
 public class ProductQueries
 {
-    public async Task<IReadOnlyList<ProductResponse>> GetProducts(
-        ProductFilter? filter,
-        [Service] IProductService productService,
-        CancellationToken ct)
-    {
-        return await productService.GetAllAsync(filter ?? new ProductFilter(), ct);
-    }
+    [UsePaging(MaxPageSize = 100, DefaultPageSize = 20)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Product> GetProducts([Service] IProductRepository repo)
+        => repo.AsQueryable();
 
-    public async Task<ProductResponse?> GetProductById(
+    [UseFirstOrDefault]
+    [UseProjection]
+    public IQueryable<Product> GetProductById(
         Guid id,
-        [Service] IProductService productService,
-        CancellationToken ct)
-    {
-        return await productService.GetByIdAsync(id, ct);
-    }
+        [Service] IProductRepository repo)
+        => repo.AsQueryable().Where(p => p.Id == id);
 }

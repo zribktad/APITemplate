@@ -2,7 +2,9 @@ namespace APITemplate.Tests.Integration;
 
 public sealed record ProductItem(Guid Id, string Name, decimal Price);
 
-public sealed record ProductsData(List<ProductItem> Products);
+public sealed record ProductConnection(List<ProductItem> Nodes);
+
+public sealed record ProductsData(ProductConnection Products);
 
 public sealed record CreateProductData(ProductItem CreateProduct);
 
