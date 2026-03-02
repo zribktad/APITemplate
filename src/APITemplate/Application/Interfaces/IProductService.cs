@@ -6,7 +6,7 @@ public interface IProductService
 {
     Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default);
 
-    Task<IReadOnlyList<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default);
+    Task<PagedResponse<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default);
 
     Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct = default);
 

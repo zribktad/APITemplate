@@ -4,9 +4,9 @@ using APITemplate.Domain.Entities;
 
 namespace APITemplate.Application.Specifications;
 
-public sealed class ProductSpecification : Specification<Product, ProductResponse>
+public sealed class ProductCountSpecification : Specification<Product>
 {
-    public ProductSpecification(ProductFilter filter)
+    public ProductCountSpecification(ProductFilter filter)
     {
         if (!string.IsNullOrWhiteSpace(filter.Name))
             Query.Where(p => p.Name.Contains(filter.Name));
@@ -25,11 +25,5 @@ public sealed class ProductSpecification : Specification<Product, ProductRespons
 
         if (filter.CreatedTo.HasValue)
             Query.Where(p => p.CreatedAt <= filter.CreatedTo.Value);
-
-        Query.OrderByDescending(p => p.CreatedAt)
-             .Select(p => new ProductResponse(p.Id, p.Name, p.Description, p.Price, p.CreatedAt));
-
-        Query.Skip((filter.PageNumber - 1) * filter.PageSize)
-             .Take(filter.PageSize);
     }
 }

@@ -149,8 +149,13 @@ public class ProductServiceTests
             .Setup(r => r.ListAsync(It.IsAny<Ardalis.Specification.ISpecification<Product, ProductResponse>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(responses);
 
+        _repositoryMock
+            .Setup(r => r.CountAsync(It.IsAny<Ardalis.Specification.ISpecification<Product>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
         var result = await _sut.GetAllAsync(new ProductFilter());
 
-        result.Count.ShouldBe(2);
+        result.Items.Count().ShouldBe(2);
+        result.TotalCount.ShouldBe(2);
     }
 }

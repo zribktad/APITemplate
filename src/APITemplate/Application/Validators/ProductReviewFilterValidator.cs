@@ -7,6 +7,8 @@ public sealed class ProductReviewFilterValidator : AbstractValidator<ProductRevi
 {
     public ProductReviewFilterValidator()
     {
+        Include(new PaginationFilterValidator());
+
         RuleFor(x => x.MinRating)
             .InclusiveBetween(1, 5).WithMessage("MinRating must be between 1 and 5.")
             .When(x => x.MinRating.HasValue);

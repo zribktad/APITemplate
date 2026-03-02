@@ -6,4 +6,6 @@ public sealed record ProductFilter(
     decimal? MinPrice = null,
     decimal? MaxPrice = null,
     DateTime? CreatedFrom = null,
-    DateTime? CreatedTo = null);
+    DateTime? CreatedTo = null,
+    int PageNumber = 1,
+    int PageSize = 10) : PaginationFilter(PageNumber, PageSize);

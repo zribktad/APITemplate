@@ -7,6 +7,8 @@ public sealed class ProductFilterValidator : AbstractValidator<ProductFilter>
 {
     public ProductFilterValidator()
     {
+        Include(new PaginationFilterValidator());
+
         RuleFor(x => x.MinPrice)
             .GreaterThanOrEqualTo(0).WithMessage("MinPrice must be greater than or equal to zero.")
             .When(x => x.MinPrice.HasValue);

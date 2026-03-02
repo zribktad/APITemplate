@@ -42,9 +42,14 @@ public class ProductReviewServiceTests
             .Setup(r => r.ListAsync(It.IsAny<Ardalis.Specification.ISpecification<ProductReview, ProductReviewResponse>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(responses);
 
+        _reviewRepoMock
+            .Setup(r => r.CountAsync(It.IsAny<Ardalis.Specification.ISpecification<ProductReview>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
         var result = await _sut.GetAllAsync(new ProductReviewFilter());
 
-        result.Count.ShouldBe(2);
+        result.Items.Count().ShouldBe(2);
+        result.TotalCount.ShouldBe(2);
     }
 
     [Fact]

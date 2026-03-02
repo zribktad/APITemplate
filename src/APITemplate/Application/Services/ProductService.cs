@@ -25,8 +25,13 @@ public sealed class ProductService : IProductService
         return product?.ToResponse();
     }
 
-    public async Task<IReadOnlyList<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
-        => await _repository.ListAsync(new ProductSpecification(filter), ct);
+    public async Task<PagedResponse<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
+    {
+        var items = await _repository.ListAsync(new ProductSpecification(filter), ct);
+        var totalCount = await _repository.CountAsync(new ProductCountSpecification(filter), ct);
+
+        return new PagedResponse<ProductResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
+    }
 
     public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {

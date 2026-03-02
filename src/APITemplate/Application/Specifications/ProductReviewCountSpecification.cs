@@ -4,9 +4,9 @@ using APITemplate.Domain.Entities;
 
 namespace APITemplate.Application.Specifications;
 
-public sealed class ProductReviewSpecification : Specification<ProductReview, ProductReviewResponse>
+public sealed class ProductReviewCountSpecification : Specification<ProductReview>
 {
-    public ProductReviewSpecification(ProductReviewFilter filter)
+    public ProductReviewCountSpecification(ProductReviewFilter filter)
     {
         if (filter.ProductId.HasValue)
             Query.Where(r => r.ProductId == filter.ProductId.Value);
@@ -25,11 +25,5 @@ public sealed class ProductReviewSpecification : Specification<ProductReview, Pr
 
         if (filter.CreatedTo.HasValue)
             Query.Where(r => r.CreatedAt <= filter.CreatedTo.Value);
-
-        Query.OrderByDescending(r => r.CreatedAt)
-             .Select(r => new ProductReviewResponse(r.Id, r.ProductId, r.ReviewerName, r.Comment, r.Rating, r.CreatedAt));
-
-        Query.Skip((filter.PageNumber - 1) * filter.PageSize)
-             .Take(filter.PageSize);
     }
 }

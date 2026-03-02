@@ -25,8 +25,13 @@ public sealed class ProductReviewService : IProductReviewService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<IReadOnlyList<ProductReviewResponse>> GetAllAsync(ProductReviewFilter filter, CancellationToken ct = default)
-        => await _reviewRepository.ListAsync(new ProductReviewSpecification(filter), ct);
+    public async Task<PagedResponse<ProductReviewResponse>> GetAllAsync(ProductReviewFilter filter, CancellationToken ct = default)
+    {
+        var items = await _reviewRepository.ListAsync(new ProductReviewSpecification(filter), ct);
+        var totalCount = await _reviewRepository.CountAsync(new ProductReviewCountSpecification(filter), ct);
+
+        return new PagedResponse<ProductReviewResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
+    }
 
     public async Task<IReadOnlyList<ProductReviewResponse>> GetByProductIdAsync(Guid productId, CancellationToken ct = default)
     {

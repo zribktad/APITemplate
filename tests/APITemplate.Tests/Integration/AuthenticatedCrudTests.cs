@@ -37,7 +37,8 @@ public class AuthenticatedCrudTests : IClassFixture<CustomWebApplicationFactory>
         var getAllResponse = await _client.GetAsync("/api/v1/products");
         getAllResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var emptyList = await getAllResponse.Content.ReadFromJsonAsync<JsonElement[]>(JsonOptions);
+        var pagedEmpty = await getAllResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var emptyList = pagedEmpty.GetProperty("items").EnumerateArray().ToArray();
         emptyList.ShouldBeEmpty();
 
         // 3. Create product
@@ -103,10 +104,11 @@ public class AuthenticatedCrudTests : IClassFixture<CustomWebApplicationFactory>
             new { Name = "Product B", Price = 20.0 });
 
         var response = await _client.GetAsync("/api/v1/products");
-        var products = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOptions);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var products = pagedResponse.GetProperty("items").EnumerateArray().ToArray();
 
         products.ShouldNotBeNull();
-        products!.Length.ShouldBeGreaterThanOrEqualTo(2);
+        products.Length.ShouldBeGreaterThanOrEqualTo(2);
     }
 
     private async Task AuthenticateAsync()

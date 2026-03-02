@@ -6,4 +6,6 @@ public sealed record ProductReviewFilter(
     int? MinRating = null,
     int? MaxRating = null,
     DateTime? CreatedFrom = null,
-    DateTime? CreatedTo = null);
+    DateTime? CreatedTo = null,
+    int PageNumber = 1,
+    int PageSize = 10) : PaginationFilter(PageNumber, PageSize);
