@@ -43,22 +43,28 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {
-        var productExists = await _productRepository.GetByIdAsync(request.ProductId, ct) is not null;
-        if (!productExists)
-            throw new NotFoundException(nameof(Product), request.ProductId);
+        ProductReview review = null!;
 
-        var review = new ProductReview
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            Id = Guid.NewGuid(),
-            ProductId = request.ProductId,
-            ReviewerName = request.ReviewerName,
-            Comment = request.Comment,
-            Rating = request.Rating,
-            CreatedAt = DateTime.UtcNow
-        };
+            var productExists = await _productRepository.GetByIdAsync(request.ProductId, ct) is not null;
+            if (!productExists)
+                throw new NotFoundException(nameof(Product), request.ProductId);
 
-        await _reviewRepository.AddAsync(review, ct);
-        await _unitOfWork.CommitAsync(ct);
+            review = new ProductReview
+            {
+                Id = Guid.NewGuid(),
+                ProductId = request.ProductId,
+                ReviewerName = request.ReviewerName,
+                Comment = request.Comment,
+                Rating = request.Rating,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _reviewRepository.AddAsync(review, ct);
+            await _unitOfWork.CommitAsync(ct);
+        }, ct);
+
         return review.ToResponse();
     }
 

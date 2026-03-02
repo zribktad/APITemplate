@@ -111,7 +111,7 @@ public static class ServiceCollectionExtensions
         services.AddMongoMigrations(
             mongoSettings.ConnectionString,
             new MigrationOptions(mongoSettings.DatabaseName),
-            config => config.LoadMigrationsFromExecutingAssembly());
+            config => config.LoadMigrationsFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
 
         services.AddHealthChecks()
             .AddCheck<MongoDbHealthCheck>("mongodb", tags: ["database"]);

@@ -13,4 +13,19 @@ public sealed class UnitOfWork : IUnitOfWork
 
     public Task CommitAsync(CancellationToken ct = default)
         => _dbContext.SaveChangesAsync(ct);
+
+    public async Task ExecuteInTransactionAsync(Func<Task> action, CancellationToken ct = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+        try
+        {
+            await action();
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
 }
