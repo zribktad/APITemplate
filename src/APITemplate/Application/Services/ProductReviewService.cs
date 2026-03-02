@@ -5,7 +5,6 @@ using APITemplate.Application.Specifications;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
-using Microsoft.EntityFrameworkCore;
 
 namespace APITemplate.Application.Services;
 
@@ -34,13 +33,7 @@ public sealed class ProductReviewService : IProductReviewService
     }
 
     public async Task<IReadOnlyList<ProductReviewResponse>> GetByProductIdAsync(Guid productId, CancellationToken ct = default)
-    {
-        return await _reviewRepository.AsQueryable()
-            .Where(r => r.ProductId == productId)
-            .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new ProductReviewResponse(r.Id, r.ProductId, r.ReviewerName, r.Comment, r.Rating, r.CreatedAt))
-            .ToListAsync(ct);
-    }
+        => await _reviewRepository.ListAsync(new ProductReviewByProductIdSpecification(productId), ct);
 
     public async Task<ProductReviewResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
@@ -50,8 +43,7 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {
-        var productExists = await _productRepository.AsQueryable()
-            .AnyAsync(p => p.Id == request.ProductId, ct);
+        var productExists = await _productRepository.GetByIdAsync(request.ProductId, ct) is not null;
         if (!productExists)
             throw new NotFoundException(nameof(Product), request.ProductId);
 

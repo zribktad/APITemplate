@@ -91,13 +91,14 @@ public class ProductReviewServiceTests
     public async Task GetByProductIdAsync_ReturnsReviewsForProduct()
     {
         var productId = Guid.NewGuid();
-        var reviews = new List<ProductReview>
+        var responses = new List<ProductReviewResponse>
         {
-            new() { Id = Guid.NewGuid(), ProductId = productId, ReviewerName = "Alice", Rating = 5, CreatedAt = DateTime.UtcNow }
+            new(Guid.NewGuid(), productId, "Alice", null, 5, DateTime.UtcNow)
         };
 
-        var mockQueryable = reviews.BuildMock();
-        _reviewRepoMock.Setup(r => r.AsQueryable()).Returns(mockQueryable);
+        _reviewRepoMock
+            .Setup(r => r.ListAsync(It.IsAny<Ardalis.Specification.ISpecification<ProductReview, ProductReviewResponse>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(responses);
 
         var result = await _sut.GetByProductIdAsync(productId);
 
@@ -112,8 +113,8 @@ public class ProductReviewServiceTests
         var request = new CreateProductReviewRequest(product.Id, "Alice", "Great!", 5);
 
         _productRepoMock
-            .Setup(r => r.AsQueryable())
-            .Returns(new List<Product> { product }.BuildMock());
+            .Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
 
         _reviewRepoMock
             .Setup(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()))
@@ -134,8 +135,8 @@ public class ProductReviewServiceTests
     public async Task CreateAsync_WhenProductNotFound_ThrowsNotFoundException()
     {
         _productRepoMock
-            .Setup(r => r.AsQueryable())
-            .Returns(new List<Product>().BuildMock());
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Product?)null);
 
         var request = new CreateProductReviewRequest(Guid.NewGuid(), "Alice", null, 3);
 
