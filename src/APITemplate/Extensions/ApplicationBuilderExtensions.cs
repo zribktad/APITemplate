@@ -1,7 +1,6 @@
 using APITemplate.Api.Middleware;
-using APITemplate.Infrastructure.Migrations;
 using APITemplate.Infrastructure.Persistence;
-using Microsoft.Extensions.Logging;
+using Kot.MongoDB.Migrations;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -30,8 +29,8 @@ public static class ApplicationBuilderExtensions
         var mongoContext = scope.ServiceProvider.GetService<MongoDbContext>();
         if (mongoContext is not null)
         {
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<MigrationRunner>>();
-            await new MigrationRunner(mongoContext.Database, logger).RunAsync();
+            var migrator = scope.ServiceProvider.GetRequiredService<IMigrator>();
+            await migrator.MigrateAsync();
         }
     }
 

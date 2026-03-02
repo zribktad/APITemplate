@@ -16,7 +16,9 @@
 
   <ItemGroup>
     <!-- MongoDB -->
-    <PackageReference Include="MongoDB.Driver" Version="3.4.0" />
+    <PackageReference Include="Kot.MongoDB.Migrations" Version="3.1.0" />
+    <PackageReference Include="Kot.MongoDB.Migrations.DI" Version="3.1.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.5.2" />
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" Version="9.0.0" />
 
     <!-- OpenAPI + Scalar -->

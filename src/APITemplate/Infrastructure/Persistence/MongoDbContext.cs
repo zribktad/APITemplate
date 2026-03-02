@@ -1,5 +1,6 @@
 using APITemplate.Domain.Entities;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace APITemplate.Infrastructure.Persistence;
@@ -10,12 +11,15 @@ public sealed class MongoDbContext
 
     public MongoDbContext(IOptions<MongoDbSettings> settings)
     {
-        var client = new MongoClient(settings.Value.ConnectionString);
+        var clientSettings = MongoClientSettings.FromConnectionString(settings.Value.ConnectionString);
+        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        var client = new MongoClient(clientSettings);
         _database = client.GetDatabase(settings.Value.DatabaseName);
     }
 
-    public IMongoDatabase Database => _database;
-
     public IMongoCollection<ProductData> ProductData
         => _database.GetCollection<ProductData>("product_data");
+
+    public Task PingAsync(CancellationToken cancellationToken = default)
+        => _database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 }

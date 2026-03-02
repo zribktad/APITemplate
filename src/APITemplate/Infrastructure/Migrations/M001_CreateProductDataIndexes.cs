@@ -1,4 +1,5 @@
 using APITemplate.Domain.Entities;
+using Kot.MongoDB.Migrations;
 using MongoDB.Driver;
 
 namespace APITemplate.Infrastructure.Migrations;
@@ -8,14 +9,13 @@ namespace APITemplate.Infrastructure.Migrations;
 ///   - idx_type    : ascending on _t (discriminator) — speeds up ?type=image|video filter
 ///   - idx_created : descending on CreatedAt — speeds up time-based ordering
 /// </summary>
-public sealed class M001_CreateProductDataIndexes : IMigration
+public sealed class M001_CreateProductDataIndexes : MongoMigration
 {
-    public int Version => 1;
-    public string Description => "Create indexes on product_data collection";
+    public M001_CreateProductDataIndexes() : base("1.0.0") { }
 
-    public async Task UpAsync(IMongoDatabase database, CancellationToken ct = default)
+    public override async Task UpAsync(IMongoDatabase db, IClientSessionHandle session, CancellationToken ct)
     {
-        var collection = database.GetCollection<ProductData>("product_data");
+        var collection = db.GetCollection<ProductData>("product_data");
 
         var indexes = new[]
         {
@@ -29,5 +29,11 @@ public sealed class M001_CreateProductDataIndexes : IMigration
         };
 
         await collection.Indexes.CreateManyAsync(indexes, ct);
+    }
+
+    public override Task DownAsync(IMongoDatabase db, IClientSessionHandle session, CancellationToken ct)
+    {
+        var collection = db.GetCollection<ProductData>("product_data");
+        return collection.Indexes.DropAllAsync(ct);
     }
 }

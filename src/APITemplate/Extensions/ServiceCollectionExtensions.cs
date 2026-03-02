@@ -3,6 +3,7 @@ using APITemplate.Application.Interfaces;
 using APITemplate.Application.Services;
 using APITemplate.Application.Validators;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Infrastructure.Health;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Repositories;
 using APITemplate.Infrastructure.StoredProcedures;
@@ -12,8 +13,8 @@ using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+using Kot.MongoDB.Migrations;
+using Kot.MongoDB.Migrations.DI;
 
 namespace APITemplate.Extensions;
 
@@ -100,16 +101,20 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMongoDB(
         this IServiceCollection services, IConfiguration configuration)
     {
+        var mongoSettings = configuration.GetSection("MongoDB").Get<MongoDbSettings>()!;
+
         services.Configure<MongoDbSettings>(configuration.GetSection("MongoDB"));
         services.AddSingleton<MongoDbContext>();
         services.AddScoped<IProductDataRepository, ProductDataRepository>();
         services.AddScoped<IProductDataService, ProductDataService>();
 
+        services.AddMongoMigrations(
+            mongoSettings.ConnectionString,
+            new MigrationOptions(mongoSettings.DatabaseName),
+            config => config.LoadMigrationsFromExecutingAssembly());
+
         services.AddHealthChecks()
-            .AddMongoDb(
-                sp => new MongoClient(sp.GetRequiredService<IOptions<MongoDbSettings>>().Value.ConnectionString),
-                name: "mongodb",
-                tags: ["database"]);
+            .AddCheck<MongoDbHealthCheck>("mongodb", tags: ["database"]);
 
         return services;
     }
