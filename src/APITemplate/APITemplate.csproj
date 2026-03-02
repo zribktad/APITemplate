@@ -7,8 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- SQL function scripts — compiled into the assembly as embedded resources.
-         Applied idempotently at startup by DatabaseFunctionBootstrapper. -->
     <EmbeddedResource Include="Infrastructure\Database\Functions\*.sql" />
   </ItemGroup>
 

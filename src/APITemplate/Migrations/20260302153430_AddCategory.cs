@@ -1,4 +1,5 @@
 using System;
+using APITemplate.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -78,11 +79,15 @@ namespace APITemplate.Migrations
                 name: "IX_Products_CategoryId",
                 table: "Products",
                 column: "CategoryId");
+
+            migrationBuilder.Sql(SqlResource.Load("get_product_category_stats.sql"));
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS get_product_category_stats(UUID);");
+
             migrationBuilder.DropTable(name: "ProductReviews");
             migrationBuilder.DropTable(name: "Products");
             migrationBuilder.DropTable(name: "Categories");
