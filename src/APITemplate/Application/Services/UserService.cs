@@ -1,5 +1,4 @@
 using APITemplate.Application.Interfaces;
-using Microsoft.Extensions.Configuration;
 
 namespace APITemplate.Application.Services;
 

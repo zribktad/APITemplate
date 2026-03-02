@@ -1,6 +1,5 @@
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
-using HotChocolate.Types;
 
 namespace APITemplate.Api.GraphQL.Queries;
 

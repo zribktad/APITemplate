@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Text;
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Interfaces;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace APITemplate.Application.Services;

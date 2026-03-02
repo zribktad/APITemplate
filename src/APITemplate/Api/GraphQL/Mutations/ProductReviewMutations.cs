@@ -1,7 +1,6 @@
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Interfaces;
 using HotChocolate.Authorization;
-using HotChocolate.Types;
 
 namespace APITemplate.Api.GraphQL.Mutations;
 

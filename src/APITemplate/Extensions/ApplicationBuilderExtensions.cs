@@ -2,7 +2,6 @@ using APITemplate.Api.Middleware;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
 using System.Text.Json;

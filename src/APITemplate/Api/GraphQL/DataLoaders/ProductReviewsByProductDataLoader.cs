@@ -1,6 +1,5 @@
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
-using GreenDonut;
 using Microsoft.EntityFrameworkCore;
 
 namespace APITemplate.Api.GraphQL.DataLoaders;

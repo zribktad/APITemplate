@@ -1,4 +1,3 @@
-using System;
 using APITemplate.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore.Migrations;
 
