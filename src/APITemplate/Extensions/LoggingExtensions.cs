@@ -21,6 +21,8 @@ public static class LoggingExtensions
 
         builder.Services.AddRedaction(redactionBuilder =>
         {
+            redactionBuilder.SetRedactor<ErasingRedactor>(LogDataClassifications.Personal);
+
 #pragma warning disable EXTEXP0002 // HMAC redactor API is experimental in current package line.
             redactionBuilder.SetHmacRedactor(
                 options =>
@@ -28,7 +30,6 @@ public static class LoggingExtensions
                     options.KeyId = redactionOptions.KeyId;
                     options.Key = hmacKey;
                 },
-                new DataClassificationSet(LogDataClassifications.Personal),
                 new DataClassificationSet(LogDataClassifications.Sensitive));
 #pragma warning restore EXTEXP0002
 
