@@ -31,14 +31,6 @@ public sealed class ProductSpecification : Specification<ProductEntity, ProductR
                 if (desc) query.OrderByDescending(p => p.Price);
                 else query.OrderBy(p => p.Price);
                 break;
-            case "createdat":
-            case "created_at":
-            case "created":
-            case null:
-            case "":
-                if (desc) query.OrderByDescending(p => p.CreatedAt);
-                else query.OrderBy(p => p.CreatedAt);
-                break;
             default:
                 if (desc) query.OrderByDescending(p => p.CreatedAt);
                 else query.OrderBy(p => p.CreatedAt);

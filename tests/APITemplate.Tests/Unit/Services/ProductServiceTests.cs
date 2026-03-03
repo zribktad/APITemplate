@@ -11,14 +11,16 @@ namespace APITemplate.Tests.Unit.Services;
 public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
+    private readonly Mock<IProductQueryService> _queryServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly ProductService _sut;
 
     public ProductServiceTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
+        _queryServiceMock = new Mock<IProductQueryService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _sut = new ProductService(_repositoryMock.Object, _unitOfWorkMock.Object);
+        _sut = new ProductService(_repositoryMock.Object, _queryServiceMock.Object, _unitOfWorkMock.Object);
     }
 
     [Fact]
@@ -33,9 +35,10 @@ public class ProductServiceTests
             CreatedAt = DateTime.UtcNow
         };
 
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(product);
+        var response = new ProductResponse(product.Id, product.Name, product.Description, product.Price, product.CreatedAt);
+        _queryServiceMock
+            .Setup(q => q.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
 
         var result = await _sut.GetByIdAsync(product.Id);
 
@@ -47,9 +50,9 @@ public class ProductServiceTests
     [Fact]
     public async Task GetByIdAsync_WhenProductDoesNotExist_ReturnsNull()
     {
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Product?)null);
+        _queryServiceMock
+            .Setup(q => q.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductResponse?)null);
 
         var result = await _sut.GetByIdAsync(Guid.NewGuid());
 
@@ -133,23 +136,15 @@ public class ProductServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllProducts()
     {
-        var products = new List<Product>
+        var responses = new List<ProductResponse>
         {
-            new() { Id = Guid.NewGuid(), Name = "Product 1", Price = 10m, CreatedAt = DateTime.UtcNow },
-            new() { Id = Guid.NewGuid(), Name = "Product 2", Price = 20m, CreatedAt = DateTime.UtcNow }
+            new(Guid.NewGuid(), "Product 1", null, 10m, DateTime.UtcNow),
+            new(Guid.NewGuid(), "Product 2", null, 20m, DateTime.UtcNow)
         };
 
-        var responses = products
-            .Select(p => new ProductResponse(p.Id, p.Name, p.Description, p.Price, p.CreatedAt))
-            .ToList();
-
-        _repositoryMock
-            .Setup(r => r.ListAsync(It.IsAny<Ardalis.Specification.ISpecification<Product, ProductResponse>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(responses);
-
-        _repositoryMock
-            .Setup(r => r.CountAsync(It.IsAny<Ardalis.Specification.ISpecification<Product>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(2);
+        _queryServiceMock
+            .Setup(q => q.GetPagedAsync(It.IsAny<ProductFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedResponse<ProductResponse>(responses, 2, 1, 10));
 
         var result = await _sut.GetAllAsync(new ProductFilter());
 

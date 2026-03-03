@@ -33,14 +33,6 @@ public sealed class ProductReviewSpecification : Specification<ProductReviewEnti
                 if (desc) query.OrderByDescending(r => r.ReviewerName);
                 else query.OrderBy(r => r.ReviewerName);
                 break;
-            case "createdat":
-            case "created_at":
-            case "created":
-            case null:
-            case "":
-                if (desc) query.OrderByDescending(r => r.CreatedAt);
-                else query.OrderBy(r => r.CreatedAt);
-                break;
             default:
                 if (desc) query.OrderByDescending(r => r.CreatedAt);
                 else query.OrderBy(r => r.CreatedAt);

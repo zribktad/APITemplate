@@ -1,5 +1,4 @@
 using APITemplate.Application.Features.Product.Mappings;
-using APITemplate.Application.Features.Product.Specifications;
 using ProductEntity = APITemplate.Domain.Entities.Product;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -8,27 +7,24 @@ namespace APITemplate.Application.Features.Product.Services;
 public sealed class ProductService : IProductService
 {
     private readonly IProductRepository _repository;
+    private readonly IProductQueryService _queryService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public ProductService(IProductRepository repository, IUnitOfWork unitOfWork)
+    public ProductService(
+        IProductRepository repository,
+        IProductQueryService queryService,
+        IUnitOfWork unitOfWork)
     {
         _repository = repository;
+        _queryService = queryService;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
-    {
-        var product = await _repository.GetByIdAsync(id, ct);
-        return product?.ToResponse();
-    }
+    public Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => _queryService.GetByIdAsync(id, ct);
 
-    public async Task<PagedResponse<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
-    {
-        var items = await _repository.ListAsync(new ProductSpecification(filter), ct);
-        var totalCount = await _repository.CountAsync(new ProductCountSpecification(filter), ct);
-
-        return new PagedResponse<ProductResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
-    }
+    public Task<PagedResponse<ProductResponse>> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
+        => _queryService.GetPagedAsync(filter, ct);
 
     public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
