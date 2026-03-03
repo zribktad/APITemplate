@@ -19,7 +19,7 @@ SQL function (.sql file, embedded resource)
   → Controller action (Api/Controllers/V1/)
 ```
 
-The `StoredProcedureExecutor` uses `DbContext.Set<T>().FromSql(procedure.ToSql())` which automatically **parameterises** all interpolated values — SQL injection is not possible.
+The `StoredProcedureExecutor` uses `DbContext.Set<T>().FromSql(procedure.ToSql())`, which automatically **parameterises** all interpolated values to help prevent SQL injection. Avoid concatenating raw SQL fragments or identifiers into the command text; always use the provided APIs and interpolation only for values.
 
 ---
 
