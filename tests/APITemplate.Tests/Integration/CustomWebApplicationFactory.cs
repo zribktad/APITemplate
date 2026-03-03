@@ -28,7 +28,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:Audience"] = "TestAudience",
                 ["Jwt:ExpirationMinutes"] = "60",
                 ["Auth:Username"] = "admin",
-                ["Auth:Password"] = "admin"
+                ["Auth:Password"] = "admin",
+                ["Cors:AllowedOrigins:0"] = "http://localhost:3000"
             });
         });
 
