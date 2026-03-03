@@ -1,4 +1,5 @@
 using APITemplate.Application.DTOs;
+using APITemplate.Application.Errors;
 using APITemplate.Application.Interfaces;
 using APITemplate.Application.Mappings;
 using APITemplate.Application.Specifications;
@@ -49,7 +50,7 @@ public sealed class ProductReviewService : IProductReviewService
         {
             var productExists = await _productRepository.GetByIdAsync(request.ProductId, ct) is not null;
             if (!productExists)
-                throw new NotFoundException(nameof(Product), request.ProductId);
+                throw new NotFoundException(nameof(Product), request.ProductId, ErrorCatalog.Reviews.ProductNotFoundForReview);
 
             review = new ProductReview
             {

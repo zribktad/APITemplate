@@ -1,0 +1,34 @@
+namespace APITemplate.Application.Errors;
+
+public static class ErrorCatalog
+{
+    public static class General
+    {
+        public const string Unknown = "GEN-0001";
+        public const string ValidationFailed = "GEN-0400";
+        public const string NotFound = "GEN-0404";
+        public const string Conflict = "GEN-0409";
+    }
+
+    public static class Auth
+    {
+        public const string InvalidCredentials = "AUTH-0401";
+        public const string Forbidden = "AUTH-0403";
+    }
+
+    public static class Products
+    {
+        public const string NotFound = "PRD-0404";
+    }
+
+    public static class Categories
+    {
+        public const string NotFound = "CAT-0404";
+    }
+
+    public static class Reviews
+    {
+        public const string ProductNotFoundForReview = "REV-2101";
+        public const string ReviewNotFound = "REV-0404";
+    }
+}

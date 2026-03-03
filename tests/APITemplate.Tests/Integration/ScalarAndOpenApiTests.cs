@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Shouldly;
 using Xunit;
 
@@ -23,6 +24,32 @@ public class ScalarAndOpenApiTests : IClassFixture<CustomWebApplicationFactory>
         var content = await response.Content.ReadAsStringAsync();
         content.ShouldContain("openapi");
         content.ShouldContain("paths");
+        content.ShouldContain("ApiProblemDetails");
+        content.ShouldContain("application/problem+json");
+    }
+
+    [Fact]
+    public async Task OpenApi_ContainsGlobalErrorResponsesForRestEndpoints()
+    {
+        var response = await _client.GetAsync("/openapi/v1.json");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+
+        var paths = doc.RootElement.GetProperty("paths");
+        var productReviewsPath = paths.EnumerateObject()
+            .FirstOrDefault(p => p.Name.Contains("productreviews", StringComparison.OrdinalIgnoreCase))
+            .Value;
+
+        productReviewsPath.ValueKind.ShouldBe(JsonValueKind.Object);
+
+        var productReviewsPost = productReviewsPath.GetProperty("post");
+        var responses = productReviewsPost.GetProperty("responses");
+
+        responses.TryGetProperty("400", out _).ShouldBeTrue();
+        responses.TryGetProperty("404", out _).ShouldBeTrue();
+        responses.TryGetProperty("500", out _).ShouldBeTrue();
     }
 
     [Fact]

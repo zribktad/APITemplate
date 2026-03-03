@@ -1,4 +1,5 @@
 using APITemplate.Application.DTOs;
+using APITemplate.Application.Errors;
 using APITemplate.Application.Interfaces;
 using APITemplate.Application.Mappings;
 using APITemplate.Domain.Entities;
@@ -48,7 +49,7 @@ public sealed class CategoryService : ICategoryService
     public async Task UpdateAsync(Guid id, UpdateCategoryRequest request, CancellationToken ct = default)
     {
         var category = await _repository.GetByIdAsync(id, ct)
-            ?? throw new NotFoundException(nameof(Category), id);
+            ?? throw new NotFoundException(nameof(Category), id, ErrorCatalog.Categories.NotFound);
 
         category.Name = request.Name;
         category.Description = request.Description;

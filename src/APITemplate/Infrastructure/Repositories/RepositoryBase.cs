@@ -1,3 +1,4 @@
+using APITemplate.Application.Errors;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;
@@ -40,7 +41,7 @@ public abstract class RepositoryBase<T>
     public virtual async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var entity = await GetByIdAsync(id, ct)
-            ?? throw new NotFoundException(typeof(T).Name, id);
+            ?? throw new NotFoundException(typeof(T).Name, id, ErrorCatalog.General.NotFound);
         DbContext.Set<T>().Remove(entity);
     }
 }

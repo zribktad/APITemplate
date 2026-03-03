@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using APITemplate.Application.Errors;
 using Shouldly;
 using Xunit;
 
@@ -93,6 +94,18 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
             new { ProductId = Guid.NewGuid(), ReviewerName = "Alice", Rating = 3 });
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("status").GetInt32().ShouldBe((int)HttpStatusCode.NotFound);
+        problem.GetProperty("title").GetString().ShouldBe("Not Found");
+        var detail = problem.GetProperty("detail").GetString();
+        detail.ShouldNotBeNullOrWhiteSpace();
+        detail.ShouldContain("Product with id");
+        detail.ShouldContain("not found");
+        problem.GetProperty("errorCode").GetString().ShouldBe(ErrorCatalog.Reviews.ProductNotFoundForReview);
+        problem.GetProperty("type").GetString().ShouldBe($"https://api-template.local/errors/{ErrorCatalog.Reviews.ProductNotFoundForReview}");
+        problem.GetProperty("traceId").GetString().ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]

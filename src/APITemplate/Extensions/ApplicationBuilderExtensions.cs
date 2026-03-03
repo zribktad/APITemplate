@@ -1,5 +1,5 @@
-using APITemplate.Api.Middleware;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Api.Middleware;
 using Kot.MongoDB.Migrations;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -11,33 +11,48 @@ namespace APITemplate.Extensions;
 
 public static class ApplicationBuilderExtensions
 {
-    /// <summary>
-    /// Applies all pending EF Core migrations at startup.
-    /// Tables, indexes, and stored procedures are all versioned in migrations —
-    /// a single call brings the database fully up to date.
-    /// </summary>
     public static async Task UseDatabaseAsync(this WebApplication app)
     {
-        await using var scope = app.Services.CreateAsyncScope();
+        await using var scope = app.Services.CreateAsyncScope(); // Resolve scoped infra services needed only during startup migration.
 
-        // PostgreSQL — InMemory provider (used in tests) does not support migrations, skip.
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>(); // Resolve EF Core context for relational migrations.
         if (dbContext.Database.IsRelational())
-            await dbContext.Database.MigrateAsync();
+            await dbContext.Database.MigrateAsync(); // Run pending relational migrations.
 
-        // MongoDB — MongoDbContext is removed in tests, GetService returns null, skip.
-        var mongoContext = scope.ServiceProvider.GetService<MongoDbContext>();
+        var mongoContext = scope.ServiceProvider.GetService<MongoDbContext>(); // Mongo context can be missing in tests.
         if (mongoContext is not null)
         {
-            var migrator = scope.ServiceProvider.GetRequiredService<IMigrator>();
-            await migrator.MigrateAsync();
+            var migrator = scope.ServiceProvider.GetRequiredService<IMigrator>(); // Resolve Mongo migrator from DI.
+            await migrator.MigrateAsync(); // Run pending Mongo migrations.
         }
     }
 
     public static WebApplication UseCustomMiddleware(this WebApplication app)
     {
-        app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
-        app.UseSerilogRequestLogging();
+        app.UseMiddleware<RequestContextMiddleware>(); // Add correlation/trace headers and request timing context.
+        app.UseSerilogRequestLogging(); // Add structured request logging for each HTTP request/response.
+
+        return app;
+    }
+
+    public static WebApplication UseApiPipeline(this WebApplication app)
+    {
+        app.UseExceptionHandler(); // Enable centralized REST exception handling with ProblemDetails output.
+        app.UseCustomMiddleware(); // Add project-specific cross-cutting middleware stack.
+        app.UseApiDocumentation(); // Expose OpenAPI/Scalar only in development.
+        app.UseHttpsRedirection(); // Redirect HTTP requests to HTTPS.
+        app.UseAuthentication(); // Authenticate principal from JWT/token.
+        app.UseAuthorization(); // Enforce authorization policies/attributes.
+
+        return app;
+    }
+
+    public static WebApplication MapApplicationEndpoints(this WebApplication app)
+    {
+        app.MapControllers(); // Map versioned REST controllers.
+        app.MapGraphQL(); // Map GraphQL endpoint.
+        app.MapNitroApp("/graphql/ui"); // Map GraphQL UI (Nitro).
+        app.UseHealthChecks(); // Map health endpoint with custom JSON response.
 
         return app;
     }
@@ -45,9 +60,9 @@ public static class ApplicationBuilderExtensions
     public static WebApplication UseApiDocumentation(this WebApplication app)
     {
         if (!app.Environment.IsDevelopment())
-            return app;
+            return app; // Keep interactive API docs available only in development.
 
-        app.MapOpenApi();
+        app.MapOpenApi(); // Map OpenAPI JSON endpoint.
         app.MapScalarApiReference("/scalar", options =>
         {
             options.WithTitle("APITemplate")
