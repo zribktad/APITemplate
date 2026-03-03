@@ -18,7 +18,7 @@ A scalable, clean, and modern template designed to jumpstart **.NET 10** Web API
     *   **Cross-Cutting Concerns:** Unified configuration via `Serilog` (Logging) and fully centralized Global Exception Management (`GlobalExceptionHandlerMiddleware`).
     *   **Authentication:** Pre-configured JWT secure endpoint access.
     *   **Observability:** Health Checks (`/health`) natively tracking both PostgreSQL and MongoDB state.
-*   **Robust Testing Engine:** Provides isolated internal `Integration` tests using test containers or `UseInMemoryDatabase` combined flawlessly with WebApplicationFactory.
+*   **Robust Testing Engine:** Provides isolated internal `Integration` tests using `UseInMemoryDatabase` combined with `WebApplicationFactory`, plus a comprehensive `Unit` test suite.
 
 ---
 
@@ -98,12 +98,22 @@ This class diagram models the aggregate roots and entities located natively with
 
 ```mermaid
 classDiagram
+    class Category {
+        +Guid Id
+        +string Name
+        +string? Description
+        +DateTime CreatedAt
+        +ICollection~Product~ Products
+    }
+
     class Product {
         +Guid Id
         +string Name
-        +string Description
+        +string? Description
         +decimal Price
         +DateTime CreatedAt
+        +Guid? CategoryId
+        +Category? Category
         +ICollection~ProductReview~ Reviews
     }
 
@@ -139,6 +149,7 @@ classDiagram
         +long FileSizeBytes
     }
 
+    Category "0..1" o-- "0..*" Product : categorises
     Product "1" *-- "0..*" ProductReview : owns
     ProductData <|-- ImageProductData : discriminator image
     ProductData <|-- VideoProductData : discriminator video
@@ -174,6 +185,87 @@ tests/APITemplate.Tests/
 ├── Integration/      # End-to-End API endpoint testing bridging a real/in-memory DB via WebApplicationFactory
 └── Unit/             # Isolated internal service logic tests
 ```
+
+---
+
+## 🌐 REST API Reference
+
+All versioned REST resource endpoints sit under the base path `api/v{version}`. JWT `Authorization: Bearer <token>` is required for these versioned API routes (except `POST /api/v1/Auth/login`), while utility endpoints such as `/health` and `/graphql/ui` are anonymous and `/scalar` is only mapped in Development.
+
+### Auth
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `POST` | `/api/v1/Auth/login` | ❌ | Exchange credentials for a JWT token |
+
+### Products
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `GET` | `/api/v1/Products` | ✅ | List products with filtering, sorting & paging |
+| `GET` | `/api/v1/Products/{id}` | ✅ | Get a single product by GUID |
+| `POST` | `/api/v1/Products` | ✅ | Create a new product |
+| `PUT` | `/api/v1/Products/{id}` | ✅ | Update an existing product |
+| `DELETE` | `/api/v1/Products/{id}` | ✅ | Delete a product |
+
+### Categories
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `GET` | `/api/v1/Categories` | ✅ | List all categories |
+| `GET` | `/api/v1/Categories/{id}` | ✅ | Get a category by GUID |
+| `POST` | `/api/v1/Categories` | ✅ | Create a new category |
+| `PUT` | `/api/v1/Categories/{id}` | ✅ | Update a category |
+| `DELETE` | `/api/v1/Categories/{id}` | ✅ | Delete a category |
+| `GET` | `/api/v1/Categories/{id}/stats` | ✅ | Aggregated stats via stored procedure |
+
+### Product Reviews
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `GET` | `/api/v1/ProductReviews` | ✅ | List reviews with filtering & paging |
+| `GET` | `/api/v1/ProductReviews/{id}` | ✅ | Get a review by GUID |
+| `GET` | `/api/v1/ProductReviews/by-product/{productId}` | ✅ | All reviews for a given product |
+| `POST` | `/api/v1/ProductReviews` | ✅ | Create a new review |
+| `DELETE` | `/api/v1/ProductReviews/{id}` | ✅ | Delete a review |
+
+### Product Data (MongoDB)
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `GET` | `/api/v1/product-data` | ✅ | List all or filter by `type` (image/video) |
+| `GET` | `/api/v1/product-data/{id}` | ✅ | Get by MongoDB ObjectId |
+| `POST` | `/api/v1/product-data/image` | ✅ | Create image media metadata |
+| `POST` | `/api/v1/product-data/video` | ✅ | Create video media metadata |
+| `DELETE` | `/api/v1/product-data/{id}` | ✅ | Delete by MongoDB ObjectId |
+
+### Utility
+
+| Method | Path | Auth Required | Description |
+|--------|------|:---:|-------------|
+| `GET` | `/health` | ❌ | JSON health status for PostgreSQL & MongoDB |
+| `GET` | `/scalar` | ❌ | Interactive Scalar OpenAPI UI (**Development only** — disabled in Production) |
+| `GET` | `/graphql/ui` | ❌ | HotChocolate Nitro GraphQL IDE |
+
+---
+
+## ⚙️ Configuration Reference
+
+All configuration lives in `appsettings.json` (production defaults) and is overridden by `appsettings.Development.json` locally or by environment variables at runtime.
+
+| Key | Example Value | Description |
+|-----|--------------|-------------|
+| `ConnectionStrings:DefaultConnection` | `Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres` | PostgreSQL connection string |
+| `MongoDB:ConnectionString` | `mongodb://localhost:27017` | MongoDB connection string |
+| `MongoDB:DatabaseName` | `apitemplate` | MongoDB database name |
+| `Jwt:Secret` | *(recommended minimum 32 characters / 256 bits)* | HMAC-SHA256 signing key — **never commit a real secret** |
+| `Jwt:Issuer` | `APITemplate` | JWT `iss` claim value |
+| `Jwt:Audience` | `APITemplate.Clients` | JWT `aud` claim value |
+| `Jwt:ExpirationMinutes` | `60` | Token lifetime in minutes |
+| `Auth:Username` | `admin` | Hard-coded dev username (Development only) |
+| `Auth:Password` | `admin` | Hard-coded dev password (Development only) |
+
+> **Security note:** `Jwt:Secret` must be supplied via an environment variable or secret manager in production — never from a committed config file.
 
 ---
 
@@ -228,6 +320,148 @@ mutation {
   }
 }
 ```
+
+---
+
+## 🏆 Design Patterns & Best Practices
+
+This template deliberately applies a number of industry-accepted patterns. Understanding *why* each pattern is used helps when extending the solution.
+
+### 1 — Repository Pattern
+
+Every data-store interaction is hidden behind a typed interface defined in `Domain/Interfaces/`. Application services depend only on `IProductRepository`, `ICategoryRepository`, etc., while controllers depend on those services — never directly on `AppDbContext` or `IMongoCollection<T>` .
+
+**Benefits:**
+- Database provider can be swapped without touching business logic.
+- Repositories can be replaced with in-memory fakes or Moq mocks in tests.
+
+### 2 — Unit of Work Pattern
+
+`IUnitOfWork` (implemented by `UnitOfWork`) groups multiple repository writes into a single atomic `SaveChanges` call. It also exposes `ExecuteInTransactionAsync` for multi-step mutations that must succeed or roll back together.
+
+```csharp
+// Wraps two repository writes in a single database transaction
+await _unitOfWork.ExecuteInTransactionAsync(async () =>
+{
+    await _productRepository.AddAsync(product);
+    await _reviewRepository.AddAsync(review);
+});
+// Both rows committed or both rolled back
+```
+
+### 3 — Specification Pattern (Ardalis.Specification)
+
+Query logic — filtering, ordering, pagination — lives in reusable `Specification<T, TResult>` classes rather than being scattered across services or repositories. A single `ProductSpecification` encapsulates all product-list query rules.
+
+```csharp
+// Application/Specifications/ProductSpecification.cs
+public sealed class ProductSpecification : Specification<Product, ProductResponse>
+{
+    public ProductSpecification(ProductFilter filter)
+    {
+        ProductFilterCriteria.Apply(Query, filter);   // dynamic WHERE clauses
+        Query.OrderByDescending(p => p.CreatedAt)
+             .Select(p => new ProductResponse(...));  // projection to DTO
+        Query.Skip((filter.PageNumber - 1) * filter.PageSize)
+             .Take(filter.PageSize);
+    }
+}
+```
+
+**Benefits:**
+- Keeps EF Core queries out of service classes.
+- Specifications are independently testable.
+- `ISpecificationEvaluator` (provided by `Ardalis.Specification.EntityFrameworkCore`) translates specs to SQL.
+
+### 4 — FluentValidation with Auto-Validation & Cross-Field Rules
+
+Models are validated automatically by `AddFluentValidationAutoValidation()` before the controller action body executes. Unlike Data Annotations, FluentValidation supports dynamic, cross-field business rules:
+
+```csharp
+// A shared base validator reused by both Create and Update validators
+public abstract class ProductRequestValidatorBase<T> : AbstractValidator<T>
+    where T : IProductRequest
+{
+    protected ProductRequestValidatorBase()
+    {
+        // Cross-field: Description is required only for expensive products
+        RuleFor(x => x.Description)
+            .NotEmpty().WithMessage("Description is required for products priced above 1000.")
+            .When(x => x.Price > 1000);
+    }
+}
+```
+
+Validator classes are auto-discovered via `AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>()` — no manual registration needed.
+
+### 5 — Global Exception Middleware
+
+`GlobalExceptionHandlerMiddleware` sits at the top of the pipeline and converts typed domain exceptions into consistent HTTP responses. This prevents accidental stack-trace leakage and ensures a uniform error shape (`{ "error": "..." }`) across the REST API.
+
+| Exception type | HTTP Status | Logged at |
+|----------------|-------------|-----------|
+| `NotFoundException` | 404 | Warning |
+| `ValidationException` | 400 | Warning |
+| Anything else | 500 | Error |
+
+> GraphQL requests are explicitly bypassed — HotChocolate handles its own error serialisation.
+
+### 6 — API Versioning (URL Segment)
+
+All controllers use URL-segment versioning (`/api/v1/…`) via `Asp.Versioning.Mvc`. The default version is `1.0`; new breaking changes should be introduced as `v2` controllers rather than modifying existing ones.
+
+```csharp
+[ApiVersion(1.0)]
+[Route("api/v{version:apiVersion}/[controller]")]
+public sealed class ProductsController : ControllerBase { ... }
+```
+
+### 7 — GraphQL Security & Performance Guards
+
+HotChocolate is configured with several safeguards:
+
+| Guard | Setting | Purpose |
+|-------|---------|---------|
+| `MaxPageSize` | 100 | Prevents unbounded result sets |
+| `DefaultPageSize` | 20 | Sensible default for clients |
+| `AddMaxExecutionDepthRule(5)` | depth ≤ 5 | Prevents deeply nested query attacks |
+| `AddAuthorization()` | JWT required | Mirrors REST auth on GraphQL endpoints |
+
+### 8 — Automatic Schema Migration at Startup
+
+`UseDatabaseAsync()` runs EF Core migrations and MongoDB migrations automatically on startup. This means a fresh container deployment is fully self-initialising — no manual `dotnet ef database update` step required in production.
+
+```csharp
+// Extensions/ApplicationBuilderExtensions.cs
+await dbContext.Database.MigrateAsync();   // PostgreSQL
+await migrator.MigrateAsync();             // MongoDB (Kot.MongoDB.Migrations)
+```
+
+EF Core migrations are skipped when using the in-memory provider, and MongoDB migrations run only if a `MongoDbContext` is registered (they do not automatically skip when MongoDB is unreachable).
+
+### 9 — Multi-Stage Docker Build
+
+The `Dockerfile` follows Docker's multi-stage build best practice to minimise the final image size:
+
+```
+Stage 1 (build)  — mcr.microsoft.com/dotnet/sdk:10.0   ← includes compiler tools
+Stage 2 (publish) — same SDK, runs dotnet publish -c Release
+Stage 3 (final)  — mcr.microsoft.com/dotnet/aspnet:10.0 ← runtime only, ~60 MB
+```
+
+Only the compiled artefacts from Stage 2 are copied into the slim Stage 3 runtime image.
+
+### 10 — Polyglot Persistence Decision Guide
+
+| Data characteristic | Recommended store |
+|---------------------|------------------|
+| Relational data with foreign keys | PostgreSQL |
+| Fixed, well-defined schema | PostgreSQL |
+| ACID transactions across tables | PostgreSQL |
+| Complex aggregations / reporting | PostgreSQL + stored procedure |
+| Semi-structured or evolving schemas | MongoDB |
+| Polymorphic document hierarchies | MongoDB |
+| Media metadata, logs, audit events | MongoDB |
 
 ---
 
@@ -478,9 +712,38 @@ Because the application encompasses the database (natively via DI) and HTTP cont
 
 The repository maintains an inclusive combination of **Unit Tests** and **Integration Tests** executing over a seamless Test-Host infrastructure.
 
-To run the whole test suite:
+### Test structure
+
+| Folder | Technology | What it tests |
+|--------|-----------|---------------|
+| `tests/APITemplate.Tests/Unit/Services/` | xUnit + Moq | Service business logic in isolation |
+| `tests/APITemplate.Tests/Unit/Repositories/` | xUnit + Moq | Repository filtering/query logic |
+| `tests/APITemplate.Tests/Unit/Validators/` | xUnit + FluentValidation.TestHelper | Validator rules per DTO |
+| `tests/APITemplate.Tests/Unit/Middleware/` | xUnit + Moq | Exception-to-HTTP mapping in `GlobalExceptionHandlerMiddleware` |
+| `tests/APITemplate.Tests/Integration/` | xUnit + `WebApplicationFactory` | Full HTTP round-trips over in-memory database |
+
+### Integration test isolation
+
+`CustomWebApplicationFactory` replaces the Npgsql provider with `UseInMemoryDatabase`, removes `MongoDbContext`, and registers a mocked `IProductDataRepository` so DI validation passes. Each test class gets its own database name (a fresh `Guid`) so tests never share state.
+
+```csharp
+// Each factory instance gets its own isolated in-memory database
+private readonly string _dbName = Guid.NewGuid().ToString();
+services.AddDbContext<AppDbContext>(options =>
+    options.UseInMemoryDatabase(_dbName));
+```
+
+### Running tests
+
 ```bash
+# Run all tests
 dotnet test
+
+# Run only unit tests
+dotnet test --filter "FullyQualifiedName~Unit"
+
+# Run only integration tests
+dotnet test --filter "FullyQualifiedName~Integration"
 ```
 
 ---
