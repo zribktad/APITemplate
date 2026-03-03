@@ -41,6 +41,7 @@ public static class ApplicationBuilderExtensions
         app.UseCustomMiddleware(); // Add project-specific cross-cutting middleware stack.
         app.UseApiDocumentation(); // Expose OpenAPI/Scalar only in development.
         app.UseHttpsRedirection(); // Redirect HTTP requests to HTTPS.
+        app.UseCors(); // Apply global CORS policy before auth middleware responses.
         app.UseAuthentication(); // Authenticate principal from JWT/token.
         app.UseAuthorization(); // Enforce authorization policies/attributes.
 
