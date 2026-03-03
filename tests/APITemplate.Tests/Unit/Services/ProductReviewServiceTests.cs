@@ -21,6 +21,9 @@ public class ProductReviewServiceTests
         _reviewRepoMock = new Mock<IProductReviewRepository>();
         _productRepoMock = new Mock<IProductRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _unitOfWorkMock
+            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<Task> action, CancellationToken _) => action());
         _sut = new ProductReviewService(_reviewRepoMock.Object, _productRepoMock.Object, _unitOfWorkMock.Object);
     }
 
