@@ -437,7 +437,7 @@ await dbContext.Database.MigrateAsync();   // PostgreSQL
 await migrator.MigrateAsync();             // MongoDB (Kot.MongoDB.Migrations)
 ```
 
-Both migrators are guarded so that in-memory test databases and absent MongoDB containers are safely skipped.
+EF Core migrations are skipped when using the in-memory provider, and MongoDB migrations run only if a `MongoDbContext` is registered (they do not automatically skip when MongoDB is unreachable).
 
 ### 9 — Multi-Stage Docker Build
 
