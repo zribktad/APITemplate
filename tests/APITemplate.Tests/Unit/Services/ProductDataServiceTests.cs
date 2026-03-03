@@ -1,5 +1,3 @@
-using APITemplate.Application.DTOs.Requests;
-using APITemplate.Application.Services;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
 using Moq;

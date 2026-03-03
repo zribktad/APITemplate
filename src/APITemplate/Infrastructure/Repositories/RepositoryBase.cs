@@ -1,4 +1,3 @@
-using APITemplate.Application.Errors;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;

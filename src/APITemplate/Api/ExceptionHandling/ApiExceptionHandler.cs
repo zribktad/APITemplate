@@ -1,4 +1,3 @@
-using APITemplate.Application.Errors;
 using APITemplate.Domain.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;

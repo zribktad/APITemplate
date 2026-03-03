@@ -1,8 +1,4 @@
 using System.Text;
-using APITemplate.Application.Interfaces;
-using APITemplate.Application.Options;
-using APITemplate.Application.Services;
-using APITemplate.Application.Validators;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Health;
 using APITemplate.Infrastructure.Persistence;

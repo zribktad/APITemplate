@@ -1,0 +1,26 @@
+using FluentValidation;
+
+namespace APITemplate.Application.Features.Product.Validation;
+public sealed class ProductFilterValidator : AbstractValidator<ProductFilter>
+{
+    public ProductFilterValidator()
+    {
+        Include(new PaginationFilterValidator());
+
+        RuleFor(x => x.MinPrice)
+            .GreaterThanOrEqualTo(0).WithMessage("MinPrice must be greater than or equal to zero.")
+            .When(x => x.MinPrice.HasValue);
+
+        RuleFor(x => x.MaxPrice)
+            .GreaterThanOrEqualTo(0).WithMessage("MaxPrice must be greater than or equal to zero.")
+            .When(x => x.MaxPrice.HasValue);
+
+        RuleFor(x => x.MaxPrice)
+            .GreaterThanOrEqualTo(x => x.MinPrice!.Value).WithMessage("MaxPrice must be greater than or equal to MinPrice.")
+            .When(x => x.MinPrice.HasValue && x.MaxPrice.HasValue);
+
+        RuleFor(x => x.CreatedTo)
+            .GreaterThanOrEqualTo(x => x.CreatedFrom!.Value).WithMessage("CreatedTo must be greater than or equal to CreatedFrom.")
+            .When(x => x.CreatedFrom.HasValue && x.CreatedTo.HasValue);
+    }
+}

@@ -1,6 +1,3 @@
-using APITemplate.Application.DTOs.Requests;
-using APITemplate.Application.DTOs.Responses;
-using APITemplate.Application.Interfaces;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

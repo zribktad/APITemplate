@@ -1,5 +1,3 @@
-using APITemplate.Application.DTOs;
-using APITemplate.Application.Interfaces;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

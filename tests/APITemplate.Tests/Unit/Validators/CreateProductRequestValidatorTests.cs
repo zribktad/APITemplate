@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using APITemplate.Application.DTOs;
-using APITemplate.Application.Validators;
 using Shouldly;
 using Xunit;
 

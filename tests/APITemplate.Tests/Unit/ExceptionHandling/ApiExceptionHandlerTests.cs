@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using APITemplate.Application.Errors;
 using APITemplate.Api.ExceptionHandling;
 using APITemplate.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;

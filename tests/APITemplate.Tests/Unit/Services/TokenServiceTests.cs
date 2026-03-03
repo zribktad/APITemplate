@@ -1,7 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using APITemplate.Application.Options;
-using APITemplate.Application.Services;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;

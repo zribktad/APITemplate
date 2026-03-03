@@ -1,4 +1,3 @@
-using APITemplate.Application.Errors;
 using Microsoft.AspNetCore.Http;
 
 namespace APITemplate.Domain.Exceptions;
