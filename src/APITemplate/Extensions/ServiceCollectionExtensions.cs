@@ -25,27 +25,29 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAuthenticationOptions(
         this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<CorsOptions>(configuration.GetSection("Cors"));
+        services.AddOptions<CorsOptions>()
+            .Bind(configuration.GetSection("Cors"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         var corsOrigins = configuration.GetSection("Cors:AllowedOrigins")
             .Get<string[]>()?
             .Where(origin => !string.IsNullOrWhiteSpace(origin))
             .Select(origin => origin.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? [];
+            .ToArray();
 
-        services.AddCors(options =>
+        if (corsOrigins?.Length > 0)
         {
-            options.AddDefaultPolicy(policy =>
+            services.AddCors(options =>
             {
-                if (corsOrigins.Length > 0)
+                options.AddDefaultPolicy(policy =>
                 {
                     policy.WithOrigins(corsOrigins)
                         .AllowAnyHeader()
                         .AllowAnyMethod();
-                }
+                });
             });
-        });
+        }
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection("Jwt"))
