@@ -1,4 +1,7 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Shouldly;
 using Xunit;
 
@@ -23,6 +26,64 @@ public class ScalarAndOpenApiTests : IClassFixture<CustomWebApplicationFactory>
         var content = await response.Content.ReadAsStringAsync();
         content.ShouldContain("openapi");
         content.ShouldContain("paths");
+        content.ShouldContain("ApiProblemDetails");
+        content.ShouldContain("application/problem+json");
+    }
+
+    [Fact]
+    public async Task OpenApi_ContainsGlobalErrorResponsesForRestEndpoints()
+    {
+        var response = await _client.GetAsync("/openapi/v1.json");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+
+        var paths = doc.RootElement.GetProperty("paths");
+        var productReviewsPath = paths.EnumerateObject()
+            .FirstOrDefault(p => p.Name.Contains("productreviews", StringComparison.OrdinalIgnoreCase))
+            .Value;
+
+        productReviewsPath.ValueKind.ShouldBe(JsonValueKind.Object);
+
+        var productReviewsPost = productReviewsPath.GetProperty("post");
+        var responses = productReviewsPost.GetProperty("responses");
+
+        responses.TryGetProperty(StatusCodes.Status400BadRequest.ToString(), out _).ShouldBeTrue();
+        responses.TryGetProperty(StatusCodes.Status404NotFound.ToString(), out _).ShouldBeTrue();
+        responses.TryGetProperty(StatusCodes.Status500InternalServerError.ToString(), out _).ShouldBeTrue();
+        responses.TryGetProperty(StatusCodes.Status401Unauthorized.ToString(), out _).ShouldBeTrue();
+        responses.TryGetProperty(StatusCodes.Status403Forbidden.ToString(), out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task OpenApi_AllowsCustomProducesResponseTypeForSpecificEndpoint()
+    {
+        var response = await _client.GetAsync("/openapi/v1.json");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+
+        var paths = doc.RootElement.GetProperty("paths");
+        var authPath = paths.EnumerateObject()
+            .FirstOrDefault(p => p.Name.Contains("/auth/login", StringComparison.OrdinalIgnoreCase))
+            .Value;
+
+        authPath.ValueKind.ShouldBe(JsonValueKind.Object);
+        var post = authPath.GetProperty("post");
+        var responses = post.GetProperty("responses");
+        var unauthorized = responses.GetProperty(StatusCodes.Status401Unauthorized.ToString());
+
+        var schemaRef = unauthorized
+            .GetProperty("content")
+            .GetProperty("application/json")
+            .GetProperty("schema")
+            .GetProperty("$ref")
+            .GetString();
+
+        schemaRef.ShouldNotBeNull();
+        schemaRef.ShouldContain("LoginErrorResponse");
     }
 
     [Fact]
@@ -39,9 +100,11 @@ public class ScalarAndOpenApiTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_Endpoint_IsAccessible()
     {
-        var response = await _client.GetAsync("/graphql");
+        var response = await _client.PostAsJsonAsync(
+            "/graphql",
+            new { query = "{ __typename }" });
 
-        // GraphQL endpoint returns 200 with Banana Cake Pop IDE on GET
+        // Verify GraphQL endpoint itself, independent of GET UI redirects/tooling.
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }

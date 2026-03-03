@@ -1,0 +1,90 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build: api",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/APITemplate/APITemplate.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test: run all",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/tests/APITemplate.Tests/APITemplate.Tests.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "docker: db up",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "-d",
+        "postgres",
+        "mongodb"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: db down",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "stop",
+        "postgres",
+        "mongodb"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: app up (full)",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "--build",
+        "-d"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: app down (full)",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "down"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "prepare: debug http",
+      "dependsOn": [
+        "docker: db up",
+        "build: api"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "prepare: debug https",
+      "dependsOn": [
+        "docker: db up",
+        "build: api"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}

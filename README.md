@@ -20,6 +20,7 @@ Step-by-step guides for the most common workflows in this project:
 | [Specifications](doc/specifications.md) | Write reusable EF Core query specifications with Ardalis |
 | [Scalar & GraphQL UI](doc/scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground |
 | [Testing](doc/testing.md) | Write unit tests (services, validators, repositories) and integration tests |
+| [Result Pattern](doc/result-pattern.md) | Guidelines for introducing selective `Result<T>` flow in phase 2 |
 
 ---
 
@@ -36,7 +37,7 @@ Step-by-step guides for the most common workflows in this project:
 *   **Domain Filtering:** Seamless filtering, sorting, and paging powered by `Ardalis.Specification` to decouple query models from infrastructural EF abstractions.
 *   **Enterprise-Grade Utilities:**
     *   **Validation:** Pipelined model validation using `FluentValidation.AspNetCore`.
-    *   **Cross-Cutting Concerns:** Unified configuration via `Serilog` (Logging) and fully centralized Global Exception Management (`GlobalExceptionHandlerMiddleware`).
+    *   **Cross-Cutting Concerns:** Unified configuration via `Serilog` (Logging) and centralized exception handling via `IExceptionHandler` + RFC 7807 `ProblemDetails`.
     *   **Authentication:** Pre-configured JWT secure endpoint access.
     *   **Observability:** Health Checks (`/health`) natively tracking both PostgreSQL and MongoDB state.
 *   **Robust Testing Engine:** Provides isolated internal `Integration` tests using `UseInMemoryDatabase` combined with `WebApplicationFactory`, plus a comprehensive `Unit` test suite.
@@ -415,15 +416,43 @@ public abstract class ProductRequestValidatorBase<T> : AbstractValidator<T>
 
 Validator classes are auto-discovered via `AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>()` — no manual registration needed.
 
-### 5 — Global Exception Middleware
+### 5 — Global Exception Handling (`IExceptionHandler` + ProblemDetails)
 
-`GlobalExceptionHandlerMiddleware` sits at the top of the pipeline and converts typed domain exceptions into consistent HTTP responses. This prevents accidental stack-trace leakage and ensures a uniform error shape (`{ "error": "..." }`) across the REST API.
+`ApiExceptionHandler` sits in the ASP.NET exception pipeline (`UseExceptionHandler`) and converts typed domain exceptions into RFC 7807 `ProblemDetails` responses. The error contract is explicit and stable: each domain exception carries `ErrorCode`, `StatusCode`, and `Title`.
 
 | Exception type | HTTP Status | Logged at |
 |----------------|-------------|-----------|
 | `NotFoundException` | 404 | Warning |
 | `ValidationException` | 400 | Warning |
 | Anything else | 500 | Error |
+
+Response extensions are standardized through `AddProblemDetails(...)` customization:
+- `errorCode` (primary code, e.g. `REV-2101`)
+- `traceId` (request correlation)
+- `metadata` (optional structured details for business errors)
+
+Example payload:
+
+```json
+{
+  "type": "https://api-template.local/errors/REV-2101",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "Product with id '...' not found.",
+  "instance": "/api/v1/productreviews",
+  "traceId": "0HN...",
+  "errorCode": "REV-2101"
+}
+```
+
+Error code catalog (excerpt):
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `GEN-0001` | 500 | Unknown/unhandled server error |
+| `GEN-0400` | 400 | Generic validation failure |
+| `GEN-0404` | 404 | Generic resource not found |
+| `REV-2101` | 404 | Product not found when creating review |
 
 > GraphQL requests are explicitly bypassed — HotChocolate handles its own error serialisation.
 
@@ -740,7 +769,7 @@ The repository maintains an inclusive combination of **Unit Tests** and **Integr
 | `tests/APITemplate.Tests/Unit/Services/` | xUnit + Moq | Service business logic in isolation |
 | `tests/APITemplate.Tests/Unit/Repositories/` | xUnit + Moq | Repository filtering/query logic |
 | `tests/APITemplate.Tests/Unit/Validators/` | xUnit + FluentValidation.TestHelper | Validator rules per DTO |
-| `tests/APITemplate.Tests/Unit/Middleware/` | xUnit + Moq | Exception-to-HTTP mapping in `GlobalExceptionHandlerMiddleware` |
+| `tests/APITemplate.Tests/Unit/ExceptionHandling/` | xUnit + Moq | Explicit `errorCode` mapping and exception-to-HTTP conversion in `ApiExceptionHandler` |
 | `tests/APITemplate.Tests/Integration/` | xUnit + `WebApplicationFactory` | Full HTTP round-trips over in-memory database |
 
 ### Integration test isolation

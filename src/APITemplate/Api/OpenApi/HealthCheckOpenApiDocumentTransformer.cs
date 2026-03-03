@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -17,8 +18,8 @@ public sealed class HealthCheckOpenApiDocumentTransformer : IOpenApiDocumentTran
             Description = "Returns the health status of all registered services.",
             Responses = new OpenApiResponses
             {
-                ["200"] = new OpenApiResponse { Description = "Healthy - all services are running" },
-                ["503"] = new OpenApiResponse { Description = "Unhealthy - one or more services are down" }
+                [StatusCodes.Status200OK.ToString()] = new OpenApiResponse { Description = "Healthy - all services are running" },
+                [StatusCodes.Status503ServiceUnavailable.ToString()] = new OpenApiResponse { Description = "Unhealthy - one or more services are down" }
             }
         });
 

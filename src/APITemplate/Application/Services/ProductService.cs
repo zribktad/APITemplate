@@ -1,4 +1,5 @@
 using APITemplate.Application.DTOs;
+using APITemplate.Application.Errors;
 using APITemplate.Application.Interfaces;
 using APITemplate.Application.Mappings;
 using APITemplate.Application.Specifications;
@@ -53,7 +54,7 @@ public sealed class ProductService : IProductService
     public async Task UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
         var product = await _repository.GetByIdAsync(id, ct)
-            ?? throw new NotFoundException(nameof(Product), id);
+            ?? throw new NotFoundException(nameof(Product), id, ErrorCatalog.Products.NotFound);
 
         product.Name = request.Name;
         product.Description = request.Description;
