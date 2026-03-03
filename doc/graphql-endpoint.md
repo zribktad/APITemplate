@@ -148,8 +148,8 @@ public static IServiceCollection AddGraphQLConfiguration(this IServiceCollection
         .AddType<ProductType>()
         .AddType<ProductReviewType>()
         // --- new registrations ---
-        .AddTypeExtension<OrderQueries>()      // or AddQueryType if it's the root
-        .AddTypeExtension<OrderMutations>()
+        .AddQueryType<OrderQueries>()          // use AddTypeExtension<OrderQueries>() if defined as a type extension
+        .AddMutationType<OrderMutations>()     // use AddTypeExtension<OrderMutations>() if defined as a type extension
         .AddType<OrderType>()
         // --- middleware ---
         .AddAuthorization()
