@@ -2,6 +2,27 @@
 
 A scalable, clean, and modern template designed to jumpstart **.NET 10** Web API and Data-Driven applications. By providing a curated set of industry-standard libraries and combining modern **REST** APIs side-by-side with a robust **GraphQL** backend, it bridges the gap between typical monolithic development speed and Clean Architecture principles within a single maintainable repository.
 
+## 📚 How-To Guides
+
+Step-by-step guides for the most common workflows in this project:
+
+| Guide | Description |
+|-------|-------------|
+| [GraphQL Endpoint](doc/graphql-endpoint.md) | Add a type, query, mutation, and optional DataLoader |
+| [REST Endpoint](doc/rest-endpoint.md) | Full workflow: entity → DTO → validator → service → controller |
+| [EF Core Migration](doc/ef-migration.md) | Create and apply PostgreSQL schema migrations |
+| [MongoDB Migration](doc/mongodb-migration.md) | Create index and data migrations with Kot.MongoDB.Migrations |
+| [Transactions](doc/transactions.md) | Wrap multiple operations in an atomic Unit of Work transaction |
+| [Authentication](doc/authentication.md) | JWT login flow, protecting endpoints, and production guidance |
+| [Stored Procedures](doc/stored-procedures.md) | Add a PostgreSQL function and call it safely from C# |
+| [MongoDB Polymorphism](doc/mongodb-polymorphism.md) | Store multiple document subtypes in one collection |
+| [Validation](doc/validation.md) | Add FluentValidation rules, cross-field rules, and shared validators |
+| [Specifications](doc/specifications.md) | Write reusable EF Core query specifications with Ardalis |
+| [Scalar & GraphQL UI](doc/scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground |
+| [Testing](doc/testing.md) | Write unit tests (services, validators, repositories) and integration tests |
+
+---
+
 ## 🚀 Key Features
 
 *   **Architecture Pattern:** Clean mapping of concerns inside a monolithic solution (emulating Clean Architecture). `Domain` rules and interfaces are isolated from `Application` logic and `Infrastructure`.
