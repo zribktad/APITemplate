@@ -3,6 +3,11 @@ using Microsoft.OpenApi;
 
 namespace APITemplate.Api.OpenApi;
 
+/// <summary>
+/// Improved alternative to repeating <c>[ProducesResponseType(typeof(ProblemDetails), 400/404/500)]</c>
+/// on every controller action. This transformer adds ProblemDetails responses globally
+/// and avoids duplication across individual controllers.
+/// </summary>
 public sealed class ProblemDetailsOpenApiTransformer : IOpenApiDocumentTransformer
 {
     public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
