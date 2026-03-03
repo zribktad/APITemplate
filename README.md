@@ -233,11 +233,11 @@ All versioned REST resource endpoints sit under the base path `api/v{version}`. 
 
 | Method | Path | Auth Required | Description |
 |--------|------|:---:|-------------|
-| `GET` | `/api/v1/ProductData` | ✅ | List all or filter by `type` (image/video) |
-| `GET` | `/api/v1/ProductData/{id}` | ✅ | Get by MongoDB ObjectId |
-| `POST` | `/api/v1/ProductData/image` | ✅ | Create image media metadata |
-| `POST` | `/api/v1/ProductData/video` | ✅ | Create video media metadata |
-| `DELETE` | `/api/v1/ProductData/{id}` | ✅ | Delete by MongoDB ObjectId |
+| `GET` | `/api/v1/product-data` | ✅ | List all or filter by `type` (image/video) |
+| `GET` | `/api/v1/product-data/{id}` | ✅ | Get by MongoDB ObjectId |
+| `POST` | `/api/v1/product-data/image` | ✅ | Create image media metadata |
+| `POST` | `/api/v1/product-data/video` | ✅ | Create video media metadata |
+| `DELETE` | `/api/v1/product-data/{id}` | ✅ | Delete by MongoDB ObjectId |
 
 ### Utility
 
