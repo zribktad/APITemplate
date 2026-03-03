@@ -18,6 +18,8 @@ Step-by-step guides for the most common workflows in this project:
 | [MongoDB Polymorphism](doc/mongodb-polymorphism.md) | Store multiple document subtypes in one collection |
 | [Validation](doc/validation.md) | Add FluentValidation rules, cross-field rules, and shared validators |
 | [Specifications](doc/specifications.md) | Write reusable EF Core query specifications with Ardalis |
+| [Scalar & GraphQL UI](doc/scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground |
+| [Testing](doc/testing.md) | Write unit tests (services, validators, repositories) and integration tests |
 
 ---
 
