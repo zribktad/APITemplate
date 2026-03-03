@@ -258,7 +258,7 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 | `ConnectionStrings:DefaultConnection` | `Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres` | PostgreSQL connection string |
 | `MongoDB:ConnectionString` | `mongodb://localhost:27017` | MongoDB connection string |
 | `MongoDB:DatabaseName` | `apitemplate` | MongoDB database name |
-| `Jwt:Secret` | *(minimum 32 characters / 256 bits)* | HMAC-SHA256 signing key — **never commit a real secret** |
+| `Jwt:Secret` | *(recommended minimum 32 characters / 256 bits)* | HMAC-SHA256 signing key — **never commit a real secret** |
 | `Jwt:Issuer` | `APITemplate` | JWT `iss` claim value |
 | `Jwt:Audience` | `APITemplate.Clients` | JWT `aud` claim value |
 | `Jwt:ExpirationMinutes` | `60` | Token lifetime in minutes |
