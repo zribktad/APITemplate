@@ -42,7 +42,7 @@ public async Task<ProductResponse> CreateAsync(CreateProductRequest request, Can
 }
 ```
 
-`CommitAsync` calls `AppDbContext.SaveChangesAsync`, which EF Core wraps in an implicit database transaction automatically.
+`CommitAsync` calls `AppDbContext.SaveChangesAsync`. With our EF Core/PostgreSQL setup, EF Core will create and use a database transaction when needed (for example, when multiple statements are generated), but the exact implicit transaction behavior can vary by provider and configuration.
 
 ---
 
