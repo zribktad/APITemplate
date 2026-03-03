@@ -1,0 +1,32 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore APITemplate.slnx
+
+      - name: Build
+        run: dotnet build APITemplate.slnx --no-restore --configuration Release
+
+      - name: Run tests
+        run: dotnet test APITemplate.slnx --no-build --configuration Release --verbosity normal
