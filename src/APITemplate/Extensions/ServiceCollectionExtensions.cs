@@ -31,6 +31,9 @@ public static class ServiceCollectionExtensions
             .Validate(
                 o => !string.IsNullOrWhiteSpace(o.Secret) && o.Secret.Length >= 32,
                 "Jwt secret too short")
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.Issuer) && !string.IsNullOrWhiteSpace(o.Audience),
+                "Jwt issuer/audience is required")
             .ValidateOnStart();
 
         services.AddOptions<AuthOptions>()
