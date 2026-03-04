@@ -16,7 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Infrastructure\Database\**\*.sql" />
+    <EmbeddedResource Include="Infrastructure\Database\Procedures\**\*.sql" />
+    <EmbeddedResource Include="Infrastructure\Database\Triggers\**\*.sql" />
   </ItemGroup>
 
   <ItemGroup>

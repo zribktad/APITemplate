@@ -224,7 +224,7 @@ public sealed class PostgresDataIntegrityTests
     }
 
     [Fact]
-    public async Task DeleteProduct_WithExistingReviews_CurrentlyReturnsInternalServerError()
+    public async Task DeleteProduct_WithExistingReviews_SoftDeletesReviews_Cascade()
     {
         var username = $"cascade-{Guid.NewGuid():N}";
         var (tenant, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
@@ -284,16 +284,14 @@ public sealed class PostgresDataIntegrityTests
         review2Id = createdReview2.GetProperty("id").GetGuid();
 
         var deleteResponse = await _client.DeleteAsync($"/api/v1/products/{productId}");
-        deleteResponse.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
-        var body = await deleteResponse.Content.ReadAsStringAsync();
-        body.ShouldContain("An unexpected error occurred");
+        deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var reviewsResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}");
         reviewsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var visibleReviews = await reviewsResponse.Content.ReadFromJsonAsync<JsonElement[]>();
         visibleReviews.ShouldNotBeNull();
-        visibleReviews.Length.ShouldBe(2);
+        visibleReviews.ShouldBeEmpty();
 
         await using var verifyScope = _factory.Services.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -304,7 +302,7 @@ public sealed class PostgresDataIntegrityTests
             .ToListAsync();
 
         allReviews.Count.ShouldBe(2);
-        allReviews.All(r => !r.IsDeleted).ShouldBeTrue();
+        allReviews.All(r => r.IsDeleted).ShouldBeTrue();
     }
 
     [Fact]
