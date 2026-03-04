@@ -4,6 +4,7 @@ using DotNet.Testcontainers.Builders;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -58,6 +59,36 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
 
         builder.ConfigureTestServices(services =>
         {
+            // Remove eagerly-captured Npgsql registrations so the container connection string is used.
+            services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
+            services.RemoveAll(typeof(AppDbContext));
+
+            var optionsConfigs = services
+                .Where(d =>
+                    d.ServiceType.IsGenericType &&
+                    d.ServiceType.GetGenericTypeDefinition().FullName?
+                        .Contains("IDbContextOptionsConfiguration") == true)
+                .ToList();
+
+            foreach (var d in optionsConfigs)
+                services.Remove(d);
+
+            // Re-register with the test container's connection string.
+            var connectionString = _postgresContainer.GetConnectionString();
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseNpgsql(connectionString));
+
+            // Replace the health check that was registered with the default connection string.
+            var healthCheckDescriptors = services
+                .Where(d => d.ServiceType.FullName?.Contains("HealthCheck") == true)
+                .ToList();
+
+            foreach (var d in healthCheckDescriptors)
+                services.Remove(d);
+
+            services.AddHealthChecks()
+                .AddNpgSql(connectionString, name: "postgresql", tags: ["database"]);
+
             // MongoDB is intentionally disabled in integration tests.
             services.RemoveAll(typeof(MongoDbContext));
             services.RemoveAll(typeof(IProductDataRepository));
