@@ -37,13 +37,13 @@
     {
       "label": "docker: db ensure up",
       "type": "process",
-      "command": "powershell",
+      "command": "pwsh",
       "args": [
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "$pgPortInUse = @(Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue).Count -gt 0; $mongoPortInUse = @(Get-NetTCPConnection -LocalPort 27017 -State Listen -ErrorAction SilentlyContinue).Count -gt 0; if ($pgPortInUse) { Write-Host 'Port 5432 is already in use. Skipping postgres startup.' } else { docker compose up -d postgres }; if ($mongoPortInUse) { Write-Host 'Port 27017 is already in use. Skipping mongodb startup.' } else { docker compose up -d mongodb }"
+        "$services = docker compose ps --services; $pgRunning = $services -contains 'postgres'; $mongoRunning = $services -contains 'mongodb'; if ($pgRunning) { Write-Host 'postgres service is already running. Skipping postgres startup.' } else { docker compose up -d postgres }; if ($mongoRunning) { Write-Host 'mongodb service is already running. Skipping mongodb startup.' } else { docker compose up -d mongodb }"
       ],
       "problemMatcher": []
     },
