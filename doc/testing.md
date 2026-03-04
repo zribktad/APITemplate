@@ -519,6 +519,34 @@ dotnet test --logger "console;verbosity=detailed"
 
 ---
 
+## Hybrid Integration Strategy (InMemory + PostgreSQL)
+
+The suite uses a hybrid approach:
+
+- **InMemory integration tests** for fast feedback on HTTP pipeline, auth, middleware, and endpoint contracts.
+- **PostgreSQL Testcontainers integration tests** for real migration/function/trigger behavior
+  (for example `RowVersion` triggers and tenant-scoped SQL function behavior).
+
+### Requirements for PostgreSQL integration tests
+
+1. Docker daemon must be running (Testcontainers starts/stops PostgreSQL automatically).
+2. Do not run app under debugger while running tests, otherwise `APITemplate.dll` may be file-locked.
+
+### Targeted execution commands
+
+```bash
+# Fast integration suite (excludes PostgreSQL-tagged tests)
+dotnet test --filter "FullyQualifiedName~Integration&Category!=Integration.Postgres"
+
+# PostgreSQL-only integration suite
+dotnet test --filter "Category=Integration.Postgres"
+
+# Full suite
+dotnet test
+```
+
+---
+
 ## Key Files Reference
 
 | File | Purpose |
