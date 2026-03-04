@@ -17,6 +17,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="*" />
     <PackageReference Include="MockQueryable.Moq" Version="*" />
+    <PackageReference Include="DotNet.Testcontainers" Version="*" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="*" />
   </ItemGroup>
 
   <ItemGroup>

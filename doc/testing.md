@@ -391,7 +391,7 @@ public class OrdersControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         var loginResponse = await _client.PostAsJsonAsync(
             "/api/v1/auth/login",
-            new { Username = "admin", Password = "admin" });
+            new { Username = "default\\admin", Password = "admin" });
 
         var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
         var token = loginJson.GetProperty("accessToken").GetString();
@@ -402,7 +402,7 @@ public class OrdersControllerTests : IClassFixture<CustomWebApplicationFactory>
 }
 ```
 
-> **Credentials:** The demo credentials are `admin` / `admin` (set in `appsettings.Development.json` or injected by the test environment).
+> **Credentials:** The demo credentials are `default\admin` / `admin` (set in `appsettings.Development.json` or injected by the test environment).
 
 ---
 
@@ -460,7 +460,7 @@ public class OrderGraphQLTests : IClassFixture<CustomWebApplicationFactory>
     {
         var loginResponse = await _client.PostAsJsonAsync(
             "/api/v1/auth/login",
-            new { Username = "admin", Password = "admin" });
+            new { Username = "default\\admin", Password = "admin" });
 
         var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
         var token = loginJson.GetProperty("accessToken").GetString();
@@ -519,6 +519,34 @@ dotnet test --logger "console;verbosity=detailed"
 
 ---
 
+## Hybrid Integration Strategy (InMemory + PostgreSQL)
+
+The suite uses a hybrid approach:
+
+- **InMemory integration tests** for fast feedback on HTTP pipeline, auth, middleware, and endpoint contracts.
+- **PostgreSQL Testcontainers integration tests** for real migration/function behavior
+  (for example row version updates and tenant-scoped SQL function behavior).
+
+### Requirements for PostgreSQL integration tests
+
+1. Docker daemon must be running (Testcontainers starts/stops PostgreSQL automatically).
+2. Do not run app under debugger while running tests, otherwise `APITemplate.dll` may be file-locked.
+
+### Targeted execution commands
+
+```bash
+# Fast integration suite (excludes PostgreSQL-tagged tests)
+dotnet test --filter "FullyQualifiedName~Integration&Category!=Integration.Postgres"
+
+# PostgreSQL-only integration suite
+dotnet test --filter "Category=Integration.Postgres"
+
+# Full suite
+dotnet test
+```
+
+---
+
 ## Key Files Reference
 
 | File | Purpose |
@@ -526,6 +554,9 @@ dotnet test --logger "console;verbosity=detailed"
 | `tests/APITemplate.Tests/Integration/CustomWebApplicationFactory.cs` | Replaces databases for integration tests |
 | `tests/APITemplate.Tests/Integration/GraphQLResponse.cs` | Generic GraphQL response wrapper |
 | `tests/APITemplate.Tests/Integration/GraphQLJsonOptions.cs` | Shared `JsonSerializerOptions` for GraphQL responses |
+| `tests/APITemplate.Tests/Integration/IntegrationAuthHelper.cs` | Shared tenant-aware login/seeding helper for integration tests |
+| `tests/APITemplate.Tests/Integration/Postgres/PostgresWebApplicationFactory.cs` | PostgreSQL Testcontainers host factory |
+| `tests/APITemplate.Tests/Integration/Postgres/PostgresDataIntegrityTests.cs` | High-fidelity PostgreSQL integration tests |
 | `tests/APITemplate.Tests/Unit/Services/ProductServiceTests.cs` | Service unit test example |
 | `tests/APITemplate.Tests/Unit/Repositories/ProductRepositoryTests.cs` | Repository unit test example |
 | `tests/APITemplate.Tests/Unit/Validators/CreateProductRequestValidatorTests.cs` | Validator test example |

@@ -202,6 +202,7 @@ public sealed class AppDbContext : DbContext
 
         entry.State = EntityState.Modified;
         MarkSoftDeleted(entity, now, actor);
+        EnsureAuditOwnedEntryState(entry, now, actor);
 
         foreach (var rule in _softDeleteCascadeRules.Where(r => r.CanHandle(entity)))
         {
@@ -215,6 +216,24 @@ public sealed class AppDbContext : DbContext
                 SoftDeleteWithRules(dependentEntry, dependent, now, actor, visited);
             }
         }
+    }
+
+    /// <summary>
+    /// When entity state transitions from Deleted to Modified, EF can keep owned entries in Deleted state.
+    /// For table-split owned Audit this would null-out required columns on update.
+    /// Force the owned Audit entry back to Modified and stamp updated metadata.
+    /// </summary>
+    private static void EnsureAuditOwnedEntryState(EntityEntry ownerEntry, DateTime now, string actor)
+    {
+        var auditEntry = ownerEntry.Reference(nameof(IAuditableTenantEntity.Audit)).TargetEntry;
+        if (auditEntry is null)
+            return;
+
+        if (auditEntry.State is EntityState.Deleted or EntityState.Detached or EntityState.Unchanged)
+            auditEntry.State = EntityState.Modified;
+
+        auditEntry.Property(nameof(AuditInfo.UpdatedAtUtc)).CurrentValue = now;
+        auditEntry.Property(nameof(AuditInfo.UpdatedBy)).CurrentValue = actor;
     }
 
     private static void MarkUpdated(IAuditableTenantEntity entity, DateTime now, string actor)
