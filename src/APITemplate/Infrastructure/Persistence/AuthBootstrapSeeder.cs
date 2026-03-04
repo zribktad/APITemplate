@@ -28,9 +28,12 @@ public sealed class AuthBootstrapSeeder
     {
         var hasChanges = false;
 
+        var tenantCode = _tenantOptions.Code.Trim();
+        var tenantName = _tenantOptions.Name.Trim();
+
         var tenant = await _dbContext.Tenants
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Code == _tenantOptions.Code, ct);
+            .FirstOrDefaultAsync(t => t.Code == tenantCode, ct);
 
         if (tenant is null)
         {
@@ -38,8 +41,8 @@ public sealed class AuthBootstrapSeeder
             {
                 Id = Guid.NewGuid(),
                 TenantId = Guid.Empty,
-                Code = _tenantOptions.Code,
-                Name = _tenantOptions.Name,
+                Code = tenantCode,
+                Name = tenantName,
                 IsActive = true
             };
 

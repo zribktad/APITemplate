@@ -1,5 +1,4 @@
 using System.Text;
-using System.IdentityModel.Tokens.Jwt;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Security;
 using APITemplate.Domain.Interfaces;
@@ -193,7 +192,9 @@ public static class ServiceCollectionExtensions
                     OnTokenValidated = context =>
                     {
                         var hasTenantClaim = context.Principal?.HasClaim(
-                            c => c.Type == CustomClaimTypes.TenantId && Guid.TryParse(c.Value, out _)) == true;
+                            c => c.Type == CustomClaimTypes.TenantId
+                                 && Guid.TryParse(c.Value, out var tenantId)
+                                 && tenantId != Guid.Empty) == true;
 
                         if (!hasTenantClaim)
                             context.Fail("Missing required tenant_id claim.");

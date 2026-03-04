@@ -27,7 +27,11 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
 
     public Task InitializeAsync() => _postgresContainer.StartAsync();
 
-    public new Task DisposeAsync() => _postgresContainer.DisposeAsync().AsTask();
+    public new async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _postgresContainer.DisposeAsync();
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

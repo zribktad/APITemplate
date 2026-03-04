@@ -135,7 +135,7 @@ query {
       name
       price
       description
-      createdAt
+      createdAtUtc
     }
     totalCount
     pageNumber
@@ -157,7 +157,7 @@ query {
       reviewerName
       rating
       comment
-      createdAt
+      createdAtUtc
     }
   }
 }
@@ -197,7 +197,7 @@ mutation {
     id
     name
     price
-    createdAt
+    createdAtUtc
   }
 }
 ```
