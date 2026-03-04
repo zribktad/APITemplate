@@ -293,9 +293,10 @@ public sealed class ReviewByProductIdSpecification : Specification<ProductReview
 
 | File | Purpose |
 |------|---------|
-| `Application/Specifications/ProductSpecification.cs` | Projection + pagination example |
-| `Application/Specifications/ProductCountSpecification.cs` | Count-only example |
-| `Application/Specifications/ProductFilterCriteria.cs` | Shared `Where` criteria helper |
-| `Application/Specifications/ProductReviewByProductIdSpecification.cs` | Single-relation filter |
+| `Application/Features/Product/Specifications/ProductSpecification.cs` | Projection + pagination example |
+| `Application/Features/Product/Specifications/ProductCountSpecification.cs` | Count-only example |
+| `Application/Features/Product/Specifications/ProductFilterCriteria.cs` | Shared `Where` criteria helper |
+| `Application/Features/ProductReview/Specifications/ProductReviewByProductIdSpecification.cs` | Single-relation filter |
 | `Infrastructure/Repositories/RepositoryBase.cs` | Base repository that executes specifications |
-| `Application/Services/ProductService.cs` | Usage of `ListAsync(spec)` + `CountAsync(spec)` |
+| `Application/Features/Product/Services/ProductService.cs` | Usage of `ListAsync(spec)` + `CountAsync(spec)` |
+

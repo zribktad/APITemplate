@@ -11,7 +11,7 @@ The REST layer follows **Clean Architecture**:
 ```
 HTTP Request
   → Controller (Api/Controllers/V1/)     ← thin, no business logic
-  → Service    (Application/Services/)   ← business rules, maps DTOs ↔ entities
+  → Service    (Application/Features/<Feature>/Services/)   ← business rules, maps DTOs ↔ entities
   → Repository (Infrastructure/Repositories/) ← data access
   → Database   (PostgreSQL via EF Core)
 ```
@@ -41,12 +41,12 @@ public sealed class Order
 
 ## Step 2 – Create the DTOs
 
-DTOs decouple the API contract from the domain model. Place them in `src/APITemplate/Application/DTOs/`.
+DTOs decouple the API contract from the domain model. Place them in `src/APITemplate/Application/Features/<Feature>/DTOs/`.
 
 **Request DTO** (what the client sends):
 
 ```csharp
-// Application/DTOs/CreateOrderRequest.cs
+// Application/Features/<Feature>/DTOs/CreateOrderRequest.cs
 namespace APITemplate.Application.DTOs;
 
 public sealed record CreateOrderRequest(
@@ -58,7 +58,7 @@ public sealed record CreateOrderRequest(
 **Response DTO** (what the API returns):
 
 ```csharp
-// Application/DTOs/OrderResponse.cs
+// Application/Features/<Feature>/DTOs/OrderResponse.cs
 namespace APITemplate.Application.DTOs;
 
 public sealed record OrderResponse(
@@ -73,10 +73,10 @@ public sealed record OrderResponse(
 
 ## Step 3 – Add the FluentValidation Validator
 
-Validators live in `src/APITemplate/Application/Validators/`. They are auto-discovered and invoked by `FluentValidation.AspNetCore` before the controller action runs.
+Validators live in `src/APITemplate/Application/Features/<Feature>/Validation/`. They are auto-discovered and invoked by `FluentValidation.AspNetCore` before the controller action runs.
 
 ```csharp
-// Application/Validators/CreateOrderRequestValidator.cs
+// Application/Features/<Feature>/Validation/CreateOrderRequestValidator.cs
 using FluentValidation;
 
 namespace APITemplate.Application.Validators;
@@ -100,10 +100,10 @@ FluentValidation returns HTTP 400 with a structured error body automatically whe
 
 ## Step 4 – Define the Mapping Extension
 
-Mappings keep the service layer clean. Place them in `src/APITemplate/Application/Mappings/`:
+Mappings keep the service layer clean. Place them in `src/APITemplate/Application/Features/<Feature>/Mappings/`:
 
 ```csharp
-// Application/Mappings/OrderMappings.cs
+// Application/Features/<Feature>/Mappings/OrderMappings.cs
 using APITemplate.Domain.Entities;
 
 namespace APITemplate.Application.Mappings;
@@ -119,10 +119,10 @@ public static class OrderMappings
 
 ## Step 5 – Define the Service Interface and Implementation
 
-**Interface** in `Application/Interfaces/`:
+**Interface** in `Application/Features/<Feature>/Interfaces/`:
 
 ```csharp
-// Application/Interfaces/IOrderService.cs
+// Application/Features/<Feature>/Interfaces/IOrderService.cs
 using APITemplate.Application.DTOs;
 
 namespace APITemplate.Application.Interfaces;
@@ -136,10 +136,10 @@ public interface IOrderService
 }
 ```
 
-**Implementation** in `Application/Services/`:
+**Implementation** in `Application/Features/<Feature>/Services/`:
 
 ```csharp
-// Application/Services/OrderService.cs
+// Application/Features/<Feature>/Services/OrderService.cs
 using APITemplate.Application.DTOs;
 using APITemplate.Application.Interfaces;
 using APITemplate.Application.Mappings;
@@ -345,10 +345,10 @@ To obtain a Bearer token, see [authentication.md](authentication.md).
 ## Checklist
 
 - [ ] Domain entity in `Domain/Entities/`
-- [ ] Request + Response DTOs in `Application/DTOs/`
-- [ ] FluentValidation validator in `Application/Validators/`
-- [ ] Mapping extension in `Application/Mappings/`
-- [ ] Service interface + implementation in `Application/`
+- [ ] Request + Response DTOs in `Application/Features/<Feature>/DTOs/`
+- [ ] FluentValidation validator in `Application/Features/<Feature>/Validation/`
+- [ ] Mapping extension in `Application/Features/<Feature>/Mappings/`
+- [ ] Service interface + implementation in `Application/Features/<Feature>/`
 - [ ] Repository interface + implementation
 - [ ] Controller in `Api/Controllers/V1/`
 - [ ] DI registration in `ServiceCollectionExtensions.cs`
@@ -361,12 +361,13 @@ To obtain a Bearer token, see [authentication.md](authentication.md).
 | File | Purpose |
 |------|---------|
 | `Api/Controllers/V1/` | HTTP endpoint definitions |
-| `Application/DTOs/` | Request/response contracts |
-| `Application/Validators/` | Input validation rules |
-| `Application/Mappings/` | Entity ↔ DTO converters |
-| `Application/Services/` | Business logic |
-| `Application/Interfaces/` | Service contracts |
+| `Application/Features/<Feature>/DTOs/` | Request/response contracts |
+| `Application/Features/<Feature>/Validation/` | Input validation rules |
+| `Application/Features/<Feature>/Mappings/` | Entity ↔ DTO converters |
+| `Application/Features/<Feature>/Services/` | Business logic |
+| `Application/Features/<Feature>/Interfaces/` | Service contracts |
 | `Domain/Entities/` | Domain models |
 | `Domain/Interfaces/` | Repository contracts |
 | `Infrastructure/Repositories/` | EF Core repository implementations |
 | `Extensions/ServiceCollectionExtensions.cs` | DI registration |
+

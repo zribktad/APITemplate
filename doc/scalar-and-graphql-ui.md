@@ -129,8 +129,8 @@ http://localhost:5174/graphql
 
 ```graphql
 query {
-  products(first: 10, order: { createdAt: DESC }) {
-    nodes {
+  products(input: { pageNumber: 1, pageSize: 10 }) {
+    items {
       id
       name
       price
@@ -138,10 +138,8 @@ query {
       createdAt
     }
     totalCount
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
+    pageNumber
+    pageSize
   }
 }
 ```
@@ -155,29 +153,34 @@ query {
     name
     price
     reviews {
-      nodes {
-        reviewerName
-        rating
-        comment
-      }
+      id
+      reviewerName
+      rating
+      comment
+      createdAt
     }
   }
 }
 ```
 
-**Filter products by price (built-in filtering):**
+**Filter products by price/sort/paging (using `ProductQueryInput`):**
 
 ```graphql
 query {
-  products(
-    where: { price: { gte: 10, lte: 100 } }
-    order: { price: ASC }
-  ) {
-    nodes {
+  products(input: {
+    minPrice: 10
+    maxPrice: 100
+    sortBy: "price"
+    sortDirection: "asc"
+    pageNumber: 1
+    pageSize: 20
+  }) {
+    items {
       id
       name
       price
     }
+    totalCount
   }
 }
 ```
@@ -278,4 +281,5 @@ Example response:
 | `Extensions/ApplicationBuilderExtensions.cs` | `UseApiDocumentation()` — mounts Scalar and OpenAPI |
 | `Api/OpenApi/HealthCheckOpenApiDocumentTransformer.cs` | Adds `/health` to the OpenAPI document |
 | `Program.cs` | `app.MapGraphQL()` and `app.MapNitroApp("/graphql/ui")` |
-| `appsettings.json` → `Jwt` | Credentials and secret used for demo login |
+| `appsettings.json` → `Bootstrap:Admin` and `Jwt` | Bootstrap login credentials and JWT settings |
+

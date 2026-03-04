@@ -28,9 +28,9 @@ Every `AbstractValidator<T>` in the assembly is discovered and registered automa
 
 ## Step 1 – Create a Simple Validator
 
-Place validators in `src/APITemplate/Application/Validators/`. Name them `<RequestTypeName>Validator.cs`.
+Place validators in `src/APITemplate/Application/Features/<Feature>/Validation/`. Name them `<RequestTypeName>Validator.cs`.
 
-**`src/APITemplate/Application/Validators/CreateOrderRequestValidator.cs`**
+**`src/APITemplate/Application/Features/<Feature>/Validation/CreateOrderRequestValidator.cs`**
 
 ```csharp
 using FluentValidation;
@@ -92,7 +92,7 @@ public sealed class CreateShipmentRequestValidator : AbstractValidator<CreateShi
 When multiple request types share the same fields and rules, extract a base validator:
 
 ```csharp
-// Application/Validators/ProductRequestValidatorBase.cs (existing pattern)
+// Application/Features/<Feature>/Validation/ProductRequestValidatorBase.cs (existing pattern)
 public abstract class ProductRequestValidatorBase<T> : AbstractValidator<T>
     where T : IProductRequest
 {
@@ -120,7 +120,7 @@ public sealed class UpdateProductRequestValidator
 Use `Include()` to compose validators without inheritance. This is useful for shared pagination/filter rules:
 
 ```csharp
-// Application/Validators/PaginationFilterValidator.cs (existing)
+// Application/Features/<Feature>/Validation/PaginationFilterValidator.cs (existing)
 public sealed class PaginationFilterValidator : AbstractValidator<PaginationFilter>
 {
     public PaginationFilterValidator()
@@ -215,7 +215,7 @@ When any rule fails, FluentValidation returns HTTP **400 Bad Request** with this
 }
 ```
 
-The `GlobalExceptionHandlerMiddleware` handles domain-level `ValidationException` (thrown manually in service code) and returns HTTP 400 as well.
+The `ApiExceptionHandler` handles domain-level `ValidationException` (thrown manually in service code) and returns HTTP 400 as well.
 
 ---
 
@@ -239,7 +239,7 @@ public async Task<OrderResponse> CreateAsync(CreateOrderRequest request, Cancell
 
 ## Checklist
 
-- [ ] Create `<RequestType>Validator.cs` in `Application/Validators/`
+- [ ] Create `<RequestType>Validator.cs` in `Application/Features/<Feature>/Validation/`
 - [ ] Inherit from `AbstractValidator<YourRequestType>`
 - [ ] Add `RuleFor` calls for each property
 - [ ] For shared rules, create a base validator or use `Include()`
@@ -251,10 +251,11 @@ public async Task<OrderResponse> CreateAsync(CreateOrderRequest request, Cancell
 
 | File | Purpose |
 |------|---------|
-| `Application/Validators/` | All validator classes |
-| `Application/Validators/ProductRequestValidatorBase.cs` | Base validator example |
-| `Application/Validators/ProductFilterValidator.cs` | `Include()` composition example |
-| `Application/Validators/CreateProductReviewRequestValidator.cs` | Typical standalone validator |
+| `Application/Features/<Feature>/Validation/` | All validator classes |
+| `Application/Features/<Feature>/Validation/ProductRequestValidatorBase.cs` | Base validator example |
+| `Application/Features/<Feature>/Validation/ProductFilterValidator.cs` | `Include()` composition example |
+| `Application/Features/<Feature>/Validation/CreateProductReviewRequestValidator.cs` | Typical standalone validator |
 | `Domain/Exceptions/ValidationException.cs` | Domain-level validation exception |
-| `Api/Middleware/GlobalExceptionHandlerMiddleware.cs` | Catches `ValidationException` → 400 |
+| `Api/ExceptionHandling/ApiExceptionHandler.cs` | Catches `ValidationException` → 400 |
 | `Extensions/ServiceCollectionExtensions.cs` | `AddValidatorsFromAssemblyContaining` + `AddFluentValidationAutoValidation` |
+

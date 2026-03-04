@@ -15,7 +15,7 @@ SQL function (.sql file, embedded resource)
   → EF HasNoKey() configuration (Infrastructure/Persistence/Configurations/)
   → Procedure record (Infrastructure/StoredProcedures/)
   → Repository method (Infrastructure/Repositories/)
-  → Service method (Application/Services/)
+  → Service method (Application/Features/Category/Services/)
   → Controller action (Api/Controllers/V1/)
 ```
 
@@ -222,7 +222,7 @@ public interface IOrderRepository : IRepository<Order>
 ## Step 8 – Expose via a Service Method
 
 ```csharp
-// Application/Services/OrderService.cs (new method)
+// Application/Features/Category/Services/CategoryService.cs (new method)
 public async Task<OrderSummaryResponse?> GetSummaryAsync(Guid customerId, CancellationToken ct)
 {
     var summary = await _orderRepository.GetSummaryAsync(customerId, ct);
@@ -292,3 +292,4 @@ public Task<TResult?> QueryFirstAsync<TResult>(
 | `Domain/Interfaces/IStoredProcedureExecutor.cs` | Executor contract |
 | `Domain/Entities/ProductCategoryStats.cs` | Real keyless result entity example |
 | `Infrastructure/Persistence/Configurations/ProductCategoryStatsConfiguration.cs` | Real `HasNoKey()` example |
+

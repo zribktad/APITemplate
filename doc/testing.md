@@ -260,28 +260,27 @@ public class OrderRepositoryTests : IDisposable
 
 ### Middleware Unit Tests
 
-Middleware tests build a `DefaultHttpContext` manually — no HTTP server needed:
+Middleware tests build a `DefaultHttpContext` manually — no HTTP server needed. The project uses this pattern in `RequestContextMiddlewareTests`:
 
 ```csharp
-// tests/APITemplate.Tests/Unit/Middleware/GlobalExceptionHandlerMiddlewareTests.cs
+// tests/APITemplate.Tests/Unit/Middleware/RequestContextMiddlewareTests.cs
 [Fact]
-public async Task InvokeAsync_WhenNotFoundException_Returns404()
+public async Task InvokeAsync_WhenHeaderProvided_EchoesCorrelationIdToResponse()
 {
-    RequestDelegate next = _ => throw new NotFoundException("Order", Guid.Empty);
-
-    var middleware = new GlobalExceptionHandlerMiddleware(next, _loggerMock.Object);
+    var middleware = new RequestContextMiddleware(async ctx => await ctx.Response.WriteAsync("ok"));
     var context = new DefaultHttpContext();
     context.Response.Body = new MemoryStream();
+    context.Request.Headers[RequestContextMiddleware.CorrelationIdHeader] = "corr-123";
 
     await middleware.InvokeAsync(context);
 
-    context.Response.StatusCode.ShouldBe(404);
-
-    context.Response.Body.Seek(0, SeekOrigin.Begin);
-    var body = await JsonDocument.ParseAsync(context.Response.Body);
-    body.RootElement.GetProperty("error").GetString().ShouldNotBeNullOrEmpty();
+    context.Response.Headers[RequestContextMiddleware.CorrelationIdHeader].ToString().ShouldBe("corr-123");
+    context.Response.Headers["X-Trace-Id"].ToString().ShouldNotBeNullOrWhiteSpace();
+    context.Response.Headers["X-Elapsed-Ms"].ToString().ShouldNotBeNullOrWhiteSpace();
 }
 ```
+
+Exception translation behavior is covered separately in `tests/APITemplate.Tests/Unit/ExceptionHandling/ApiExceptionHandlerTests.cs`.
 
 ---
 
@@ -532,3 +531,4 @@ dotnet test --logger "console;verbosity=detailed"
 | `tests/APITemplate.Tests/Unit/Validators/CreateProductRequestValidatorTests.cs` | Validator test example |
 | `tests/APITemplate.Tests/Integration/AuthenticatedCrudTests.cs` | Full REST CRUD integration test example |
 | `tests/APITemplate.Tests/Integration/GraphQLTests.cs` | GraphQL integration test example |
+

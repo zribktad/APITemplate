@@ -284,8 +284,14 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 | `Jwt:Issuer` | `APITemplate` | JWT `iss` claim value |
 | `Jwt:Audience` | `APITemplate.Clients` | JWT `aud` claim value |
 | `Jwt:ExpirationMinutes` | `60` | Token lifetime in minutes |
-| `Auth:Username` | `admin` | Hard-coded dev username (Development only) |
-| `Auth:Password` | `admin` | Hard-coded dev password (Development only) |
+| `SystemIdentity:DefaultActorId` | `system` | Default actor ID used when request actor context is unavailable |
+| `Bootstrap:Admin:Username` | `admin` | Bootstrap admin username seeded at startup |
+| `Bootstrap:Admin:Password` | `admin` | Bootstrap admin password seeded at startup |
+| `Bootstrap:Admin:Email` | `admin@example.com` | Bootstrap admin email |
+| `Bootstrap:Admin:IsPlatformAdmin` | `true` | Whether seeded admin receives `PlatformAdmin` role |
+| `Bootstrap:Tenant:Code` | `default` | Bootstrap tenant code seeded at startup |
+| `Bootstrap:Tenant:Name` | `Default Tenant` | Bootstrap tenant display name |
+| `Cors:AllowedOrigins` | `http://localhost:3000` | Allowed origins for CORS default policy |
 
 > **Security note:** `Jwt:Secret` must be supplied via an environment variable or secret manager in production — never from a committed config file.
 
@@ -293,10 +299,10 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 
 ## 🔐 Authentication & Examples
 
-Most REST and GraphQL endpoints might be protected by JWT Authentication (`[Authorize]`). A sample HTTP file (`src/APITemplate/APITemplate.http`) is included for simple direct execution from VS Code or Visual Studio.
+All versioned REST endpoints except `POST /api/v1/Auth/login` are protected by JWT Authentication (`[Authorize]`). In GraphQL, mutations are protected with `[Authorize]` while query fields are currently anonymous. A sample HTTP file (`src/APITemplate/APITemplate.http`) is included for direct execution from VS Code or Visual Studio.
 
 **1. Acquiring a JWT Token via REST:**
-Send your configured `Auth:Username` and `Auth:Password` (default: `admin`/`admin` per Development settings) to:
+Send your configured bootstrap admin credentials (`Bootstrap:Admin:Username` and `Bootstrap:Admin:Password`, default `admin`/`admin`) to:
 ```http
 POST /api/v1/Auth/login
 Content-Type: application/json
@@ -310,10 +316,10 @@ Content-Type: application/json
 ### ⚡ GraphQL DataLoaders (N+1 Problem Solved)
 By leveraging HotChocolate's built-in **DataLoaders** pipeline (`ProductReviewsByProductDataLoader`), fetching deeply nested parent-child relationships avoids querying the database `n` times. The framework collects IDs requested entirely within the GraphQL query, then queries the underlying EF Core PostgreSQL implementation precisely *once*.
 
-**2. Example GraphQL Query (Using the token via `Authorization: Bearer <token>`):**
+**2. Example GraphQL Query:**
 ```graphql
 query {
-  products(take: 10, skip: 0) {
+  products(input: { pageNumber: 1, pageSize: 10 }) {
     items {
       id
       name
@@ -324,6 +330,8 @@ query {
         rating
       }
     }
+    pageNumber
+    pageSize
     totalCount
   }
 }
@@ -418,7 +426,7 @@ Validator classes are auto-discovered via `AddValidatorsFromAssemblyContaining<C
 
 ### 5 — Global Exception Handling (`IExceptionHandler` + ProblemDetails)
 
-`ApiExceptionHandler` sits in the ASP.NET exception pipeline (`UseExceptionHandler`) and converts typed domain exceptions into RFC 7807 `ProblemDetails` responses. The error contract is explicit and stable: each domain exception carries `ErrorCode`, `StatusCode`, and `Title`.
+`ApiExceptionHandler` sits in the ASP.NET exception pipeline (`UseExceptionHandler`) and converts typed `AppException` instances into RFC 7807 `ProblemDetails` responses. HTTP status/title are mapped by exception type (`ValidationException`, `NotFoundException`, `ConflictException`), while `ErrorCode` is resolved from `AppException.ErrorCode` or metadata fallback.
 
 | Exception type | HTTP Status | Logged at |
 |----------------|-------------|-----------|
@@ -452,6 +460,7 @@ Error code catalog (excerpt):
 | `GEN-0001` | 500 | Unknown/unhandled server error |
 | `GEN-0400` | 400 | Generic validation failure |
 | `GEN-0404` | 404 | Generic resource not found |
+| `GEN-0409` | 409 | Generic conflict |
 | `REV-2101` | 404 | Product not found when creating review |
 
 > GraphQL requests are explicitly bypassed — HotChocolate handles its own error serialisation.
@@ -475,15 +484,18 @@ HotChocolate is configured with several safeguards:
 | `MaxPageSize` | 100 | Prevents unbounded result sets |
 | `DefaultPageSize` | 20 | Sensible default for clients |
 | `AddMaxExecutionDepthRule(5)` | depth ≤ 5 | Prevents deeply nested query attacks |
-| `AddAuthorization()` | JWT required | Mirrors REST auth on GraphQL endpoints |
+| `AddAuthorization()` | policy support enabled | Enables `[Authorize]` on GraphQL fields/mutations |
+
+GraphQL mutations are protected with `[Authorize]`; query fields are currently anonymous unless explicitly decorated.
 
 ### 8 — Automatic Schema Migration at Startup
 
-`UseDatabaseAsync()` runs EF Core migrations and MongoDB migrations automatically on startup. This means a fresh container deployment is fully self-initialising — no manual `dotnet ef database update` step required in production.
+`UseDatabaseAsync()` runs EF Core migrations, auth bootstrap seeding, and MongoDB migrations automatically on startup. This means a fresh container deployment is fully self-initialising — no manual `dotnet ef database update` step required in production.
 
 ```csharp
 // Extensions/ApplicationBuilderExtensions.cs
 await dbContext.Database.MigrateAsync();   // PostgreSQL
+await seeder.SeedAsync();                  // bootstrap tenant/admin user
 await migrator.MigrateAsync();             // MongoDB (Kot.MongoDB.Migrations)
 ```
 

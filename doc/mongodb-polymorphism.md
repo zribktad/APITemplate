@@ -87,7 +87,7 @@ public abstract class ProductData { ... }
 
 ## Step 4 – Create the Request DTO
 
-**`src/APITemplate/Application/DTOs/Requests/CreateAudioProductDataRequest.cs`**
+**`src/APITemplate/Application/Features/ProductData/DTOs/CreateAudioProductDataRequest.cs`**
 
 ```csharp
 namespace APITemplate.Application.DTOs.Requests;
@@ -106,7 +106,7 @@ public sealed record CreateAudioProductDataRequest(
 
 ## Step 5 – Add a FluentValidation Validator
 
-**`src/APITemplate/Application/Validators/CreateAudioProductDataRequestValidator.cs`**
+**`src/APITemplate/Application/Features/ProductData/Validation/CreateAudioProductDataRequestValidator.cs`**
 
 ```csharp
 using FluentValidation;
@@ -131,7 +131,7 @@ public sealed class CreateAudioProductDataRequestValidator
 
 ## Step 6 – Add the Mapping
 
-Open `src/APITemplate/Application/Mappings/ProductDataMappings.cs` and add a mapping for the new subtype:
+Open `src/APITemplate/Application/Features/ProductData/Mappings/ProductDataMappings.cs` and add a mapping for the new subtype:
 
 ```csharp
 // Existing pattern (in ProductDataMappings.cs):
@@ -154,7 +154,7 @@ public static ProductDataResponse ToResponse(this ProductData data)
 
 ## Step 7 – Add the Service Method
 
-Open `src/APITemplate/Application/Services/ProductDataService.cs` and add:
+Open `src/APITemplate/Application/Features/ProductData/Services/ProductDataService.cs` and add:
 
 ```csharp
 public async Task<ProductDataResponse> CreateAudioAsync(
@@ -264,10 +264,10 @@ The driver deserialises each result into `AudioProductData` automatically.
 
 - [ ] Create subtype class in `Domain/Entities/` with `[BsonDiscriminator("…")]`
 - [ ] Add the subtype to `[BsonKnownTypes]` on the base class
-- [ ] Create request DTO in `Application/DTOs/Requests/`
-- [ ] Create validator in `Application/Validators/`
-- [ ] Add mapping in `Application/Mappings/ProductDataMappings.cs`
-- [ ] Add service method in `Application/Services/ProductDataService.cs`
+- [ ] Create request DTO in `Application/Features/ProductData/DTOs/`
+- [ ] Create validator in `Application/Features/ProductData/Validation/`
+- [ ] Add mapping in `Application/Features/ProductData/Mappings/ProductDataMappings.cs`
+- [ ] Add service method in `Application/Features/ProductData/Services/ProductDataService.cs`
 - [ ] Add controller action in `Api/Controllers/V1/ProductDataController.cs`
 - [ ] (Optional) Add a MongoDB migration for indexes
 
@@ -282,6 +282,7 @@ The driver deserialises each result into `AudioProductData` automatically.
 | `Domain/Entities/VideoProductData.cs` | Example concrete subtype |
 | `Infrastructure/Persistence/MongoDbContext.cs` | MongoDB client & collection access |
 | `Infrastructure/Repositories/ProductDataRepository.cs` | CRUD operations on the collection |
-| `Application/Services/ProductDataService.cs` | Business logic for all subtypes |
+| `Application/Features/ProductData/Services/ProductDataService.cs` | Business logic for all subtypes |
 | `Api/Controllers/V1/ProductDataController.cs` | HTTP endpoints per subtype |
 | `Infrastructure/Migrations/` | MongoDB index migrations |
+

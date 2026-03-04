@@ -1,75 +1,87 @@
-# How Authentication Works (JWT)
+# How Authentication Works (JWT + Tenant Claims)
 
-This guide explains the JWT authentication flow used in the project, how to obtain a token, how to use it, and how to extend the implementation for production use.
+This guide explains the current authentication flow used in the project: bootstrap-seeded users, JWT issuance, tenant claim validation, and endpoint protection.
 
 ---
 
 ## Overview
 
-The project uses **ASP.NET Core JWT Bearer authentication**. The flow is:
+Authentication is database-backed and seeded at startup:
 
 ```
-Client  →  POST /api/v1/Auth/login  →  AuthController
-                                            ↓
-                                       UserService.ValidateAsync()
-                                            ↓
-                                       TokenService.GenerateToken()
-                                            ↓
-                                       { accessToken, expiresAt }
-                                            ↓
-Client  →  Authorization: Bearer <token>  →  Any protected endpoint
+Client  ->  POST /api/v1/Auth/login  ->  AuthController
+                                          |
+                                          v
+                                   UserService.AuthenticateAsync()
+                                          |
+                                          v
+                                   TokenService.GenerateToken()
+                                          |
+                                          v
+                                   { accessToken, expiresAt }
+                                          |
+Client  ->  Authorization: Bearer <token>  ->  Protected REST/GraphQL mutation endpoint
 ```
 
-All controllers except `AuthController` require a valid token (`[Authorize]` attribute on the class). The GraphQL mutation classes use `[HotChocolate.Authorization.Authorize]`.
+Startup (`UseDatabaseAsync`) runs `AuthBootstrapSeeder`, which ensures a default tenant and admin user exist.
 
 ---
 
-## Step 1 – Configure JWT Settings
+## Step 1 - Configure Authentication Settings
 
-### Development
-
-`appsettings.Development.json` ships with a placeholder secret that satisfies the startup validation so the app runs out-of-the-box in the `Development` environment:
+`Jwt` values control token signing/validation:
 
 ```json
 {
   "Jwt": {
-    "Secret": "DevelopmentOnlySuperSecretKeyAtLeast32Chars!",
+    "Secret": "",
     "Issuer": "APITemplate",
     "Audience": "APITemplate.Clients",
     "ExpirationMinutes": 60
-  },
-  "Auth": {
-    "Username": "admin",
-    "Password": "admin"
   }
 }
 ```
 
-> ⚠️ This placeholder is intentionally **not suitable for production**. Replace it before deploying.
+`Bootstrap` values control initial seeded credentials:
+
+```json
+{
+  "Bootstrap": {
+    "Admin": {
+      "Username": "admin",
+      "Password": "admin",
+      "Email": "admin@example.com",
+      "IsPlatformAdmin": true
+    },
+    "Tenant": {
+      "Code": "default",
+      "Name": "Default Tenant"
+    }
+  }
+}
+```
+
+`SystemIdentity` is also validated on startup:
+
+```json
+{
+  "SystemIdentity": {
+    "DefaultActorId": "system"
+  }
+}
+```
+
+### Development
+
+`appsettings.Development.json` includes a development-only JWT secret so local startup works without extra setup.
 
 ### Production
 
-The base `appsettings.json` intentionally leaves `Jwt:Secret` empty. The app **will not start** unless a real secret (>= 32 characters) is supplied at runtime. Provide it through one of the following mechanisms:
-
-**Environment variable (recommended):**
-```bash
-# ASP.NET Core flattens __ into : so this maps to Jwt:Secret
-Jwt__Secret=<your-256-bit-or-longer-secret>
-```
-
-**Docker / Compose secret:**
-```yaml
-environment:
-  - Jwt__Secret=${JWT_SECRET}
-```
-
-**Cloud secrets manager** (Azure Key Vault, AWS Secrets Manager, etc.) – inject the value as the `Jwt__Secret` environment variable or mount it via the provider's configuration source.
-
-> ⚠️ **Never commit real secrets** to source control. The startup validation will throw an `OptionsValidationException` at startup if the secret is missing or shorter than 32 characters, giving you a clear fail-fast signal before the app accepts traffic.
+`Jwt:Secret` must be supplied securely (env var/secret manager). The app validates options with `ValidateOnStart()` and fails fast if required values are missing.
 
 ---
 
-## Step 2 – Obtain a Token
+## Step 2 - Obtain a Token
 
 ```http
 POST /api/v1/Auth/login
@@ -77,195 +89,75 @@ Content-Type: application/json
 
 {
   "username": "admin",
-  "password": "changeme"
+  "password": "admin"
 }
 ```
 
-**Response (200 OK):**
+Success:
 
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresAt": "2024-01-01T13:00:00Z"
+  "accessToken": "<jwt>",
+  "expiresAt": "2026-03-04T12:00:00Z"
 }
 ```
 
-**Error (401 Unauthorized):** credentials did not match.
+Failure:
+- `401 Unauthorized` with `LoginErrorResponse` when credentials are invalid.
 
 ---
 
-## Step 3 – Use the Token
+## Step 3 - Use the Token
 
-Include the token in the `Authorization` header for all subsequent requests:
+Use `Authorization: Bearer <token>` for protected endpoints:
 
 ```http
 GET /api/v1/Products
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <jwt>
 ```
 
-Or in the [Scalar](https://scalar.com/) / Swagger UI: click **Authorize** → enter the token (without the `Bearer ` prefix).
+REST controllers are protected with `[Authorize]` (except `AuthController.Login`).
+GraphQL mutations are protected with `[Authorize]`; queries are currently anonymous.
 
 ---
 
-## How the Token Is Generated
+## Current Token Claims
 
-`TokenService` (`Application/Services/TokenService.cs`) creates a signed JWT using the strongly-typed `JwtOptions` (injected via `IOptions<JwtOptions>`):
+`TokenService` issues these claims:
+- `sub` -> user id
+- `tenant_id` -> tenant id (required)
+- `role` -> user role (`PlatformAdmin` / `TenantUser`)
+- `jti` -> token id
 
-```csharp
-public sealed class TokenService : ITokenService
-{
-    private readonly JwtOptions _jwt;
-
-    public TokenService(IOptions<JwtOptions> jwtOptions)
-    {
-        _jwt = jwtOptions.Value;
-    }
-
-    public TokenResponse GenerateToken(string username)
-    {
-        var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(_jwt.Secret));
-
-        var expires = DateTime.UtcNow.AddMinutes(_jwt.ExpirationMinutes);
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        var token = new JwtSecurityToken(
-            issuer:             _jwt.Issuer,
-            audience:           _jwt.Audience,
-            claims:             claims,
-            expires:            expires,
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
-
-        return new TokenResponse(new JwtSecurityTokenHandler().WriteToken(token), expires);
-    }
-}
-```
+`JwtBearerOptions.OnTokenValidated` rejects tokens missing a valid `tenant_id` claim.
 
 ---
 
-## How Token Validation Is Configured
-
-Options are registered and validated at startup in `ServiceCollectionExtensions.AddAuthenticationOptions()`. The startup validation uses `.ValidateOnStart()` so a misconfigured secret (missing or shorter than 32 characters) causes an `OptionsValidationException` before the app accepts any traffic:
+## Reading Claims in Code
 
 ```csharp
-services.AddOptions<JwtOptions>()
-    .Bind(configuration.GetSection("Jwt"))
-    .ValidateDataAnnotations()
-    .Validate(
-        o => !string.IsNullOrWhiteSpace(o.Secret) && o.Secret.Length >= 32,
-        "Jwt secret too short")
-    .Validate(
-        o => !string.IsNullOrWhiteSpace(o.Issuer) && !string.IsNullOrWhiteSpace(o.Audience),
-        "Jwt issuer/audience is required")
-    .ValidateOnStart();
+var userId = User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+var tenantId = User.FindFirstValue(CustomClaimTypes.TenantId);
+var role = User.FindFirstValue(ClaimTypes.Role);
 ```
-
-The `JwtBearerOptions` are then wired up from the validated `JwtOptions`:
-
-```csharp
-services
-    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-    .Configure<IOptions<JwtOptions>>((options, jwtOptionsAccessor) =>
-    {
-        var jwt = jwtOptionsAccessor.Value;
-        var key = Encoding.UTF8.GetBytes(jwt.Secret);
-
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer           = true,
-            ValidateAudience         = true,
-            ValidateLifetime         = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer              = jwt.Issuer,
-            ValidAudience            = jwt.Audience,
-            IssuerSigningKey         = new SymmetricSecurityKey(key)
-        };
-    });
-```
-
-`app.UseAuthentication()` and `app.UseAuthorization()` are called in `Program.cs` in the correct order.
 
 ---
 
 ## Protecting a New Endpoint
 
-Add `[Authorize]` to the controller class (protects all actions) or to individual actions:
+REST:
 
 ```csharp
-// Entire controller requires a valid token
 [ApiController]
 [Authorize]
-public sealed class OrdersController : ControllerBase { ... }
-
-// Or allow anonymous access to specific actions
-[HttpGet("public-summary")]
-[AllowAnonymous]
-public IActionResult GetPublicSummary() { ... }
+public sealed class OrdersController : ControllerBase { }
 ```
 
-For GraphQL mutations, use the HotChocolate attribute:
+GraphQL mutation:
 
 ```csharp
-using HotChocolate.Authorization;
-
 [Authorize]
-public class OrderMutations { ... }
-```
-
----
-
-## Reading the Authenticated User in a Controller
-
-```csharp
-[HttpGet("me")]
-public IActionResult GetCurrentUser()
-{
-    var username = User.FindFirstValue(ClaimTypes.Name);
-    return Ok(new { username });
-}
-```
-
----
-
-## Replacing the Demo User Store (Production)
-
-`UserService` currently validates against credentials stored in configuration — suitable only for demos. Replace it with a real user store:
-
-### Option A – Database Users (EF Core)
-
-```csharp
-public sealed class UserService : IUserService
-{
-    private readonly IUserRepository _userRepository;
-
-    public UserService(IUserRepository userRepository)
-    {
-        _userRepository = userRepository;
-    }
-
-    public async Task<bool> ValidateAsync(string username, string password, CancellationToken ct)
-    {
-        var user = await _userRepository.GetByUsernameAsync(username, ct);
-        if (user is null) return false;
-
-        // Use a constant-time comparison library — never compare plain-text passwords.
-        return BCrypt.Net.BCrypt.Verify(password, user.PasswordHash);
-    }
-}
-```
-
-### Option B – External Identity Provider (OAuth 2.0 / OpenID Connect)
-
-Replace the local token generation entirely with an identity server (e.g., Keycloak, Auth0, Microsoft Entra ID) and configure `AddJwtBearer` to validate tokens issued by the external provider:
-
-```csharp
-options.Authority  = "https://your-identity-provider.com";
-options.Audience   = "your-api-audience";
+public class OrderMutations { }
 ```
 
 ---
@@ -275,13 +167,14 @@ options.Audience   = "your-api-audience";
 | File | Purpose |
 |------|---------|
 | `Api/Controllers/V1/AuthController.cs` | Login endpoint |
-| `Application/Services/TokenService.cs` | JWT generation |
-| `Application/Services/UserService.cs` | Credential validation (replace in production) |
-| `Application/Options/JwtOptions.cs` | Strongly-typed JWT configuration class |
-| `Application/Options/AuthOptions.cs` | Strongly-typed Auth configuration class |
-| `Application/DTOs/LoginRequest.cs` | Login request DTO |
-| `Application/DTOs/TokenResponse.cs` | Token response DTO |
-| `Extensions/ServiceCollectionExtensions.cs` | `AddAuthenticationOptions()` / `AddJwtAuthentication()` |
-| `Program.cs` | `app.UseAuthentication()` / `app.UseAuthorization()` |
-| `appsettings.json` | Base config – `Jwt:Secret` intentionally empty (must be overridden in production) |
-| `appsettings.Development.json` | Dev-only overrides – includes a placeholder secret for local development |
+| `Application/Features/Auth/Services/UserService.cs` | Username/password authentication against seeded `AppUser` |
+| `Application/Features/Auth/Services/TokenService.cs` | JWT generation |
+| `Application/Common/Security/CustomClaimTypes.cs` | `tenant_id` claim type constant |
+| `Application/Common/Options/JwtOptions.cs` | Strongly-typed JWT options |
+| `Application/Common/Options/BootstrapAdminOptions.cs` | Seeded admin options |
+| `Application/Common/Options/BootstrapTenantOptions.cs` | Seeded tenant options |
+| `Infrastructure/Persistence/AuthBootstrapSeeder.cs` | Startup bootstrap seed for tenant/admin |
+| `Extensions/ServiceCollectionExtensions.cs` | `AddAuthenticationOptions()` + `AddJwtAuthentication()` |
+| `Extensions/ApplicationBuilderExtensions.cs` | `UseDatabaseAsync()` runs seeding |
+| `appsettings.json` | Base config (`Jwt`, `Bootstrap`, `SystemIdentity`, `Cors`) |
+| `appsettings.Development.json` | Development overrides (dev JWT secret) |

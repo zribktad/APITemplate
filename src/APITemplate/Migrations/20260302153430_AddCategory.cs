@@ -79,13 +79,13 @@ namespace APITemplate.Migrations
                 table: "Products",
                 column: "CategoryId");
 
-            migrationBuilder.Sql(SqlResource.Load("get_product_category_stats.sql"));
+            migrationBuilder.Sql(SqlResource.Load("Procedures.get_product_category_stats_v1_up.sql"));
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS get_product_category_stats(UUID);");
+            migrationBuilder.Sql(SqlResource.Load("Procedures.get_product_category_stats_v1_down.sql"));
 
             migrationBuilder.DropTable(name: "ProductReviews");
             migrationBuilder.DropTable(name: "Products");

@@ -16,3 +16,4 @@ Step-by-step workflow guides for this API template. Each guide covers a complete
 | [Specifications](specifications.md) | Write reusable EF Core query specifications with Ardalis.Specification |
 | [Scalar & GraphQL UI](scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground |
 | [Testing](testing.md) | Write unit tests (services, validators, repositories) and integration tests |
+| [Result Pattern](result-pattern.md) | Guidelines for introducing selective `Result<T>` flow in phase 2 |
