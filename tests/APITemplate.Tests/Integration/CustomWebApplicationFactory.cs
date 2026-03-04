@@ -10,6 +10,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace APITemplate.Tests.Integration;
 
@@ -19,6 +21,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        var testRedactionHmacKey = Convert.ToBase64String(
+            SHA256.HashData(Encoding.UTF8.GetBytes("APITemplate.Tests.RedactionKey")));
+
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
@@ -29,7 +34,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:ExpirationMinutes"] = "60",
                 ["Auth:Username"] = "admin",
                 ["Auth:Password"] = "admin",
-                ["Cors:AllowedOrigins:0"] = "http://localhost:3000"
+                ["Cors:AllowedOrigins:0"] = "http://localhost:3000",
+                ["Redaction:HmacKeyEnvironmentVariable"] = "APITEMPLATE_REDACTION_HMAC_KEY",
+                ["Redaction:HmacKey"] = testRedactionHmacKey,
+                ["Redaction:KeyId"] = "1001"
             });
         });
 

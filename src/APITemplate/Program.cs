@@ -1,30 +1,16 @@
 using APITemplate.Extensions;
 using Serilog;
 
-var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-var bootstrapConfiguration = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables()
-    .Build();
-
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(bootstrapConfiguration)
-    .Enrich.FromLogContext()
-    .CreateLogger();
-
 try
 {
-    Log.Information("Starting APITemplate"); // Startup banner for early diagnostics.
-
     var builder = WebApplication.CreateBuilder(args); // Build host, configuration, and DI container.
+    builder.AddApplicationRedaction();
 
     builder.Host.UseSerilog((context, services, loggerConfiguration) =>
     {
         loggerConfiguration
             .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
-            .Enrich.FromLogContext();
+            .ReadFrom.Services(services);
     });
 
     builder.Services.AddApiFoundation(); // Register REST/OpenAPI/ProblemDetails/exception handling foundation.
@@ -37,6 +23,7 @@ try
     builder.Services.AddGraphQLConfiguration(); // Register GraphQL schema and server services.
 
     var app = builder.Build(); // Materialize the web app from configured services.
+    app.Logger.LogInformation("Starting APITemplate"); // Startup banner for diagnostics after logging pipeline is ready.
 
     await app.UseDatabaseAsync(); // Apply SQL/Mongo migrations before serving traffic.
 
@@ -47,11 +34,7 @@ try
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Application terminated unexpectedly"); // Fatal startup/runtime exception before graceful shutdown.
-}
-finally
-{
-    Log.CloseAndFlush(); // Ensure buffered logs are flushed on shutdown/crash.
+    Console.Error.WriteLine($"Application terminated unexpectedly: {ex}"); // Avoid static Serilog race in parallel test hosts.
 }
 
 public partial class Program; // Used by integration tests via WebApplicationFactory.

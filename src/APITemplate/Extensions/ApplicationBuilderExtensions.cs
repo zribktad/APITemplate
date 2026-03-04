@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Events;
 using System.Text.Json;
 
 namespace APITemplate.Extensions;
@@ -30,7 +31,28 @@ public static class ApplicationBuilderExtensions
     public static WebApplication UseCustomMiddleware(this WebApplication app)
     {
         app.UseMiddleware<RequestContextMiddleware>(); // Add correlation/trace headers and request timing context.
-        app.UseSerilogRequestLogging(); // Add structured request logging for each HTTP request/response.
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.MessageTemplate =
+                "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+            options.GetLevel = (httpContext, _, exception) =>
+            {
+                if (exception is not null || httpContext.Response.StatusCode >= 500)
+                    return LogEventLevel.Error;
+
+                if (httpContext.Response.StatusCode >= 400)
+                    return LogEventLevel.Warning;
+
+                return LogEventLevel.Information;
+            };
+
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+                diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+            };
+        }); // Add structured request logging for each HTTP request/response.
 
         return app;
     }
