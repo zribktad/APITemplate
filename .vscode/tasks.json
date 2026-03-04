@@ -43,7 +43,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "$services = docker compose ps --services; $pgRunning = $services -contains 'postgres'; $mongoRunning = $services -contains 'mongodb'; if ($pgRunning) { Write-Host 'postgres service is already running. Skipping postgres startup.' } else { docker compose up -d postgres }; if ($mongoRunning) { Write-Host 'mongodb service is already running. Skipping mongodb startup.' } else { docker compose up -d mongodb }"
+        "$ErrorActionPreference = 'Stop'; function Start-Or-Skip([string]$service) { $output = docker compose up -d $service 2>&1; $exitCode = $LASTEXITCODE; if ($exitCode -eq 0) { $output | Out-Host; return }; $msg = ($output | Out-String); if ($msg -match 'port is already allocated' -or $msg -match 'Bind for 0\\.0\\.0\\.0') { Write-Host \"$service port is already allocated. Continuing.\"; return }; throw $msg }; Start-Or-Skip 'postgres'; Start-Or-Skip 'mongodb'; exit 0"
       ],
       "problemMatcher": []
     },
