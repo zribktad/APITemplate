@@ -23,7 +23,7 @@ public static class LoggingExtensions
         {
             redactionBuilder.SetRedactor<ErasingRedactor>(LogDataClassifications.Personal);
 
-#pragma warning disable EXTEXP0002 // HMAC redactor API is experimental in current package line.
+#pragma warning disable EXTEXP0002 // HMAC redactor API is currently marked experimental in the Microsoft.Extensions.Compliance.Redaction package.
             redactionBuilder.SetHmacRedactor(
                 options =>
                 {
