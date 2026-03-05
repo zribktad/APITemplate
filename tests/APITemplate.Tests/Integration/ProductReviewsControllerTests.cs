@@ -1,9 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using APITemplate.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -11,8 +8,8 @@ namespace APITemplate.Tests.Integration;
 
 public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly HttpClient _client;
     private readonly CustomWebApplicationFactory _factory;
+    private readonly HttpClient _client;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public ProductReviewsControllerTests(CustomWebApplicationFactory factory)
@@ -133,9 +130,7 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
 
     private async Task<Guid> AuthenticateAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var tenant = await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Code == "default");
-        return IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenant.Id);
+        return await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client, _factory.Services);
     }
+
 }

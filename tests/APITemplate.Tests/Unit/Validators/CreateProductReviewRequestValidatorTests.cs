@@ -11,7 +11,7 @@ public class CreateProductReviewRequestValidatorTests
     [Fact]
     public async Task Validate_ValidRequest_Passes()
     {
-        var request = new CreateProductReviewRequest(Guid.NewGuid(), Guid.NewGuid(), "Great product!", 5);
+        var request = new CreateProductReviewRequest(Guid.NewGuid(), "Great product!", 5);
 
         var result = await _validator.ValidateAsync(request);
 
@@ -24,7 +24,7 @@ public class CreateProductReviewRequestValidatorTests
     [InlineData(-1)]
     public async Task Validate_InvalidRating_Fails(int rating)
     {
-        var request = new CreateProductReviewRequest(Guid.NewGuid(), Guid.NewGuid(), null, rating);
+        var request = new CreateProductReviewRequest(Guid.NewGuid(), null, rating);
 
         var result = await _validator.ValidateAsync(request);
 
@@ -33,20 +33,9 @@ public class CreateProductReviewRequestValidatorTests
     }
 
     [Fact]
-    public async Task Validate_EmptyUserId_Fails()
-    {
-        var request = new CreateProductReviewRequest(Guid.NewGuid(), Guid.Empty, null, 3);
-
-        var result = await _validator.ValidateAsync(request);
-
-        result.IsValid.ShouldBeFalse();
-        result.Errors.ShouldContain(e => e.PropertyName == "UserId");
-    }
-
-    [Fact]
     public async Task Validate_EmptyProductId_Fails()
     {
-        var request = new CreateProductReviewRequest(Guid.Empty, Guid.NewGuid(), null, 3);
+        var request = new CreateProductReviewRequest(Guid.Empty, null, 3);
 
         var result = await _validator.ValidateAsync(request);
 

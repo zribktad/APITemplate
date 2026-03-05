@@ -1,4 +1,5 @@
 using APITemplate.Api.GraphQL.Models;
+using APITemplate.Application.Common.Validation;
 using FluentValidation;
 using HotChocolate.Authorization;
 
@@ -25,11 +26,7 @@ public class ProductQueries
             input?.PageNumber ?? 1,
             input?.PageSize ?? 20);
 
-        var validation = await validator.ValidateAsync(filter, ct);
-        if (!validation.IsValid)
-            throw new Domain.Exceptions.ValidationException(
-                string.Join("; ", validation.Errors.Select(e => e.ErrorMessage)),
-                ErrorCatalog.General.ValidationFailed);
+        await validator.ValidateAndThrowAppAsync(filter, ct);
 
         var page = await queryService.GetPagedAsync(filter, ct);
         return new ProductPageResult(page.Items, page.TotalCount, page.PageNumber, page.PageSize);

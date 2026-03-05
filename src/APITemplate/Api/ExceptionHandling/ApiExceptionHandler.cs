@@ -102,6 +102,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         => appException switch
         {
             ValidationException => (StatusCodes.Status400BadRequest, "Bad Request", ErrorCatalog.General.ValidationFailed),
+            ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden", ErrorCatalog.Auth.Forbidden),
             NotFoundException => (StatusCodes.Status404NotFound, "Not Found", ErrorCatalog.General.NotFound),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict", ErrorCatalog.General.Conflict),
             _ => (StatusCodes.Status500InternalServerError, "Internal Server Error", ErrorCatalog.General.Unknown)

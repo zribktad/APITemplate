@@ -1,4 +1,5 @@
 using APITemplate.Api.GraphQL.Models;
+using APITemplate.Application.Common.Validation;
 using FluentValidation;
 using HotChocolate.Authorization;
 
@@ -26,11 +27,7 @@ public class ProductReviewQueries
             input?.PageNumber ?? 1,
             input?.PageSize ?? 20);
 
-        var validation = await validator.ValidateAsync(filter, ct);
-        if (!validation.IsValid)
-            throw new Domain.Exceptions.ValidationException(
-                string.Join("; ", validation.Errors.Select(e => e.ErrorMessage)),
-                ErrorCatalog.General.ValidationFailed);
+        await validator.ValidateAndThrowAppAsync(filter, ct);
 
         var page = await queryService.GetPagedAsync(filter, ct);
         return new ProductReviewPageResult(page.Items, page.TotalCount, page.PageNumber, page.PageSize);
@@ -52,11 +49,7 @@ public class ProductReviewQueries
     {
         var filter = new ProductReviewFilter(ProductId: productId, PageNumber: pageNumber, PageSize: pageSize);
 
-        var validation = await validator.ValidateAsync(filter, ct);
-        if (!validation.IsValid)
-            throw new Domain.Exceptions.ValidationException(
-                string.Join("; ", validation.Errors.Select(e => e.ErrorMessage)),
-                ErrorCatalog.General.ValidationFailed);
+        await validator.ValidateAndThrowAppAsync(filter, ct);
 
         var page = await queryService.GetPagedAsync(filter, ct);
         return new ProductReviewPageResult(page.Items, page.TotalCount, page.PageNumber, page.PageSize);

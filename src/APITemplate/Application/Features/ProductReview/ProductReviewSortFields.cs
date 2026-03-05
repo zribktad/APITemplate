@@ -9,5 +9,6 @@ public static class ProductReviewSortFields
 
     public static readonly SortFieldMap<ProductReviewEntity> Map = new SortFieldMap<ProductReviewEntity>()
         .Add(Rating, r => (object)r.Rating)
+        .Add(CreatedAt, r => r.Audit.CreatedAtUtc)
         .Default(r => r.Audit.CreatedAtUtc);
 }

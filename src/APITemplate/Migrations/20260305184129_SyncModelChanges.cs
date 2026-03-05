@@ -11,16 +11,38 @@ namespace APITemplate.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "ReviewerName",
-                table: "ProductReviews");
-
+            // Step 1: Add UserId as nullable so existing rows are not rejected.
             migrationBuilder.AddColumn<Guid>(
                 name: "UserId",
                 table: "ProductReviews",
                 type: "uuid",
+                nullable: true);
+
+            // Step 2: Backfill existing rows — assign each review to the user
+            // who matches the old ReviewerName, falling back to the first admin user
+            // in the same tenant. Adjust this query if your mapping differs.
+            migrationBuilder.Sql("""
+                UPDATE "ProductReviews" pr
+                SET "UserId" = u."Id"
+                FROM "Users" u
+                WHERE u."Username" = pr."ReviewerName"
+                  AND u."TenantId" = pr."TenantId";
+                """);
+
+            // Step 3: Drop the old column now that data has been migrated.
+            migrationBuilder.DropColumn(
+                name: "ReviewerName",
+                table: "ProductReviews");
+
+            // Step 4: Make UserId non-nullable now that all rows have a value.
+            migrationBuilder.AlterColumn<Guid>(
+                name: "UserId",
+                table: "ProductReviews",
+                type: "uuid",
                 nullable: false,
-                defaultValue: new Guid("00000000-0000-0000-0000-000000000000"));
+                oldClrType: typeof(Guid),
+                oldType: "uuid",
+                oldNullable: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductReviews_UserId",

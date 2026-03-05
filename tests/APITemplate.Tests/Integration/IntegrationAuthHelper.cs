@@ -123,4 +123,16 @@ internal static class IntegrationAuthHelper
 
         return (tenant, user);
     }
+
+    /// <summary>
+    /// Seeds a tenant and authenticates the client with a test token. Returns the user ID.
+    /// </summary>
+    public static async Task<Guid> AuthenticateAndGetUserIdAsync(
+        HttpClient client,
+        IServiceProvider services,
+        string role = nameof(UserRole.PlatformAdmin))
+    {
+        var tenant = await SeedTenantAsync(services);
+        return AuthenticateAndGetUserId(client, tenant.Id, role);
+    }
 }

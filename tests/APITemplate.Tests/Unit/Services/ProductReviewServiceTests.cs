@@ -1,3 +1,4 @@
+using APITemplate.Application.Common.Context;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -14,6 +15,8 @@ public class ProductReviewServiceTests
     private readonly Mock<IProductReviewQueryService> _queryServiceMock;
     private readonly Mock<IProductRepository> _productRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IActorProvider> _actorProviderMock;
+    private readonly Guid _currentUserId = Guid.NewGuid();
     private readonly ProductReviewService _sut;
 
     public ProductReviewServiceTests()
@@ -22,6 +25,8 @@ public class ProductReviewServiceTests
         _queryServiceMock = new Mock<IProductReviewQueryService>();
         _productRepoMock = new Mock<IProductRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _actorProviderMock = new Mock<IActorProvider>();
+        _actorProviderMock.Setup(a => a.ActorId).Returns(_currentUserId.ToString());
         _unitOfWorkMock
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<ProductReview>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<ProductReview>> action, CancellationToken _) => action());
@@ -29,7 +34,8 @@ public class ProductReviewServiceTests
             _reviewRepoMock.Object,
             _queryServiceMock.Object,
             _productRepoMock.Object,
-            _unitOfWorkMock.Object);
+            _unitOfWorkMock.Object,
+            _actorProviderMock.Object);
     }
 
     [Fact]
@@ -113,8 +119,7 @@ public class ProductReviewServiceTests
     public async Task CreateAsync_WhenProductExists_CreatesReview()
     {
         var product = new Product { Id = Guid.NewGuid(), Name = "Test", Price = 10m, Audit = new() { CreatedAtUtc = DateTime.UtcNow } };
-        var userId = Guid.NewGuid();
-        var request = new CreateProductReviewRequest(product.Id, userId, "Great!", 5);
+        var request = new CreateProductReviewRequest(product.Id, "Great!", 5);
 
         _productRepoMock
             .Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
@@ -126,7 +131,7 @@ public class ProductReviewServiceTests
 
         var result = await _sut.CreateAsync(request);
 
-        result.UserId.ShouldBe(userId);
+        result.UserId.ShouldBe(_currentUserId);
         result.Rating.ShouldBe(5);
         result.ProductId.ShouldBe(product.Id);
         result.Id.ShouldNotBe(Guid.Empty);
@@ -141,7 +146,7 @@ public class ProductReviewServiceTests
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Product?)null);
 
-        var request = new CreateProductReviewRequest(Guid.NewGuid(), Guid.NewGuid(), null, 3);
+        var request = new CreateProductReviewRequest(Guid.NewGuid(), null, 3);
 
         var act = () => _sut.CreateAsync(request);
 
@@ -149,13 +154,48 @@ public class ProductReviewServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_CallsRepositoryDelete()
+    public async Task DeleteAsync_WhenOwner_CallsRepositoryDelete()
     {
         var id = Guid.NewGuid();
+        var review = new ProductReview { Id = id, UserId = _currentUserId, Rating = 3 };
+
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(review);
 
         await _sut.DeleteAsync(id);
 
         _reviewRepoMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenNotOwner_ThrowsForbiddenException()
+    {
+        var id = Guid.NewGuid();
+        var review = new ProductReview { Id = id, UserId = Guid.NewGuid(), Rating = 3 };
+
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(review);
+
+        var act = () => _sut.DeleteAsync(id);
+
+        await Should.ThrowAsync<ForbiddenException>(act);
+        _reviewRepoMock.Verify(r => r.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenNotFound_ThrowsNotFoundException()
+    {
+        var id = Guid.NewGuid();
+
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductReview?)null);
+
+        var act = () => _sut.DeleteAsync(id);
+
+        await Should.ThrowAsync<NotFoundException>(act);
     }
 }

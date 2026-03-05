@@ -12,8 +12,8 @@ namespace APITemplate.Tests.Integration;
 
 public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly HttpClient _client;
     private readonly CustomWebApplicationFactory _factory;
+    private readonly HttpClient _client;
     private Guid _userId;
 
     public GraphQLTests(CustomWebApplicationFactory factory)
@@ -241,10 +241,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
     private async Task AuthenticateAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var tenant = await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Code == "default");
-        _userId = IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenant.Id);
+        _userId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client, _factory.Services);
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)
@@ -288,7 +285,6 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
                 input = new
                 {
                     productId,
-                    userId = _userId,
                     rating
                 }
             }

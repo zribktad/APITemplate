@@ -12,8 +12,8 @@ namespace APITemplate.Tests.Integration;
 
 public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly HttpClient _client;
     private readonly CustomWebApplicationFactory _factory;
+    private readonly HttpClient _client;
     private Guid _userId;
 
     public GraphQLProductReviewTests(CustomWebApplicationFactory factory)
@@ -44,7 +44,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 input = new
                 {
                     productId,
-                    userId = _userId,
                     comment = "Tested via GraphQL",
                     rating = 4
                 }
@@ -91,7 +90,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating = 3 }
+                input = new { productId, rating = 3 }
             }
         };
         await PostGraphQLAsync(createMutation);
@@ -170,7 +169,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating = 2 }
+                input = new { productId, rating = 2 }
             }
         };
 
@@ -193,10 +192,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task AuthenticateAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var tenant = await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Code == "default");
-        _userId = IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenant.Id);
+        _userId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client, _factory.Services);
     }
 
     private async Task<Guid> CreateProductViaGraphQLAsync(string name, decimal price)
@@ -228,7 +224,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating }
+                input = new { productId, rating }
             }
         };
 
