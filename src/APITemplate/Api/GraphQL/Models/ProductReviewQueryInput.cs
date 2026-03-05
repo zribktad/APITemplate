@@ -3,7 +3,7 @@ namespace APITemplate.Api.GraphQL.Models;
 public sealed class ProductReviewQueryInput
 {
     public Guid? ProductId { get; init; }
-    public string? ReviewerName { get; init; }
+    public Guid? UserId { get; init; }
     public int? MinRating { get; init; }
     public int? MaxRating { get; init; }
     public DateTime? CreatedFrom { get; init; }

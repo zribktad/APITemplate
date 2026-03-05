@@ -87,13 +87,13 @@ public sealed class PostgresDataIntegrityTests
         var usernameA = $"tenant-a-{Guid.NewGuid():N}";
         var usernameB = $"tenant-b-{Guid.NewGuid():N}";
 
-        var (tenantA, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
+        var (tenantA, userA) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             usernameA,
             $"{usernameA}@example.com",
             "pass-a");
 
-        var (tenantB, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
+        var (tenantB, userB) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             usernameB,
             $"{usernameB}@example.com",
@@ -154,7 +154,7 @@ public sealed class PostgresDataIntegrityTests
                 Id = Guid.NewGuid(),
                 TenantId = tenantA.Id,
                 ProductId = productA1.Id,
-                ReviewerName = "A1",
+                UserId = userA.Id,
                 Rating = 5
             };
 
@@ -163,7 +163,7 @@ public sealed class PostgresDataIntegrityTests
                 Id = Guid.NewGuid(),
                 TenantId = tenantA.Id,
                 ProductId = productA1.Id,
-                ReviewerName = "A2",
+                UserId = userA.Id,
                 Rating = 4
             };
 
@@ -172,7 +172,7 @@ public sealed class PostgresDataIntegrityTests
                 Id = Guid.NewGuid(),
                 TenantId = tenantB.Id,
                 ProductId = productB1.Id,
-                ReviewerName = "B1",
+                UserId = userB.Id,
                 Rating = 3
             };
 
@@ -254,7 +254,7 @@ public sealed class PostgresDataIntegrityTests
             categoryId = category.Id;
         }
 
-        await IntegrationAuthHelper.AuthenticateAsync(_client, $"{tenant.Code}\\{username}", "pass-cascade");
+        var cascadeUserId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client, $"{tenant.Code}\\{username}", "pass-cascade");
 
         var createProductResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
@@ -271,14 +271,14 @@ public sealed class PostgresDataIntegrityTests
 
         var createReview1 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, ReviewerName = "r1", Rating = 5 });
+            new { ProductId = productId, UserId = cascadeUserId, Rating = 5 });
         createReview1.StatusCode.ShouldBe(HttpStatusCode.Created);
         var createdReview1 = await createReview1.Content.ReadFromJsonAsync<JsonElement>();
         review1Id = createdReview1.GetProperty("id").GetGuid();
 
         var createReview2 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, ReviewerName = "r2", Rating = 4 });
+            new { ProductId = productId, UserId = cascadeUserId, Rating = 4 });
         createReview2.StatusCode.ShouldBe(HttpStatusCode.Created);
         var createdReview2 = await createReview2.Content.ReadFromJsonAsync<JsonElement>();
         review2Id = createdReview2.GetProperty("id").GetGuid();

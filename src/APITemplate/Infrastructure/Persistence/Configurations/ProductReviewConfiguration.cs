@@ -11,10 +11,6 @@ public sealed class ProductReviewConfiguration : IEntityTypeConfiguration<Produc
         builder.HasKey(r => r.Id);
         builder.ConfigureTenantAuditable();
 
-        builder.Property(r => r.ReviewerName)
-            .IsRequired()
-            .HasMaxLength(100);
-
         builder.Property(r => r.Comment)
             .HasMaxLength(2000);
 
@@ -25,6 +21,11 @@ public sealed class ProductReviewConfiguration : IEntityTypeConfiguration<Produc
             .WithMany(p => p.Reviews)
             .HasForeignKey(r => r.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Tenant>()
             .WithMany()

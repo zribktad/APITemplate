@@ -32,10 +32,10 @@ public abstract class RepositoryBase<T>
 
 
     // Guid-based delete (our contract, not in IRepositoryBase)
-    public virtual async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    public virtual async Task DeleteAsync(Guid id, CancellationToken ct = default, string? errorCode = null)
     {
         var entity = await GetByIdAsync(id, ct)
-            ?? throw new NotFoundException(typeof(T).Name, id, ErrorCatalog.General.NotFound);
+            ?? throw new NotFoundException(typeof(T).Name, id, errorCode ?? ErrorCatalog.General.NotFound);
         DbContext.Set<T>().Remove(entity);
     }
 }

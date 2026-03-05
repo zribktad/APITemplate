@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -33,6 +34,20 @@ internal static class IntegrationAuthHelper
     {
         var token = await LoginAndGetTokenAsync(client, username, password);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    public static async Task<Guid> AuthenticateAndGetUserIdAsync(
+        HttpClient client,
+        string username = "default\\admin",
+        string password = "admin")
+    {
+        var token = await LoginAndGetTokenAsync(client, username, password);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(token);
+        var sub = jwt.Claims.First(c => c.Type == "sub").Value;
+        return Guid.Parse(sub);
     }
 
     public static async Task<(Tenant Tenant, AppUser User)> SeedTenantUserAsync(

@@ -12,5 +12,5 @@ public interface IRepository<T> : IRepositoryBase<T> where T : class
     //   AddAsync(T entity, ct), UpdateAsync(T entity, ct), DeleteAsync(T entity, ct)
 
     // Ardalis only has DeleteAsync(T entity), we also need DeleteAsync(Guid id)
-    Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default, string? errorCode = null);
 }

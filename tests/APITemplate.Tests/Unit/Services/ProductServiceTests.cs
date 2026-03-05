@@ -12,6 +12,7 @@ public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
     private readonly Mock<IProductQueryService> _queryServiceMock;
+    private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly ProductService _sut;
 
@@ -19,8 +20,13 @@ public class ProductServiceTests
     {
         _repositoryMock = new Mock<IProductRepository>();
         _queryServiceMock = new Mock<IProductQueryService>();
+        _categoryRepositoryMock = new Mock<ICategoryRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _sut = new ProductService(_repositoryMock.Object, _queryServiceMock.Object, _unitOfWorkMock.Object);
+        _sut = new ProductService(
+            _repositoryMock.Object,
+            _queryServiceMock.Object,
+            _categoryRepositoryMock.Object,
+            _unitOfWorkMock.Object);
     }
 
     [Theory]
@@ -75,6 +81,42 @@ public class ProductServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithCategoryId_ValidatesCategory()
+    {
+        var categoryId = Guid.NewGuid();
+        var category = new Category { Id = categoryId, Name = "Test" };
+        var request = new CreateProductRequest("New Product", "Description", 19.99m, categoryId);
+
+        _categoryRepositoryMock
+            .Setup(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(category);
+
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Product p, CancellationToken _) => p);
+
+        var result = await _sut.CreateAsync(request);
+
+        result.Name.ShouldBe("New Product");
+        _categoryRepositoryMock.Verify(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithNonExistentCategory_ThrowsNotFoundException()
+    {
+        var categoryId = Guid.NewGuid();
+        var request = new CreateProductRequest("New Product", "Description", 19.99m, categoryId);
+
+        _categoryRepositoryMock
+            .Setup(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Category?)null);
+
+        var act = () => _sut.CreateAsync(request);
+
+        await Should.ThrowAsync<NotFoundException>(act);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenProductNotFound_ThrowsNotFoundException()
     {
         _repositoryMock
@@ -94,7 +136,7 @@ public class ProductServiceTests
         await _sut.DeleteAsync(id);
 
         _repositoryMock.Verify(
-            r => r.DeleteAsync(id, It.IsAny<CancellationToken>()),
+            r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()),
             Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
     }

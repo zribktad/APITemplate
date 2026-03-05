@@ -8,7 +8,11 @@ public sealed class NotEmptyAttribute : ValidationAttribute
 
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
-        if (value is null || (value is string str && string.IsNullOrWhiteSpace(str)))
+        var isEmpty = value is null
+            || (value is string str && string.IsNullOrWhiteSpace(str))
+            || (value is Guid guid && guid == Guid.Empty);
+
+        if (isEmpty)
             return new ValidationResult(
                 FormatErrorMessage(validationContext.DisplayName),
                 [validationContext.MemberName!]);

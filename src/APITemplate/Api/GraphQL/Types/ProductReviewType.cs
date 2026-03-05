@@ -14,9 +14,9 @@ public sealed class ProductReviewType : ObjectType<ProductReviewResponse>
             .Type<NonNullType<UuidType>>()
             .Description("The identifier of the reviewed product.");
 
-        descriptor.Field(r => r.ReviewerName)
-            .Type<NonNullType<StringType>>()
-            .Description("The name of the reviewer.");
+        descriptor.Field(r => r.UserId)
+            .Type<NonNullType<UuidType>>()
+            .Description("The identifier of the user who wrote the review.");
 
         descriptor.Field(r => r.Rating)
             .Type<NonNullType<IntType>>()

@@ -1,3 +1,5 @@
+using APITemplate.Application.Common.Contracts;
+
 namespace APITemplate.Application.Features.Product.DTOs;
 public sealed record ProductFilter(
     string? Name = null,
@@ -9,4 +11,4 @@ public sealed record ProductFilter(
     string? SortBy = null,
     string? SortDirection = null,
     int PageNumber = 1,
-    int PageSize = 10) : PaginationFilter(PageNumber, PageSize);
+    int PageSize = 10) : PaginationFilter(PageNumber, PageSize), IDateRangeFilter, ISortableFilter;

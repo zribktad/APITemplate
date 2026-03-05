@@ -8,15 +8,18 @@ public sealed class ProductService : IProductService
 {
     private readonly IProductRepository _repository;
     private readonly IProductQueryService _queryService;
+    private readonly ICategoryRepository _categoryRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public ProductService(
         IProductRepository repository,
         IProductQueryService queryService,
+        ICategoryRepository categoryRepository,
         IUnitOfWork unitOfWork)
     {
         _repository = repository;
         _queryService = queryService;
+        _categoryRepository = categoryRepository;
         _unitOfWork = unitOfWork;
     }
 
@@ -28,6 +31,8 @@ public sealed class ProductService : IProductService
 
     public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {
+        await ValidateCategoryExistsAsync(request.CategoryId, ct);
+
         var product = new ProductEntity
         {
             Id = Guid.NewGuid(),
@@ -50,6 +55,8 @@ public sealed class ProductService : IProductService
                 id,
                 ErrorCatalog.Products.NotFound);
 
+        await ValidateCategoryExistsAsync(request.CategoryId, ct);
+
         product.Name = request.Name;
         product.Description = request.Description;
         product.Price = request.Price;
@@ -61,8 +68,19 @@ public sealed class ProductService : IProductService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        await _repository.DeleteAsync(id, ct);
+        await _repository.DeleteAsync(id, ct, ErrorCatalog.Products.NotFound);
         await _unitOfWork.CommitAsync(ct);
     }
 
+    private async Task ValidateCategoryExistsAsync(Guid? categoryId, CancellationToken ct)
+    {
+        if (!categoryId.HasValue)
+            return;
+
+        _ = await _categoryRepository.GetByIdAsync(categoryId.Value, ct)
+            ?? throw new NotFoundException(
+                nameof(Domain.Entities.Category),
+                categoryId.Value,
+                ErrorCatalog.Categories.NotFound);
+    }
 }

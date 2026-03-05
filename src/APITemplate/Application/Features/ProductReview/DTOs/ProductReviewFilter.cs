@@ -1,7 +1,9 @@
+using APITemplate.Application.Common.Contracts;
+
 namespace APITemplate.Application.Features.ProductReview.DTOs;
 public sealed record ProductReviewFilter(
     Guid? ProductId = null,
-    string? ReviewerName = null,
+    Guid? UserId = null,
     int? MinRating = null,
     int? MaxRating = null,
     DateTime? CreatedFrom = null,
@@ -9,4 +11,4 @@ public sealed record ProductReviewFilter(
     string? SortBy = null,
     string? SortDirection = null,
     int PageNumber = 1,
-    int PageSize = 10) : PaginationFilter(PageNumber, PageSize);
+    int PageSize = 10) : PaginationFilter(PageNumber, PageSize), IDateRangeFilter, ISortableFilter;

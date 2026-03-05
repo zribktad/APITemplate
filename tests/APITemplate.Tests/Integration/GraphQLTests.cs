@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -192,9 +191,9 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
         var p1 = await CreateProductViaGraphQLAsync($"{prefix}-P1", 11m);
         var p2 = await CreateProductViaGraphQLAsync($"{prefix}-P2", 22m);
 
-        await CreateReviewViaGraphQLAsync(p1, "r1", 5);
-        await CreateReviewViaGraphQLAsync(p1, "r2", 4);
-        await CreateReviewViaGraphQLAsync(p2, "r3", 3);
+        await CreateReviewViaGraphQLAsync(p1, 5);
+        await CreateReviewViaGraphQLAsync(p1, 4);
+        await CreateReviewViaGraphQLAsync(p2, 3);
 
         var query = new
         {
@@ -236,16 +235,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
     private async Task AuthenticateAsync()
     {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString();
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        await IntegrationAuthHelper.AuthenticateAsync(_client);
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)
@@ -276,7 +266,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
         return result!.Data.CreateProduct.Id;
     }
 
-    private async Task<Guid> CreateReviewViaGraphQLAsync(Guid productId, string reviewerName, int rating)
+    private async Task<Guid> CreateReviewViaGraphQLAsync(Guid productId, int rating)
     {
         var mutation = new
         {
@@ -289,7 +279,6 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
                 input = new
                 {
                     productId,
-                    reviewerName,
                     rating
                 }
             }

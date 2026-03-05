@@ -9,8 +9,8 @@ internal static class ProductReviewFilterCriteria
         if (filter.ProductId.HasValue)
             query.Where(r => r.ProductId == filter.ProductId.Value);
 
-        if (!string.IsNullOrWhiteSpace(filter.ReviewerName))
-            query.Where(r => r.ReviewerName.Contains(filter.ReviewerName));
+        if (filter.UserId.HasValue)
+            query.Where(r => r.UserId == filter.UserId.Value);
 
         if (filter.MinRating.HasValue)
             query.Where(r => r.Rating >= filter.MinRating.Value);
