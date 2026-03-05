@@ -1,6 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -41,7 +39,6 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 input = new
                 {
                     productId,
-                    userId = _userId,
                     comment = "Tested via GraphQL",
                     rating = 4
                 }
@@ -88,7 +85,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating = 3 }
+                input = new { productId, rating = 3 }
             }
         };
         await PostGraphQLAsync(createMutation);
@@ -167,7 +164,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating = 2 }
+                input = new { productId, rating = 2 }
             }
         };
 
@@ -190,21 +187,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task AuthenticateAsync()
     {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString()!;
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(token);
-        var sub = jwt.Claims.First(c => c.Type == "sub").Value;
-        _userId = Guid.Parse(sub);
+        _userId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client);
     }
 
     private async Task<Guid> CreateProductViaGraphQLAsync(string name, decimal price)
@@ -236,7 +219,7 @@ public class GraphQLProductReviewTests : IClassFixture<CustomWebApplicationFacto
                 }",
             variables = new
             {
-                input = new { productId, userId = _userId, rating }
+                input = new { productId, rating }
             }
         };
 

@@ -6,9 +6,6 @@ public sealed record CreateProductReviewRequest(
     [property: NotEmpty(ErrorMessage = "ProductId is required.")]
     Guid ProductId,
 
-    [property: NotEmpty(ErrorMessage = "UserId is required.")]
-    Guid UserId,
-
     string? Comment,
 
     [property: Range(1, 5, ErrorMessage = "Rating must be between 1 and 5.")]

@@ -1,6 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Shouldly;
@@ -29,7 +27,7 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task FullReviewFlow_CreateAndQuery()
     {
-        var userId = await AuthenticateAsync();
+        var userId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client);
 
         // 1. Create a product
         var productResponse = await _client.PostAsJsonAsync(
@@ -43,7 +41,7 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
         // 2. Create a review for the product
         var createReviewResponse = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, UserId = userId, Comment = "Great product!", Rating = 5 });
+            new { ProductId = productId, Comment = "Great product!", Rating = 5 });
 
         createReviewResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         var created = await createReviewResponse.Content.ReadFromJsonAsync<JsonElement>();
@@ -77,7 +75,7 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task GetById_NonExistentReview_ReturnsNotFound()
     {
-        await AuthenticateAsync();
+        await IntegrationAuthHelper.AuthenticateAsync(_client);
 
         var response = await _client.GetAsync($"/api/v1/productreviews/{Guid.NewGuid()}");
 
@@ -87,11 +85,11 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task Create_WithNonExistentProduct_ReturnsNotFound()
     {
-        var userId = await AuthenticateAsync();
+        await IntegrationAuthHelper.AuthenticateAsync(_client);
 
         var response = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = Guid.NewGuid(), UserId = userId, Rating = 3 });
+            new { ProductId = Guid.NewGuid(), Rating = 3 });
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
@@ -111,7 +109,7 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
     [Fact]
     public async Task GetByProductId_ReturnsEmptyForProductWithNoReviews()
     {
-        await AuthenticateAsync();
+        await IntegrationAuthHelper.AuthenticateAsync(_client);
 
         var productResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
@@ -128,20 +126,4 @@ public class ProductReviewsControllerTests : IClassFixture<CustomWebApplicationF
         reviews!.ShouldBeEmpty();
     }
 
-    private async Task<Guid> AuthenticateAsync()
-    {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString()!;
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(token);
-        var sub = jwt.Claims.First(c => c.Type == "sub").Value;
-        return Guid.Parse(sub);
-    }
 }

@@ -1,6 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -12,7 +10,6 @@ namespace APITemplate.Tests.Integration;
 public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    private Guid _userId;
 
     public GraphQLTests(CustomWebApplicationFactory factory)
     {
@@ -238,21 +235,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 
     private async Task AuthenticateAsync()
     {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        loginResponse.EnsureSuccessStatusCode();
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString()!;
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwt = handler.ReadJwtToken(token);
-        var sub = jwt.Claims.First(c => c.Type == "sub").Value;
-        _userId = Guid.Parse(sub);
+        await IntegrationAuthHelper.AuthenticateAsync(_client);
     }
 
     private async Task<HttpResponseMessage> PostGraphQLAsync(object query)
@@ -296,7 +279,6 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
                 input = new
                 {
                     productId,
-                    userId = _userId,
                     rating
                 }
             }

@@ -1,3 +1,4 @@
+using APITemplate.Application.Common.Validation;
 using FluentValidation;
 using HotChocolate.Authorization;
 
@@ -13,12 +14,7 @@ public class ProductReviewMutations
         [Service] IValidator<CreateProductReviewRequest> validator,
         CancellationToken ct)
     {
-        var validation = await validator.ValidateAsync(input, ct);
-        if (!validation.IsValid)
-            throw new Domain.Exceptions.ValidationException(
-                string.Join("; ", validation.Errors.Select(e => e.ErrorMessage)),
-                ErrorCatalog.General.ValidationFailed);
-
+        await validator.ValidateAndThrowAppAsync(input, ct);
         return await reviewService.CreateAsync(input, ct);
     }
 
