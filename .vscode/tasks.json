@@ -22,7 +22,7 @@
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "docker: db up",
+      "label": "docker: infra up",
       "type": "process",
       "command": "docker",
       "args": [
@@ -30,12 +30,14 @@
         "up",
         "-d",
         "postgres",
-        "mongodb"
+        "mongodb",
+        "authentik-server",
+        "authentik-worker"
       ],
       "problemMatcher": []
     },
     {
-      "label": "docker: db ensure up",
+      "label": "docker: infra ensure up",
       "type": "process",
       "command": "pwsh",
       "args": [
@@ -43,19 +45,23 @@
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "$ErrorActionPreference = 'Stop'; function Start-Or-Skip([string]$service) { $output = docker compose up -d $service 2>&1; $exitCode = $LASTEXITCODE; if ($exitCode -eq 0) { $output | Out-Host; return }; $msg = ($output | Out-String); if ($msg -match 'port is already allocated' -or $msg -match 'Bind for 0\\.0\\.0\\.0') { Write-Host \"$service port is already allocated. Continuing.\"; return }; throw $msg }; Start-Or-Skip 'postgres'; Start-Or-Skip 'mongodb'; exit 0"
+        "$ErrorActionPreference = 'Stop'; function Start-Or-Skip([string]$service) { $output = docker compose up -d $service 2>&1; $exitCode = $LASTEXITCODE; if ($exitCode -eq 0) { $output | Out-Host; return }; $msg = ($output | Out-String); if ($msg -match 'port is already allocated' -or $msg -match 'Bind for 0\\.0\\.0\\.0') { Write-Host \"$service port is already allocated. Continuing.\"; return }; throw $msg }; Start-Or-Skip 'postgres'; Start-Or-Skip 'mongodb'; Start-Or-Skip 'authentik-server'; Start-Or-Skip 'authentik-worker'; exit 0"
       ],
       "problemMatcher": []
     },
     {
-      "label": "docker: db down",
+      "label": "docker: infra down",
       "type": "process",
       "command": "docker",
       "args": [
         "compose",
         "stop",
         "postgres",
-        "mongodb"
+        "mongodb",
+        "authentik-server",
+        "authentik-worker",
+        "authentik-postgres",
+        "authentik-redis"
       ],
       "problemMatcher": []
     },
@@ -84,7 +90,7 @@
     {
       "label": "prepare: debug http",
       "dependsOn": [
-        "docker: db ensure up",
+        "docker: infra ensure up",
         "build: api"
       ],
       "dependsOrder": "sequence",
@@ -93,7 +99,7 @@
     {
       "label": "prepare: debug https",
       "dependsOn": [
-        "docker: db ensure up",
+        "docker: infra ensure up",
         "build: api"
       ],
       "dependsOrder": "sequence",

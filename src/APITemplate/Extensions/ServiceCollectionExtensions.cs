@@ -138,6 +138,7 @@ public static class ServiceCollectionExtensions
                 var authentik = authentikAccessor.Value;
 
                 options.Authority = authentik.Authority;
+                options.RequireHttpsMetadata = !authentik.Authority.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
                 options.Audience = authentik.ClientId;
 
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -168,6 +169,10 @@ public static class ServiceCollectionExtensions
                 AuthorizationPolicies.PlatformAdminOnly,
                 policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()));
         });
+
+        services.AddHttpClient<AuthentikHealthCheck>();
+        services.AddHealthChecks()
+            .AddCheck<AuthentikHealthCheck>("authentik", tags: ["identity"]);
 
         return services;
     }
@@ -214,6 +219,7 @@ public static class ServiceCollectionExtensions
             {
                 var bff = bffAccessor.Value;
                 options.Authority = bff.Authority;
+                options.RequireHttpsMetadata = !bff.Authority.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
                 options.ClientId = bff.ClientId;
                 options.ClientSecret = bff.ClientSecret;
                 options.ResponseType = "code";

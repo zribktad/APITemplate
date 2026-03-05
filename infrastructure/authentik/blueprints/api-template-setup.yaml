@@ -1,0 +1,104 @@
+version: 1
+metadata:
+  name: API Template - Dev Setup
+  labels:
+    blueprints.goauthentik.io/description: >-
+      Provisions OAuth2 providers, applications, scope mappings, groups, and
+      default user attributes for local API Template development.
+
+entries:
+  # ──────────────────────────────────────────────
+  # 1. Custom scope mapping: tenant_id
+  # ──────────────────────────────────────────────
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-mapping-tenant-id
+    attrs:
+      name: "tenant_id"
+      scope_name: "tenant_id"
+      expression: |
+        return {
+          "tenant_id": request.user.attributes.get("tenant_id", "")
+        }
+
+  # ──────────────────────────────────────────────
+  # 2. Custom scope mapping: groups (expose group names)
+  # ──────────────────────────────────────────────
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-mapping-groups
+    attrs:
+      name: "groups"
+      scope_name: "groups"
+      expression: |
+        return {
+          "groups": [group.name for group in request.user.ak_groups.all()]
+        }
+
+  # ──────────────────────────────────────────────
+  # 3. OAuth2 Provider: api-template (JWT Bearer)
+  # ──────────────────────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-api-template
+    attrs:
+      name: "api-template"
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      client_type: "confidential"
+      client_id: "api-template"
+      client_secret: "dev-client-secret"
+      redirect_uris: "http://localhost:5174/*"
+      include_claims_in_id_token: true
+      sub_mode: "hashed_user_id"
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !KeyOf scope-mapping-tenant-id
+        - !KeyOf scope-mapping-groups
+
+  # ──────────────────────────────────────────────
+  # 4. OAuth2 Provider: api-template-bff (Cookie+OIDC)
+  # ──────────────────────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-api-template-bff
+    attrs:
+      name: "api-template-bff"
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      client_type: "confidential"
+      client_id: "api-template-bff"
+      client_secret: "dev-bff-client-secret"
+      redirect_uris: "http://localhost:5174/bff/callback"
+      include_claims_in_id_token: true
+      sub_mode: "hashed_user_id"
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !KeyOf scope-mapping-tenant-id
+        - !KeyOf scope-mapping-groups
+
+  # ──────────────────────────────────────────────
+  # 5. Application: api-template
+  # ──────────────────────────────────────────────
+  - model: authentik_core.application
+    id: app-api-template
+    attrs:
+      name: "API Template"
+      slug: "api-template"
+      provider: !KeyOf provider-api-template
+
+  # ──────────────────────────────────────────────
+  # 6. Application: api-template-bff
+  # ──────────────────────────────────────────────
+  - model: authentik_core.application
+    id: app-api-template-bff
+    attrs:
+      name: "API Template BFF"
+      slug: "api-template-bff"
+      provider: !KeyOf provider-api-template-bff
+
+  # ──────────────────────────────────────────────
+  # 7. Group: PlatformAdmin
+  # ──────────────────────────────────────────────
+  - model: authentik_core.group
+    id: group-platform-admin
+    attrs:
+      name: "PlatformAdmin"

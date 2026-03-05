@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -17,6 +18,7 @@ services:
 
   mongodb:
     image: mongo:8
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
@@ -29,6 +31,7 @@ services:
 
   authentik-postgres:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_USER: authentik
       POSTGRES_PASSWORD: authentik
@@ -43,6 +46,7 @@ services:
 
   authentik-redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: --save 60 1 --loglevel warning
     volumes:
       - authentik-redis:/data
@@ -53,7 +57,8 @@ services:
       retries: 5
 
   authentik-server:
-    image: ghcr.io/goauthentik/server:2024.12
+    image: ghcr.io/goauthentik/server:2026.2.1
+    restart: unless-stopped
     command: server
     environment:
       AUTHENTIK_SECRET_KEY: "change-me-to-a-long-random-string-in-production"
@@ -62,6 +67,9 @@ services:
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_BOOTSTRAP_EMAIL: "admin@localhost"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: "admin"
+      AUTHENTIK_BOOTSTRAP_TOKEN: "dev-admin-api-token"
     ports:
       - "9000:9000"
       - "9443:9443"
@@ -70,12 +78,20 @@ services:
         condition: service_healthy
       authentik-redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     volumes:
       - authentik-media:/media
       - authentik-templates:/templates
+      - ./infrastructure/authentik/blueprints:/blueprints/custom
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2024.12
+    image: ghcr.io/goauthentik/server:2026.2.1
+    restart: unless-stopped
     command: worker
     environment:
       AUTHENTIK_SECRET_KEY: "change-me-to-a-long-random-string-in-production"
@@ -84,16 +100,27 @@ services:
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_BOOTSTRAP_EMAIL: "admin@localhost"
+      AUTHENTIK_BOOTSTRAP_PASSWORD: "admin"
+      AUTHENTIK_BOOTSTRAP_TOKEN: "dev-admin-api-token"
     depends_on:
       authentik-postgres:
         condition: service_healthy
       authentik-redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     volumes:
       - authentik-media:/media
       - authentik-templates:/templates
+      - ./infrastructure/authentik/blueprints:/blueprints/custom
 
   api:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: src/APITemplate/Dockerfile
@@ -106,7 +133,7 @@ services:
       MongoDB__DatabaseName: "apitemplate"
       Authentik__Authority: "http://authentik-server:9000/application/o/api-template/"
       Authentik__ClientId: "api-template"
-      Authentik__ClientSecret: ""
+      Authentik__ClientSecret: "dev-client-secret"
       Authentik__TokenEndpoint: "http://authentik-server:9000/application/o/token/"
     depends_on:
       postgres:
@@ -114,7 +141,7 @@ services:
       mongodb:
         condition: service_healthy
       authentik-server:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:
