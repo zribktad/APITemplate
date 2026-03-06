@@ -1,8 +1,8 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using APITemplate.Domain.Entities;
+using APITemplate.Tests.Integration.Helpers;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.AspNetCore.TestHost;
@@ -18,7 +18,6 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
 {
     private readonly HttpClient _client;
     private readonly Mock<IProductDataRepository> _repositoryMock;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public ProductDataControllerTests(CustomWebApplicationFactory factory)
     {
@@ -46,7 +45,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task GetAll_WithToken_ReturnsOk()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
             .Setup(r => r.GetAllAsync(null, It.IsAny<CancellationToken>()))
@@ -60,7 +59,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task GetAll_WithTypeFilter_PassesTypeToRepository()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
             .Setup(r => r.GetAllAsync("image", It.IsAny<CancellationToken>()))
@@ -69,7 +68,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
         var response = await _client.GetAsync("/api/v1/product-data?type=image");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOptions);
+        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive);
         items.ShouldNotBeNull();
         items!.Length.ShouldBe(1);
         items[0].GetProperty("type").GetString().ShouldBe("image");
@@ -78,7 +77,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task GetById_WhenExists_ReturnsOk()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var image = new ImageProductData { Title = "Banner", Width = 800, Height = 600, Format = "jpg", FileSizeBytes = 200000 };
 
@@ -89,7 +88,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
         var response = await _client.GetAsync($"/api/v1/product-data/{image.Id}");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive);
         json.GetProperty("title").GetString().ShouldBe("Banner");
         json.GetProperty("type").GetString().ShouldBe("image");
     }
@@ -97,7 +96,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task GetById_WhenNotFound_ReturnsNotFound()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -111,7 +110,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task CreateImage_ValidRequest_ReturnsCreated()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<ImageProductData>(), It.IsAny<CancellationToken>()))
@@ -128,7 +127,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive);
         json.GetProperty("type").GetString().ShouldBe("image");
         json.GetProperty("title").GetString().ShouldBe("Hero Banner");
         json.GetProperty("width").GetInt32().ShouldBe(1920);
@@ -137,7 +136,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task CreateImage_InvalidRequest_ReturnsBadRequest()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var response = await _client.PostAsJsonAsync("/api/v1/product-data/image", new
         {
@@ -154,7 +153,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task CreateVideo_ValidRequest_ReturnsCreated()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<VideoProductData>(), It.IsAny<CancellationToken>()))
@@ -170,7 +169,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive);
         json.GetProperty("type").GetString().ShouldBe("video");
         json.GetProperty("title").GetString().ShouldBe("Product Demo");
         json.GetProperty("durationSeconds").GetInt32().ShouldBe(120);
@@ -179,7 +178,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task CreateVideo_InvalidRequest_ReturnsBadRequest()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var response = await _client.PostAsJsonAsync("/api/v1/product-data/video", new
         {
@@ -196,7 +195,7 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task Delete_WithToken_ReturnsNoContent()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var id = "507f1f77bcf86cd799439011";
 
@@ -208,18 +207,6 @@ public class ProductDataControllerTests : IClassFixture<CustomWebApplicationFact
 
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         _repositoryMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    private async Task AuthenticateAsync()
-    {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString();
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 }
 

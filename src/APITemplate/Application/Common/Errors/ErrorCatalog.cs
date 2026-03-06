@@ -11,7 +11,6 @@ public static class ErrorCatalog
 
     public static class Auth
     {
-        public const string InvalidCredentials = "AUTH-0401";
         public const string Forbidden = "AUTH-0403";
     }
 

@@ -1,8 +1,8 @@
 global using APITemplate.Application.Common.Contracts;
 global using APITemplate.Application.Common.Errors;
 global using APITemplate.Application.Common.Options;
-global using APITemplate.Application.Features.Auth.DTOs;
-global using APITemplate.Application.Features.Auth.Interfaces;
+global using APITemplate.Application.Options;
+global using APITemplate.Domain.Interfaces;
 global using APITemplate.Application.Features.Category.DTOs;
 global using APITemplate.Application.Features.Category.Interfaces;
 global using APITemplate.Application.Features.Product.DTOs;

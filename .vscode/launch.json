@@ -15,7 +15,11 @@
         "ASPNETCORE_URLS": "http://localhost:5174",
         "ConnectionStrings__DefaultConnection": "Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres",
         "MongoDB__ConnectionString": "mongodb://localhost:27017",
-        "MongoDB__DatabaseName": "apitemplate"
+        "MongoDB__DatabaseName": "apitemplate",
+        "Keycloak__realm": "api-template",
+        "Keycloak__auth-server-url": "http://localhost:8180/",
+        "Keycloak__resource": "api-template",
+        "Keycloak__credentials__secret": "dev-client-secret"
       },
       "console": "integratedTerminal"
     },
@@ -33,7 +37,11 @@
         "ASPNETCORE_URLS": "https://localhost:7289;http://localhost:5174",
         "ConnectionStrings__DefaultConnection": "Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres",
         "MongoDB__ConnectionString": "mongodb://localhost:27017",
-        "MongoDB__DatabaseName": "apitemplate"
+        "MongoDB__DatabaseName": "apitemplate",
+        "Keycloak__realm": "api-template",
+        "Keycloak__auth-server-url": "http://localhost:8180/",
+        "Keycloak__resource": "api-template",
+        "Keycloak__credentials__secret": "dev-client-secret"
       },
       "console": "integratedTerminal"
     }

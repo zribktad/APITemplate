@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using Shouldly;
 using Xunit;
 
@@ -23,17 +22,12 @@ public class ProductsControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task Login_WithValidCredentials_ReturnsToken()
+    public async Task GetAll_WithValidToken_ReturnsOk()
     {
-        var response = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
+        IntegrationAuthHelper.Authenticate(_client);
+
+        var response = await _client.GetAsync("/api/v1/products");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        var content = await response.Content.ReadAsStringAsync();
-        content.ShouldContain("accessToken");
     }
-
 }
-

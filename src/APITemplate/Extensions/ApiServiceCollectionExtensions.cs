@@ -23,9 +23,9 @@ public static class ApiServiceCollectionExtensions
         services.AddExceptionHandler<ApiExceptionHandler>();
         services.AddOpenApi(options =>
         {
+            options.AddDocumentTransformer<BearerSecuritySchemeDocumentTransformer>();
             options.AddDocumentTransformer<HealthCheckOpenApiDocumentTransformer>();
             options.AddDocumentTransformer<ProblemDetailsOpenApiTransformer>();
-            options.AddDocumentTransformer<BearerSecuritySchemeDocumentTransformer>();
             options.AddOperationTransformer<AuthorizationResponsesOperationTransformer>();
         });
 

@@ -1,7 +1,7 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using APITemplate.Tests.Integration.Helpers;
 using Shouldly;
 using Xunit;
 
@@ -10,7 +10,6 @@ namespace APITemplate.Tests.Integration;
 public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     public CategoriesControllerTests(CustomWebApplicationFactory factory)
     {
@@ -28,13 +27,13 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task FullCrudFlow_WorksWithAuthentication()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         // 1. Get all - empty
         var getAllResponse = await _client.GetAsync("/api/v1/categories");
         getAllResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var allCategories = await getAllResponse.Content.ReadFromJsonAsync<JsonElement[]>(JsonOptions);
+        var allCategories = await getAllResponse.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive);
         allCategories.ShouldNotBeNull();
 
         // 2. Create category
@@ -82,7 +81,7 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task GetById_NonExistentCategory_ReturnsNotFound()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var response = await _client.GetAsync($"/api/v1/categories/{Guid.NewGuid()}");
 
@@ -92,7 +91,7 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task Create_CategoryWithoutDescription_Succeeds()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var createResponse = await _client.PostAsJsonAsync(
             "/api/v1/categories",
@@ -110,7 +109,7 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
     [Fact]
     public async Task Create_MultipleCategories_AllReturnedInGetAll()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         await _client.PostAsJsonAsync("/api/v1/categories", new { Name = "Category A" });
         await _client.PostAsJsonAsync("/api/v1/categories", new { Name = "Category B" });
@@ -118,7 +117,7 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
         var response = await _client.GetAsync("/api/v1/categories");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var categories = await response.Content.ReadFromJsonAsync<JsonElement[]>(JsonOptions);
+        var categories = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive);
         categories.ShouldNotBeNull();
         categories!.Length.ShouldBeGreaterThanOrEqualTo(2);
     }
@@ -129,18 +128,6 @@ public class CategoriesControllerTests : IClassFixture<CustomWebApplicationFacto
         var response = await _client.GetAsync($"/api/v1/categories/{Guid.NewGuid()}/stats");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-    }
-
-    private async Task AuthenticateAsync()
-    {
-        var loginResponse = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = "default\\admin", Password = "admin" });
-
-        var loginJson = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var token = loginJson.GetProperty("accessToken").GetString();
-
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 }
 

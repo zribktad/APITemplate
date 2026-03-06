@@ -85,11 +85,11 @@ public static class ApplicationBuilderExtensions
 
     public static WebApplication MapApplicationEndpoints(this WebApplication app)
     {
-        // Endpoints are mapped here, but request execution still runs through UseApiPipeline first (including global exception handling).
-        app.MapControllers(); // Map versioned REST controllers.
-        app.MapGraphQL(); // Map GraphQL endpoint.
-        app.MapNitroApp("/graphql/ui"); // Map GraphQL UI (Nitro).
-        app.UseHealthChecks(); // Map health endpoint with custom JSON response.
+        app.MapControllers();
+        app.MapGraphQL();
+        app.MapNitroApp("/graphql/ui");
+        app.MapReverseProxy();
+        app.UseHealthChecks();
 
         return app;
     }
@@ -102,11 +102,11 @@ public static class ApplicationBuilderExtensions
         app.MapOpenApi(); // Map OpenAPI JSON endpoint.
         app.MapScalarApiReference("/scalar", options =>
         {
-            options.WithTitle("APITemplate")
-                   .AddHttpAuthentication("Bearer", scheme =>
-                   {
-                       scheme.Token = string.Empty;
-                   });
+            options.WithTitle("APITemplate");
+            options.Authentication = new ScalarAuthenticationOptions
+            {
+                PreferredSecuritySchemes = ["Bearer"]
+            };
         });
 
         return app;

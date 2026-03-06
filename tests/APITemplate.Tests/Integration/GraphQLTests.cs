@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
+using APITemplate.Tests.Integration.Helpers;
 using Shouldly;
 using Xunit;
 
@@ -10,20 +9,22 @@ namespace APITemplate.Tests.Integration;
 public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly GraphQLTestHelper _graphql;
 
     public GraphQLTests(CustomWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
+        _graphql = new GraphQLTestHelper(_client);
     }
 
     [Fact]
     public async Task GraphQL_GetProducts_ReturnsEmptyList()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var query = new { query = "{ products { items { id name price } totalCount pageNumber pageSize } }" };
 
-        var response = await PostGraphQLAsync(query);
+        var response = await _graphql.PostAsync(query);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -35,7 +36,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_CreateProduct_ReturnsNewProduct()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var query = new
         {
@@ -58,7 +59,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
             }
         };
 
-        var response = await PostGraphQLAsync(query);
+        var response = await _graphql.PostAsync(query);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -70,30 +71,16 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_GetProductById_WhenExists_ReturnsProduct()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
-        var createQuery = new
-        {
-            query = @"
-                mutation($input: CreateProductRequestInput!) {
-                    createProduct(input: $input) { id name }
-                }",
-            variables = new
-            {
-                input = new { name = "Findable Product", price = 10.0 }
-            }
-        };
-
-        var createResponse = await PostGraphQLAsync(createQuery);
-        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
-        var productId = createResult!.Data.CreateProduct.Id;
+        var productId = await _graphql.CreateProductAsync("Findable Product", 10.0m);
 
         var getQuery = new
         {
             query = $@"{{ productById(id: ""{productId}"") {{ id name }} }}"
         };
 
-        var getResponse = await PostGraphQLAsync(getQuery);
+        var getResponse = await _graphql.PostAsync(getQuery);
 
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -104,30 +91,16 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_DeleteProduct_ReturnsTrue()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
-        var createQuery = new
-        {
-            query = @"
-                mutation($input: CreateProductRequestInput!) {
-                    createProduct(input: $input) { id }
-                }",
-            variables = new
-            {
-                input = new { name = "To Delete", price = 5.0 }
-            }
-        };
-
-        var createResponse = await PostGraphQLAsync(createQuery);
-        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
-        var productId = createResult!.Data.CreateProduct.Id;
+        var productId = await _graphql.CreateProductAsync("To Delete", 5.0m);
 
         var deleteQuery = new
         {
             query = $@"mutation {{ deleteProduct(id: ""{productId}"") }}"
         };
 
-        var deleteResponse = await PostGraphQLAsync(deleteQuery);
+        var deleteResponse = await _graphql.PostAsync(deleteQuery);
 
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -138,12 +111,12 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_GetProducts_WithFilterSortAndPaging_ReturnsExpectedOrderAndSlice()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var prefix = $"sort-{Guid.NewGuid():N}";
-        await CreateProductViaGraphQLAsync($"{prefix}-A", 30m);
-        await CreateProductViaGraphQLAsync($"{prefix}-B", 10m);
-        await CreateProductViaGraphQLAsync($"{prefix}-C", 20m);
+        await _graphql.CreateProductAsync($"{prefix}-A", 30m);
+        await _graphql.CreateProductAsync($"{prefix}-B", 10m);
+        await _graphql.CreateProductAsync($"{prefix}-C", 20m);
 
         var query = new
         {
@@ -169,7 +142,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
             }
         };
 
-        var response = await PostGraphQLAsync(query);
+        var response = await _graphql.PostAsync(query);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default);
@@ -185,15 +158,15 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GraphQL_ProductReviewsField_UsesBatchResolverAndReturnsReviewsPerProduct()
     {
-        await AuthenticateAsync();
+        IntegrationAuthHelper.Authenticate(_client);
 
         var prefix = $"dl-{Guid.NewGuid():N}";
-        var p1 = await CreateProductViaGraphQLAsync($"{prefix}-P1", 11m);
-        var p2 = await CreateProductViaGraphQLAsync($"{prefix}-P2", 22m);
+        var p1 = await _graphql.CreateProductAsync($"{prefix}-P1", 11m);
+        var p2 = await _graphql.CreateProductAsync($"{prefix}-P2", 22m);
 
-        await CreateReviewViaGraphQLAsync(p1, 5);
-        await CreateReviewViaGraphQLAsync(p1, 4);
-        await CreateReviewViaGraphQLAsync(p2, 3);
+        await _graphql.CreateReviewAsync(p1, 5);
+        await _graphql.CreateReviewAsync(p1, 4);
+        await _graphql.CreateReviewAsync(p2, 3);
 
         var query = new
         {
@@ -222,7 +195,7 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
             }
         };
 
-        var response = await PostGraphQLAsync(query);
+        var response = await _graphql.PostAsync(query);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsWithReviewsData>>(GraphQLJsonOptions.Default);
@@ -232,63 +205,4 @@ public class GraphQLTests : IClassFixture<CustomWebApplicationFactory>
         items.ShouldContain(x => x.Id == p1 && x.Reviews.Count >= 2);
         items.ShouldContain(x => x.Id == p2 && x.Reviews.Count >= 1);
     }
-
-    private async Task AuthenticateAsync()
-    {
-        await IntegrationAuthHelper.AuthenticateAsync(_client);
-    }
-
-    private async Task<HttpResponseMessage> PostGraphQLAsync(object query)
-    {
-        var json = JsonSerializer.Serialize(query);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        return await _client.PostAsync("/graphql", content);
-    }
-
-    private async Task<Guid> CreateProductViaGraphQLAsync(string name, decimal price)
-    {
-        var mutation = new
-        {
-            query = @"
-                mutation($input: CreateProductRequestInput!) {
-                    createProduct(input: $input) { id }
-                }",
-            variables = new
-            {
-                input = new { name, price }
-            }
-        };
-
-        var response = await PostGraphQLAsync(mutation);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
-        return result!.Data.CreateProduct.Id;
-    }
-
-    private async Task<Guid> CreateReviewViaGraphQLAsync(Guid productId, int rating)
-    {
-        var mutation = new
-        {
-            query = @"
-                mutation($input: CreateProductReviewRequestInput!) {
-                    createProductReview(input: $input) { id }
-                }",
-            variables = new
-            {
-                input = new
-                {
-                    productId,
-                    rating
-                }
-            }
-        };
-
-        var response = await PostGraphQLAsync(mutation);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
-        return result!.Data.CreateProductReview.Id;
-    }
 }
-

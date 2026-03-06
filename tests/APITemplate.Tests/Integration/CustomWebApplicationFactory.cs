@@ -1,17 +1,13 @@
-using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Tests.Integration.Helpers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Moq;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace APITemplate.Tests.Integration;
 
@@ -21,38 +17,20 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        var testRedactionHmacKey = Convert.ToBase64String(
-            SHA256.HashData(Encoding.UTF8.GetBytes("APITemplate.Tests.RedactionKey")));
-
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
-            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Jwt:Secret"] = "TestSuperSecretKeyThatIsAtLeast32Chars!",
-                ["Jwt:Issuer"] = "TestIssuer",
-                ["Jwt:Audience"] = "TestAudience",
-                ["Jwt:ExpirationMinutes"] = "60",
-                ["SystemIdentity:DefaultActorId"] = "system",
-                ["Bootstrap:Admin:Username"] = "admin",
-                ["Bootstrap:Admin:Password"] = "admin",
-                ["Bootstrap:Admin:Email"] = "admin@example.com",
-                ["Bootstrap:Admin:IsPlatformAdmin"] = "true",
-                ["Bootstrap:Tenant:Code"] = "default",
-                ["Bootstrap:Tenant:Name"] = "Default Tenant",
-                ["Cors:AllowedOrigins:0"] = "http://localhost:3000",
-                ["Redaction:HmacKeyEnvironmentVariable"] = "APITEMPLATE_REDACTION_HMAC_KEY",
-                ["Redaction:HmacKey"] = testRedactionHmacKey,
-                ["Redaction:KeyId"] = "1001"
-            });
+            var config = TestConfigurationHelper.GetBaseConfiguration();
+            config["ReverseProxy:Routes:bff-proxy:ClusterId"] = "api-self";
+            config["ReverseProxy:Routes:bff-proxy:Match:Path"] = "/bff/proxy/{**catch-all}";
+            config["ReverseProxy:Clusters:api-self:Destinations:self:Address"] = "http://localhost/";
+            configBuilder.AddInMemoryCollection(config);
         });
 
         builder.ConfigureTestServices(services =>
         {
-            // Remove Npgsql provider registrations (required for .NET 9+)
             services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
             services.RemoveAll(typeof(AppDbContext));
 
-            // Remove IDbContextOptionsConfiguration<> - critical for .NET 9/10
             var optionsConfigs = services
                 .Where(d =>
                     d.ServiceType.IsGenericType &&
@@ -63,17 +41,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             foreach (var d in optionsConfigs)
                 services.Remove(d);
 
-            // Re-register with InMemory provider
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(_dbName)
                     .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
 
-            // MongoDB is not available in tests.
-            // Remove MongoDbContext so the migration runner is skipped in UseDatabaseAsync.
-            // Replace IProductDataRepository with a no-op mock so DI validation (ValidateOnBuild) passes.
-            services.RemoveAll(typeof(MongoDbContext));
-            services.RemoveAll(typeof(IProductDataRepository));
-            services.AddSingleton(new Mock<IProductDataRepository>().Object);
+            TestServiceHelper.MockMongoServices(services);
+            TestServiceHelper.RemoveExternalHealthChecks(services);
+            TestServiceHelper.ConfigureTestAuthentication(services);
         });
 
         builder.UseEnvironment("Development");

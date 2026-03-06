@@ -57,7 +57,7 @@ public class ScalarAndOpenApiTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task OpenApi_AllowsCustomProducesResponseTypeForSpecificEndpoint()
+    public async Task OpenApi_ContainsBearerSecurityScheme()
     {
         var response = await _client.GetAsync("/openapi/v1.json");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -65,25 +65,11 @@ public class ScalarAndOpenApiTests : IClassFixture<CustomWebApplicationFactory>
         var content = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(content);
 
-        var paths = doc.RootElement.GetProperty("paths");
-        var authPath = paths.EnumerateObject()
-            .FirstOrDefault(p => p.Name.Contains("/auth/login", StringComparison.OrdinalIgnoreCase))
-            .Value;
-
-        authPath.ValueKind.ShouldBe(JsonValueKind.Object);
-        var post = authPath.GetProperty("post");
-        var responses = post.GetProperty("responses");
-        var unauthorized = responses.GetProperty(StatusCodes.Status401Unauthorized.ToString());
-
-        var schemaRef = unauthorized
-            .GetProperty("content")
-            .GetProperty("application/json")
-            .GetProperty("schema")
-            .GetProperty("$ref")
-            .GetString();
-
-        schemaRef.ShouldNotBeNull();
-        schemaRef.ShouldContain("LoginErrorResponse");
+        var components = doc.RootElement.GetProperty("components");
+        var securitySchemes = components.GetProperty("securitySchemes");
+        securitySchemes.TryGetProperty("Bearer", out var bearer).ShouldBeTrue();
+        bearer.GetProperty("scheme").GetString().ShouldBe("bearer");
+        bearer.GetProperty("bearerFormat").GetString().ShouldBe("JWT");
     }
 
     [Fact]

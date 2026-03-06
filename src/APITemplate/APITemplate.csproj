@@ -47,7 +47,13 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 
     <!-- Authentication -->
+    <PackageReference Include="Keycloak.AuthServices.Authentication" Version="2.6.3" />
+    <PackageReference Include="Keycloak.AuthServices.Authorization" Version="2.6.3" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.3" />
+
+    <!-- Reverse Proxy -->
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
 
     <!-- API Versioning -->
     <PackageReference Include="Asp.Versioning.Mvc" Version="8.1.1" />

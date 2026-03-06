@@ -18,7 +18,8 @@ try
     builder.Services.AddPersistence(builder.Configuration); // Register EF Core + repositories + relational health checks.
     builder.Services.AddApplicationServices(); // Register application services + validators.
     builder.Services.AddMongoDB(builder.Configuration); // Register Mongo context/services + Mongo health checks.
-    builder.Services.AddJwtAuthentication(); // Register JWT authentication/authorization handlers.
+    builder.Services.AddKeycloakBffAuthentication(builder.Configuration); // Register Keycloak hybrid JWT + BFF authentication.
+    builder.Services.AddBffReverseProxy(builder.Configuration); // Register YARP reverse proxy for BFF token forwarding.
     builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
     builder.Services.AddGraphQLConfiguration(); // Register GraphQL schema and server services.
 
@@ -32,9 +33,10 @@ try
 
     app.Run(); // Start HTTP server and block until shutdown.
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is not HostAbortedException)
 {
-    Console.Error.WriteLine($"Application terminated unexpectedly: {ex}"); // Avoid static Serilog race in parallel test hosts.
+    Console.Error.WriteLine($"Application terminated unexpectedly: {ex}");
+    throw;
 }
 
 public partial class Program; // Used by integration tests via WebApplicationFactory.

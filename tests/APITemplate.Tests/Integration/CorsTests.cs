@@ -25,7 +25,8 @@ public class CorsTests : IClassFixture<CustomWebApplicationFactory>
         response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins).ShouldBeTrue();
         allowedOrigins!.Single().ShouldBe("http://localhost:3000");
 
-        response.Headers.Contains("Access-Control-Allow-Credentials").ShouldBeFalse();
+        response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credValues).ShouldBeTrue();
+        credValues!.Single().ShouldBe("true");
     }
 
     [Fact]
@@ -51,6 +52,7 @@ public class CorsTests : IClassFixture<CustomWebApplicationFactory>
         response.IsSuccessStatusCode.ShouldBeTrue();
         response.Headers.TryGetValues("Access-Control-Allow-Origin", out var allowedOrigins).ShouldBeTrue();
         allowedOrigins!.Single().ShouldBe("http://localhost:3000");
-        response.Headers.Contains("Access-Control-Allow-Credentials").ShouldBeFalse();
+        response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credValues).ShouldBeTrue();
+        credValues!.Single().ShouldBe("true");
     }
 }

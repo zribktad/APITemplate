@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using Shouldly;
 using Xunit;
@@ -9,47 +8,16 @@ namespace APITemplate.Tests.Integration;
 public class AuthEdgeCasesTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    private readonly CustomWebApplicationFactory _factory;
 
     public AuthEdgeCasesTests(CustomWebApplicationFactory factory)
     {
-        _factory = factory;
         _client = factory.CreateClient();
     }
 
     [Fact]
-    public async Task Login_WhenUserInactive_ReturnsUnauthorized()
+    public async Task Api_WithoutToken_ReturnsUnauthorized()
     {
-        var username = $"inactive-user-{Guid.NewGuid():N}";
-        var (tenant, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
-            _factory.Services,
-            username,
-            $"{username}@example.com",
-            "secret-pass",
-            userIsActive: false);
-
-        var response = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = $"{tenant.Code}\\{username}", Password = "secret-pass" });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Login_WhenTenantInactive_ReturnsUnauthorized()
-    {
-        var username = $"inactive-tenant-user-{Guid.NewGuid():N}";
-        var (tenant, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
-            _factory.Services,
-            username,
-            $"{username}@example.com",
-            "secret-pass",
-            userIsActive: true,
-            tenantIsActive: false);
-
-        var response = await _client.PostAsJsonAsync(
-            "/api/v1/auth/login",
-            new { Username = $"{tenant.Code}\\{username}", Password = "secret-pass" });
+        var response = await _client.GetAsync("/api/v1/products");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }

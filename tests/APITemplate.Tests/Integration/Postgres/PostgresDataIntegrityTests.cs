@@ -197,7 +197,7 @@ public sealed class PostgresDataIntegrityTests
             reviewToSoftDeleteId = reviewA2.Id;
         }
 
-        await IntegrationAuthHelper.AuthenticateAsync(_client, $"{tenantA.Code}\\{usernameA}", "pass-a");
+        IntegrationAuthHelper.Authenticate(_client, tenantId: tenantA.Id, username: usernameA, role: Domain.Enums.UserRole.TenantUser);
 
         var statsResponse = await _client.GetAsync($"/api/v1/categories/{categoryAId}/stats");
         statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -254,7 +254,7 @@ public sealed class PostgresDataIntegrityTests
             categoryId = category.Id;
         }
 
-        var cascadeUserId = await IntegrationAuthHelper.AuthenticateAndGetUserIdAsync(_client, $"{tenant.Code}\\{username}", "pass-cascade");
+        var cascadeUserId = IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenantId: tenant.Id, username: username, role: Domain.Enums.UserRole.TenantUser);
 
         var createProductResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
@@ -332,7 +332,7 @@ public sealed class PostgresDataIntegrityTests
             categoryId = category.Id;
         }
 
-        await IntegrationAuthHelper.AuthenticateAsync(_client, $"{tenant.Code}\\{username}", "pass-smoke");
+        IntegrationAuthHelper.Authenticate(_client, tenantId: tenant.Id, username: username, role: Domain.Enums.UserRole.TenantUser);
 
         var response = await _client.GetAsync($"/api/v1/categories/{categoryId}/stats");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
