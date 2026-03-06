@@ -8,26 +8,18 @@ namespace APITemplate.Infrastructure.Security;
 
 public static class TenantClaimValidator
 {
-    public static bool HasValidTenantClaim(ClaimsPrincipal? principal)
-    {
-        return principal?.HasClaim(
-            c => c.Type == CustomClaimTypes.TenantId
-                 && Guid.TryParse(c.Value, out var tenantId)
-                 && tenantId != Guid.Empty) == true;
-    }
-
     public static Task OnTokenValidated(JwtTokenValidatedContext context)
     {
         var identity = context.Principal?.Identity as ClaimsIdentity;
         if (identity != null)
             KeycloakClaimMapper.MapKeycloakClaims(identity);
 
-        LogTokenValidated(context.HttpContext, context.Principal, "JwtBearer");
-
-        if (!HasValidTenantClaim(context.Principal))
+        if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
             context.Fail("Missing required tenant_id claim.");
         }
+
+        LogTokenValidated(context.HttpContext, context.Principal, "JwtBearer");
 
         return Task.CompletedTask;
     }
@@ -38,14 +30,28 @@ public static class TenantClaimValidator
         if (identity != null)
             KeycloakClaimMapper.MapKeycloakClaims(identity);
 
-        LogTokenValidated(context.HttpContext, context.Principal, "OIDC");
-
-        if (!HasValidTenantClaim(context.Principal))
+        if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
             context.Fail("Missing required tenant_id claim.");
         }
 
+        LogTokenValidated(context.HttpContext, context.Principal, "OIDC");
+
         return Task.CompletedTask;
+    }
+
+    public static bool HasValidTenantClaim(ClaimsPrincipal? principal)
+    {
+        return principal?.HasClaim(
+            c => c.Type == CustomClaimTypes.TenantId
+                 && Guid.TryParse(c.Value, out var tenantId)
+                 && tenantId != Guid.Empty) == true;
+    }
+
+    private static bool IsServiceAccount(ClaimsPrincipal? principal)
+    {
+        var username = principal?.FindFirstValue("preferred_username");
+        return username != null && username.StartsWith("service-account-", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void LogTokenValidated(HttpContext httpContext, ClaimsPrincipal? principal, string scheme)
