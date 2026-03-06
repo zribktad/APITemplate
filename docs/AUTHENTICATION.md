@@ -49,7 +49,7 @@ Services:
 | PostgreSQL    | 5432  | Application database     |
 | MongoDB       | 27017 | Product data storage     |
 | Keycloak      | 8180  | Identity provider        |
-| Keycloak DB   | 5433  | Keycloak PostgreSQL      |
+| Keycloak DB   | (internal) | Keycloak PostgreSQL   |
 
 ### 2. Default Credentials
 
@@ -102,7 +102,7 @@ AddBffReverseProxy()                → registers YARP with BffTokenTransformPro
 | Scenario | Method | Why |
 |----------|--------|-----|
 | Testing API during development | **Scalar OAuth2** | Visual UI, click Authorize, test endpoints |
-| Quick token test from terminal | **JWT Bearer** (password grant) | One curl command to get token |
+| Quick token test from terminal | **JWT Bearer** (Client Credentials) | One curl command to get token |
 | Mobile app (iOS/Android) | **JWT Bearer** (Authorization Code + PKCE) | PKCE enforced (`S256`), standard OAuth2 mobile flow |
 | Service-to-service communication | **Client Credentials** | No user involved, machine-to-machine, `serviceAccountsEnabled: true` |
 | SPA frontend — login/logout/user info | **BFF Cookie** | Secure, no token exposure to JavaScript |
@@ -141,18 +141,18 @@ Uses Keycloak client `api-template-scalar` (public, no secret needed).
 ### 2. JWT Bearer via curl
 
 ```bash
-# Get token from Keycloak (password grant)
+# Get token from Keycloak (client credentials — no user context)
 TOKEN=$(curl -s -X POST "http://localhost:8180/realms/api-template/protocol/openid-connect/token" \
-  -d "grant_type=password" \
+  -d "grant_type=client_credentials" \
   -d "client_id=api-template" \
   -d "client_secret=dev-client-secret" \
-  -d "username=admin" \
-  -d "password=Admin123" \
   | jq -r '.access_token')
 
 # Call API with token
 curl -H "Authorization: Bearer $TOKEN" http://localhost:5174/api/v1/products
 ```
+
+> **Note:** Client Credentials tokens have no user context (`sub`). For user-scoped tokens, use the Scalar OAuth2 flow or BFF login.
 
 > **Tip:** Paste the token into [jwt.io](https://jwt.io) to inspect claims (roles, tenant_id, etc.)
 
@@ -302,10 +302,8 @@ Realm is auto-imported on startup from `infrastructure/keycloak/realms/api-templ
 - Secret: `dev-client-secret` (dev only)
 - Standard Flow: Enabled (Authorization Code + PKCE)
 - Service Accounts: Enabled (Client Credentials grant)
-- Direct Access Grants: Enabled (for dev password grant testing via curl)
+- Direct Access Grants: Disabled (password grant is insecure and removed from OAuth 2.1)
 - PKCE: Required (`S256`)
-
-> **Warning:** `directAccessGrantsEnabled: true` is set in `api-template-realm.json` for development convenience only. In production, set this to `false` — password grant bypasses MFA, consent screens, and is removed from OAuth 2.1.
 
 > **OAuth 2.1 compliance:** Both clients enforce PKCE (`pkce.code.challenge.method: S256`). All Authorization Code flows (Scalar, BFF, mobile) must include `code_challenge` and `code_verifier`.
 - Redirect URIs: `http://localhost:5174/*`, `http://localhost:8080/*`

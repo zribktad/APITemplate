@@ -68,6 +68,13 @@ public static class ApplicationBuilderExtensions
     public static async Task WaitForKeycloakAsync(this WebApplication app, CancellationToken cancellationToken = default)
     {
         var keycloak = app.Services.GetRequiredService<IOptions<KeycloakOptions>>().Value;
+
+        if (string.IsNullOrEmpty(keycloak.AuthServerUrl) || string.IsNullOrEmpty(keycloak.Realm))
+        {
+            app.Logger.LogWarning("Keycloak configuration is missing, skipping readiness check");
+            return;
+        }
+
         var discoveryUrl = KeycloakUrlHelper.BuildDiscoveryUrl(keycloak.AuthServerUrl, keycloak.Realm);
         var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
         using var httpClient = httpClientFactory.CreateClient();

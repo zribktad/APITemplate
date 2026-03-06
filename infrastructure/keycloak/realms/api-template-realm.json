@@ -108,7 +108,7 @@
       },
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "publicClient": false,
       "protocol": "openid-connect",
       "fullScopeAllowed": true,

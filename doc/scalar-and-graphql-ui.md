@@ -41,16 +41,12 @@ http://localhost:5174/scalar/v1
 ### Step-by-Step: Authenticate in Scalar
 
 1. Open `http://localhost:5174/scalar/v1`
-2. Expand the **Auth → POST /api/v1/Auth/login** operation
-3. Click **Send** with the default body:
-   ```json
-   { "username": "admin", "password": "Admin123" }
-   ```
-4. Copy the `accessToken` from the response
-5. Click the **🔐 Authenticate** button (top-right)
-6. Paste the token into the **Bearer** field → click **Save**
+2. Click the **🔐 Authorize** button (top-right)
+3. Keycloak login page opens → enter `admin` / `Admin123`
+4. Scalar receives a token via OAuth2 Authorization Code flow
+5. All subsequent requests include the `Authorization: Bearer <token>` header automatically
 
-All subsequent requests in this session will include the `Authorization: Bearer <token>` header automatically.
+Uses Keycloak client `api-template-scalar` (public, PKCE enforced).
 
 ### Raw OpenAPI Document
 
@@ -115,13 +111,15 @@ http://localhost:5174/graphql
      "Authorization": "Bearer <your-jwt-token>"
    }
    ```
-4. To get a token, first send a login request via Scalar (see above) or via the REST endpoint directly:
+4. To get a token, use the Keycloak token endpoint:
    ```bash
-   curl -s -X POST http://localhost:5174/api/v1/auth/login \
-     -H "Content-Type: application/json" \
-     -d '{"username":"admin","password":"Admin123"}' \
-   | grep -o '"accessToken":"[^"]*"'
+   curl -s -X POST "http://localhost:8180/realms/api-template/protocol/openid-connect/token" \
+     -d "grant_type=client_credentials" \
+     -d "client_id=api-template" \
+     -d "client_secret=dev-client-secret" \
+   | jq -r '.access_token'
    ```
+   Or authenticate via Scalar OAuth2 flow (see above) and copy the token from the request headers.
 
 ### Example Queries
 
@@ -281,5 +279,5 @@ Example response:
 | `Extensions/ApplicationBuilderExtensions.cs` | `UseApiDocumentation()` — mounts Scalar and OpenAPI |
 | `Api/OpenApi/HealthCheckOpenApiDocumentTransformer.cs` | Adds `/health` to the OpenAPI document |
 | `Program.cs` | `app.MapGraphQL()` and `app.MapNitroApp("/graphql/ui")` |
-| `appsettings.json` → `Bootstrap:Admin` and `Jwt` | Bootstrap login credentials and JWT settings |
+| `appsettings.json` → `Keycloak` and `Bff` | Keycloak and BFF authentication settings |
 
