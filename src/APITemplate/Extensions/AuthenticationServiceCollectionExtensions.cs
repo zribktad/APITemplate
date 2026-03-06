@@ -65,16 +65,20 @@ public static class AuthenticationServiceCollectionExtensions
                 "Bootstrap tenant code/name is required")
             .ValidateOnStart();
 
+        services.AddOptions<KeycloakOptions>()
+            .Bind(configuration.GetSection("Keycloak"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         return services;
     }
 
     public static IServiceCollection AddKeycloakBffAuthentication(
-        this IServiceCollection services, IConfiguration configuration)
+        this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        var keycloakSection = configuration.GetSection("Keycloak");
-        var authServerUrl = keycloakSection["auth-server-url"]!;
-        var realm = keycloakSection["realm"]!;
-        var authority = KeycloakUrlHelper.BuildAuthority(authServerUrl, realm);
+        var keycloak = configuration.GetSection("Keycloak").Get<KeycloakOptions>()
+                      ?? throw new InvalidOperationException("Keycloak configuration section is missing.");
+        var authority = KeycloakUrlHelper.BuildAuthority(keycloak.AuthServerUrl, keycloak.Realm);
         var bffOptions = configuration.GetSection("Bff").Get<BffOptions>() ?? new BffOptions();
 
         services.AddAuthentication(options =>
@@ -85,8 +89,8 @@ public static class AuthenticationServiceCollectionExtensions
             .AddJwtBearer(options =>
             {
                 options.Authority = authority;
-                options.Audience = keycloakSection["resource"];
-                options.RequireHttpsMetadata = false;
+                options.Audience = keycloak.Resource;
+                options.RequireHttpsMetadata = !environment.IsDevelopment();
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -115,12 +119,11 @@ public static class AuthenticationServiceCollectionExtensions
             .AddOpenIdConnect(BffAuthenticationSchemes.Oidc, options =>
             {
                 options.Authority = authority;
-                options.RequireHttpsMetadata = false;
-                options.ClientId = keycloakSection["resource"];
-                options.ClientSecret = keycloakSection["credentials:secret"];
+                options.RequireHttpsMetadata = !environment.IsDevelopment();
+                options.ClientId = keycloak.Resource;
+                options.ClientSecret = keycloak.Credentials.Secret;
                 options.ResponseType = OpenIdConnectResponseType.Code;
                 options.SaveTokens = true;
-                options.GetClaimsFromUserInfoEndpoint = true;
                 options.SignInScheme = BffAuthenticationSchemes.Cookie;
 
                 options.Scope.Clear();

@@ -1,6 +1,8 @@
+using APITemplate.Application.Common.Options;
 using APITemplate.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 
 namespace APITemplate.Api.OpenApi;
@@ -8,14 +10,14 @@ namespace APITemplate.Api.OpenApi;
 public sealed class BearerSecuritySchemeDocumentTransformer : IOpenApiDocumentTransformer
 {
     private readonly IAuthenticationSchemeProvider _schemeProvider;
-    private readonly IConfiguration _configuration;
+    private readonly KeycloakOptions _keycloak;
 
     public BearerSecuritySchemeDocumentTransformer(
         IAuthenticationSchemeProvider schemeProvider,
-        IConfiguration configuration)
+        IOptions<KeycloakOptions> keycloakOptions)
     {
         _schemeProvider = schemeProvider;
-        _configuration = configuration;
+        _keycloak = keycloakOptions.Value;
     }
 
     public async Task TransformAsync(
@@ -27,9 +29,7 @@ public sealed class BearerSecuritySchemeDocumentTransformer : IOpenApiDocumentTr
         if (!schemes.Any(s => s.Name == "Bearer"))
             return;
 
-        var authServerUrl = _configuration["Keycloak:auth-server-url"]!;
-        var realm = _configuration["Keycloak:realm"]!;
-        var authority = KeycloakUrlHelper.BuildAuthority(authServerUrl, realm);
+        var authority = KeycloakUrlHelper.BuildAuthority(_keycloak.AuthServerUrl, _keycloak.Realm);
 
         var securityScheme = new OpenApiSecurityScheme
         {

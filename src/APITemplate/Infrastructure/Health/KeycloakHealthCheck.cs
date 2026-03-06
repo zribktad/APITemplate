@@ -1,5 +1,7 @@
+using APITemplate.Application.Common.Options;
 using APITemplate.Infrastructure.Security;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace APITemplate.Infrastructure.Health;
 
@@ -10,14 +12,11 @@ public sealed class KeycloakHealthCheck : IHealthCheck
     private readonly HttpClient _httpClient;
     private readonly string _discoveryUrl;
 
-    public KeycloakHealthCheck(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public KeycloakHealthCheck(IHttpClientFactory httpClientFactory, IOptions<KeycloakOptions> keycloakOptions)
     {
         _httpClient = httpClientFactory.CreateClient(nameof(KeycloakHealthCheck));
-        var authServerUrl = configuration["Keycloak:auth-server-url"]
-                            ?? throw new InvalidOperationException("Keycloak:auth-server-url is not configured.");
-        var realm = configuration["Keycloak:realm"]
-                    ?? throw new InvalidOperationException("Keycloak:realm is not configured.");
-        _discoveryUrl = KeycloakUrlHelper.BuildDiscoveryUrl(authServerUrl, realm);
+        var keycloak = keycloakOptions.Value;
+        _discoveryUrl = KeycloakUrlHelper.BuildDiscoveryUrl(keycloak.AuthServerUrl, keycloak.Realm);
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
