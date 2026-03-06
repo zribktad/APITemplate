@@ -107,7 +107,7 @@ public static class ApplicationBuilderExtensions
                 .AddPreferredSecuritySchemes("OAuth2")
                 .AddAuthorizationCodeFlow("OAuth2", flow =>
                 {
-                    flow.ClientId = app.Configuration["Keycloak:resource"]!;
+                    flow.ClientId = "api-template-scalar";
                     flow.SelectedScopes = ["openid", "profile", "email"];
                 });
         });
