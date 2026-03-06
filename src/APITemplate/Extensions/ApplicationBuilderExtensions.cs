@@ -75,6 +75,12 @@ public static class ApplicationBuilderExtensions
             return;
         }
 
+        if (app.Configuration.GetValue<bool>("Keycloak:SkipReadinessCheck"))
+        {
+            app.Logger.LogInformation("Keycloak readiness check skipped via configuration");
+            return;
+        }
+
         var discoveryUrl = KeycloakUrlHelper.BuildDiscoveryUrl(keycloak.AuthServerUrl, keycloak.Realm);
         var httpClientFactory = app.Services.GetRequiredService<IHttpClientFactory>();
         using var httpClient = httpClientFactory.CreateClient();
