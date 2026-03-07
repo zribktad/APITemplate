@@ -15,12 +15,16 @@ namespace APITemplate.Infrastructure.Persistence;
 /// </summary>
 public sealed class UnitOfWork : IUnitOfWork
 {
+    private const string CommitWithinTransactionMessage =
+        "CommitAsync cannot be called inside ExecuteInTransactionAsync. The outermost transaction saves and commits automatically.";
+
     private readonly AppDbContext _dbContext;
     private readonly TransactionDefaultsOptions _transactionDefaults;
     private readonly Func<TransactionOptions, IExecutionStrategy> _executionStrategyFactory;
     private readonly Func<IDbContextTransaction?> _currentTransactionAccessor;
     private readonly Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> _beginTransactionAsync;
     private int _savepointCounter;
+    private int _managedTransactionDepth;
     private TransactionOptions? _activeTransactionOptions;
 
     /// <summary>
@@ -68,11 +72,28 @@ public sealed class UnitOfWork : IUnitOfWork
     /// <summary>
     /// Persists all currently staged relational changes without opening an explicit transaction boundary.
     /// Use this for simple service flows that already know when the write should be flushed.
+    /// Retries are managed by this unit of work using the configured default transaction policy.
     /// </summary>
     /// <param name="ct">Cancellation token for the underlying <c>SaveChangesAsync</c> call.</param>
     /// <returns>A task that completes when all staged changes have been flushed to the database.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when called inside <see cref="ExecuteInTransactionAsync"/> because the outermost managed transaction
+    /// owns the save and commit lifecycle.
+    /// </exception>
     public Task CommitAsync(CancellationToken ct = default)
-        => _dbContext.SaveChangesAsync(ct);
+    {
+        if (IsInsideManagedTransactionScope())
+            throw new InvalidOperationException(CommitWithinTransactionMessage);
+
+        var effectiveOptions = _transactionDefaults.Resolve(null);
+        var strategy = _executionStrategyFactory(effectiveOptions);
+        return strategy.ExecuteAsync(
+            async cancellationToken =>
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            },
+            ct);
+    }
 
     /// <summary>
     /// Executes a write delegate inside an explicit relational transaction.
@@ -107,7 +128,7 @@ public sealed class UnitOfWork : IUnitOfWork
     /// </summary>
     /// <remarks>
     /// Do not call <see cref="CommitAsync"/> inside <paramref name="action"/>. The outermost transaction saves and commits
-    /// after the delegate completes successfully.
+    /// after the delegate completes successfully, and nested calls use savepoints only.
     /// </remarks>
     /// <typeparam name="T">Type returned by the transactional delegate.</typeparam>
     /// <param name="action">
@@ -159,7 +180,7 @@ public sealed class UnitOfWork : IUnitOfWork
         await transaction.CreateSavepointAsync(savepointName, ct);
         try
         {
-            var result = await action();
+            var result = await ExecuteWithinManagedTransactionScopeAsync(action);
             await ReleaseSavepointIfSupportedAsync(transaction, savepointName, ct);
             return result;
         }
@@ -213,7 +234,7 @@ public sealed class UnitOfWork : IUnitOfWork
 
                 try
                 {
-                    var result = await transactionalAction();
+                    var result = await ExecuteWithinManagedTransactionScopeAsync(transactionalAction);
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     if (transaction is not null)
@@ -358,6 +379,21 @@ public sealed class UnitOfWork : IUnitOfWork
 
     private static bool IsTransactionNotSupported(Exception ex)
         => ex is InvalidOperationException or NotSupportedException;
+
+    private bool IsInsideManagedTransactionScope() => Volatile.Read(ref _managedTransactionDepth) > 0;
+
+    private async Task<T> ExecuteWithinManagedTransactionScopeAsync<T>(Func<Task<T>> action)
+    {
+        Interlocked.Increment(ref _managedTransactionDepth);
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _managedTransactionDepth);
+        }
+    }
 
     private int? GetCommandTimeoutIfSupported()
     {

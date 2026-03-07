@@ -632,6 +632,98 @@ public sealed class PostgresDataIntegrityTests
     }
 
     [Fact]
+    public async Task UnitOfWork_WhenCommitIsCalledInsideOuterTransaction_ThrowsAndRollsBack()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var actorId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant { Id = tenantId, Code = $"tenant-commit-outer-{Guid.NewGuid():N}", Name = "Tenant Commit Outer" };
+
+        await using (var seedContext = await CreateDbContextAsync(hasTenant: false, Guid.Empty, actorId, ct))
+        {
+            seedContext.Tenants.Add(tenant);
+            await seedContext.SaveChangesAsync(ct);
+        }
+
+        var categoryId = Guid.NewGuid();
+
+        await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
+        {
+            var unitOfWork = new UnitOfWork(dbContext);
+
+            var ex = await Should.ThrowAsync<InvalidOperationException>(() =>
+                unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    dbContext.Categories.Add(new Category
+                    {
+                        Id = categoryId,
+                        TenantId = tenantId,
+                        Name = $"Commit-Outer-{Guid.NewGuid():N}"
+                    });
+
+                    await unitOfWork.CommitAsync(ct);
+                }, ct));
+
+            ex.Message.ShouldContain("CommitAsync cannot be called inside ExecuteInTransactionAsync");
+        }
+
+        await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
+        (await verifyContext.Categories.IgnoreQueryFilters().CountAsync(c => c.Id == categoryId, ct)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task UnitOfWork_WhenCommitIsCalledInsideNestedTransaction_ThrowsAndRollsBackOuterTransaction()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var actorId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant { Id = tenantId, Code = $"tenant-commit-inner-{Guid.NewGuid():N}", Name = "Tenant Commit Inner" };
+
+        await using (var seedContext = await CreateDbContextAsync(hasTenant: false, Guid.Empty, actorId, ct))
+        {
+            seedContext.Tenants.Add(tenant);
+            await seedContext.SaveChangesAsync(ct);
+        }
+
+        var outerCategoryId = Guid.NewGuid();
+        var innerCategoryId = Guid.NewGuid();
+
+        await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
+        {
+            var unitOfWork = new UnitOfWork(dbContext);
+
+            var ex = await Should.ThrowAsync<InvalidOperationException>(() =>
+                unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    dbContext.Categories.Add(new Category
+                    {
+                        Id = outerCategoryId,
+                        TenantId = tenantId,
+                        Name = $"Commit-Outer-{Guid.NewGuid():N}"
+                    });
+
+                    await unitOfWork.ExecuteInTransactionAsync(async () =>
+                    {
+                        dbContext.Categories.Add(new Category
+                        {
+                            Id = innerCategoryId,
+                            TenantId = tenantId,
+                            Name = $"Commit-Inner-{Guid.NewGuid():N}"
+                        });
+
+                        await unitOfWork.CommitAsync(ct);
+                    }, ct);
+                }, ct));
+
+            ex.Message.ShouldContain("CommitAsync cannot be called inside ExecuteInTransactionAsync");
+        }
+
+        await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
+        (await verifyContext.Categories.IgnoreQueryFilters().CountAsync(c => c.Id == outerCategoryId, ct)).ShouldBe(0);
+        (await verifyContext.Categories.IgnoreQueryFilters().CountAsync(c => c.Id == innerCategoryId, ct)).ShouldBe(0);
+    }
+
+    [Fact]
     public async Task CategoryStats_FunctionCallable_ReturnsZeroValuesForEmptyCategory()
     {
         var ct = TestContext.Current.CancellationToken;

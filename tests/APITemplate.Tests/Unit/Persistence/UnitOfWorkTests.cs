@@ -16,6 +16,51 @@ namespace APITemplate.Tests.Unit.Persistence;
 public class UnitOfWorkTests
 {
     [Fact]
+    public async Task CommitAsync_UsesExecutionStrategy_AndPersistsChanges()
+    {
+        var executionStrategy = new RecordingExecutionStrategy();
+        await using var dbContext = CreateDbContext();
+        TransactionOptions? capturedOptions = null;
+        var defaults = new TransactionDefaultsOptions
+        {
+            IsolationLevel = IsolationLevel.ReadCommitted,
+            TimeoutSeconds = 30,
+            RetryEnabled = true,
+            RetryCount = 6,
+            RetryDelaySeconds = 8
+        };
+        var sut = new UnitOfWork(
+            dbContext,
+            defaults,
+            options =>
+            {
+                capturedOptions = options;
+                return executionStrategy;
+            },
+            () => null,
+            (_, _) => throw new ShouldAssertException("CommitAsync should not open an explicit transaction."));
+
+        dbContext.Categories.Add(new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Committed"
+        });
+
+        await sut.CommitAsync(TestContext.Current.CancellationToken);
+
+        executionStrategy.ExecuteAsyncCallCount.ShouldBe(1);
+        capturedOptions.ShouldBe(new TransactionOptions
+        {
+            IsolationLevel = IsolationLevel.ReadCommitted,
+            TimeoutSeconds = 30,
+            RetryEnabled = true,
+            RetryCount = 6,
+            RetryDelaySeconds = 8
+        });
+        (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task ExecuteInTransactionAsync_WithLegacyCallShape_UsesExecutionStrategy_AndPersistsChanges()
     {
         var executionStrategy = new RecordingExecutionStrategy();
@@ -314,6 +359,75 @@ public class UnitOfWorkTests
 
         await Should.ThrowAsync<InvalidOperationException>(act);
         executionStrategy.ExecuteAsyncCallCount.ShouldBe(1);
+        transaction.CreateSavepointCount.ShouldBe(1);
+        transaction.RollbackToSavepointCount.ShouldBe(1);
+        transaction.RollbackCount.ShouldBe(1);
+        (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_WhenCommitIsCalledInsideOuterScope_ThrowsAndRollsBack()
+    {
+        var executionStrategy = new RecordingExecutionStrategy();
+        await using var dbContext = CreateDbContext();
+        IDbContextTransaction? currentTransaction = null;
+        var transaction = new RecordingTransaction();
+        var sut = new UnitOfWork(
+            dbContext,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
+            () => currentTransaction,
+            (_, _) =>
+            {
+                currentTransaction = transaction;
+                return Task.FromResult<IDbContextTransaction>(transaction);
+            });
+
+        var act = () => sut.ExecuteInTransactionAsync(async () =>
+        {
+            dbContext.Categories.Add(new Category { Id = Guid.NewGuid(), Name = "Outer" });
+            await sut.CommitAsync(TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(act);
+
+        ex.Message.ShouldContain("CommitAsync cannot be called inside ExecuteInTransactionAsync");
+        transaction.RollbackCount.ShouldBe(1);
+        (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ExecuteInTransactionAsync_WhenCommitIsCalledInsideNestedScope_ThrowsAndRollsBackOuterTransaction()
+    {
+        var executionStrategy = new RecordingExecutionStrategy();
+        await using var dbContext = CreateDbContext();
+        IDbContextTransaction? currentTransaction = null;
+        var transaction = new RecordingTransaction();
+        var sut = new UnitOfWork(
+            dbContext,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
+            () => currentTransaction,
+            (_, _) =>
+            {
+                currentTransaction = transaction;
+                return Task.FromResult<IDbContextTransaction>(transaction);
+            });
+
+        var act = () => sut.ExecuteInTransactionAsync(async () =>
+        {
+            dbContext.Categories.Add(new Category { Id = Guid.NewGuid(), Name = "Outer" });
+
+            await sut.ExecuteInTransactionAsync(async () =>
+            {
+                dbContext.Categories.Add(new Category { Id = Guid.NewGuid(), Name = "Inner" });
+                await sut.CommitAsync(TestContext.Current.CancellationToken);
+            }, TestContext.Current.CancellationToken);
+        }, TestContext.Current.CancellationToken);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(act);
+
+        ex.Message.ShouldContain("CommitAsync cannot be called inside ExecuteInTransactionAsync");
         transaction.CreateSavepointCount.ShouldBe(1);
         transaction.RollbackToSavepointCount.ShouldBe(1);
         transaction.RollbackCount.ShouldBe(1);

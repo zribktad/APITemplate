@@ -46,16 +46,8 @@ public static class PersistenceServiceCollectionExtensions
         string connectionString,
         TransactionDefaultsOptions transactionDefaults)
     {
-        options.UseNpgsql(connectionString, npgsqlOptions =>
-        {
-            if (!transactionDefaults.RetryEnabled)
-                return;
-
-            npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: transactionDefaults.RetryCount,
-                maxRetryDelay: TimeSpan.FromSeconds(transactionDefaults.RetryDelaySeconds),
-                errorCodesToAdd: null);
-        });
+        _ = transactionDefaults;
+        options.UseNpgsql(connectionString);
     }
 
     public static IServiceCollection AddMongoDB(

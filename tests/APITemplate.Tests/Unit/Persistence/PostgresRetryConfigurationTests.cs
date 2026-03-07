@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Shouldly;
 using Xunit;
 
@@ -72,42 +71,17 @@ public class PostgresRetryConfigurationTests
         options.RetryDelaySeconds.ShouldBe(5);
     }
 
-    [Fact]
-    public void ConfigurePostgresDbContext_EnablesRetryingExecutionStrategyWhenConfigured()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ConfigurePostgresDbContext_DoesNotEnableProviderLevelRetries(bool retryEnabled)
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=test;Password=test",
-                ["Persistence:Transactions:RetryEnabled"] = "true",
-                ["Persistence:Transactions:RetryCount"] = "4",
-                ["Persistence:Transactions:RetryDelaySeconds"] = "9"
-            })
-            .Build();
-
-        services.AddLogging();
-        services.AddSingleton<ITenantProvider, TestTenantProvider>();
-        services.AddSingleton<IActorProvider, TestActorProvider>();
-        services.AddPersistence(configuration);
-
-        using var provider = services.BuildServiceProvider();
-        using var scope = provider.CreateScope();
-        using var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        dbContext.Database.CreateExecutionStrategy().ShouldBeOfType<NpgsqlRetryingExecutionStrategy>();
-        dbContext.Database.CreateExecutionStrategy().RetriesOnFailure.ShouldBeTrue();
-    }
-
-    [Fact]
-    public void ConfigurePostgresDbContext_DisablesProviderRetriesWhenConfigured()
-    {
-        var services = new ServiceCollection();
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=test;Password=test",
-                ["Persistence:Transactions:RetryEnabled"] = "false"
+                ["Persistence:Transactions:RetryEnabled"] = retryEnabled.ToString()
             })
             .Build();
 

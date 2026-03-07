@@ -29,6 +29,8 @@ public interface IUnitOfWork
     /// <summary>
     /// Persists all staged relational changes for the current service operation.
     /// Use this for single-write flows after repository calls.
+    /// This method must not be called inside <see cref="ExecuteInTransactionAsync(Func{Task}, CancellationToken, TransactionOptions?)"/>
+    /// or <see cref="ExecuteInTransactionAsync{T}(Func{Task{T}}, CancellationToken, TransactionOptions?)"/>.
     /// </summary>
     Task CommitAsync(CancellationToken ct = default);
 
@@ -36,6 +38,7 @@ public interface IUnitOfWork
     /// Runs a multi-step relational write flow in one explicit transaction.
     /// The outermost call owns the database transaction and retry strategy; nested calls use savepoints inside the active transaction.
     /// The delegate should stage repository changes only; do not call <see cref="CommitAsync"/> inside it.
+    /// Calling <see cref="CommitAsync"/> from inside the delegate throws <see cref="InvalidOperationException"/>.
     /// When <paramref name="options"/> is provided, its non-null values override the configured transaction defaults for the outermost call.
     /// Nested calls inherit the active outer transaction policy and must not pass conflicting overrides.
     /// Example:
@@ -54,6 +57,7 @@ public interface IUnitOfWork
     /// Runs a multi-step relational write flow in one explicit transaction and returns a value.
     /// The outermost call owns the database transaction and retry strategy; nested calls use savepoints inside the active transaction.
     /// The delegate should stage repository changes only; do not call <see cref="CommitAsync"/> inside it.
+    /// Calling <see cref="CommitAsync"/> from inside the delegate throws <see cref="InvalidOperationException"/>.
     /// When <paramref name="options"/> is provided, its non-null values override the configured transaction defaults for the outermost call.
     /// Nested calls inherit the active outer transaction policy and must not pass conflicting overrides.
     /// </summary>
