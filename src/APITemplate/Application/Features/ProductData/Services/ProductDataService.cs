@@ -13,6 +13,7 @@ public sealed class ProductDataService : IProductDataService
 {
     private readonly IProductDataRepository _repository;
     private readonly IProductDataLinkRepository _productDataLinkRepository;
+    private readonly ITenantProvider _tenantProvider;
     private readonly IActorProvider _actorProvider;
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _timeProvider;
@@ -22,6 +23,7 @@ public sealed class ProductDataService : IProductDataService
     public ProductDataService(
         IProductDataRepository repository,
         IProductDataLinkRepository productDataLinkRepository,
+        ITenantProvider tenantProvider,
         IActorProvider actorProvider,
         IUnitOfWork unitOfWork,
         TimeProvider timeProvider,
@@ -30,6 +32,7 @@ public sealed class ProductDataService : IProductDataService
     {
         _repository = repository;
         _productDataLinkRepository = productDataLinkRepository;
+        _tenantProvider = tenantProvider;
         _actorProvider = actorProvider;
         _unitOfWork = unitOfWork;
         _timeProvider = timeProvider;
@@ -53,6 +56,7 @@ public sealed class ProductDataService : IProductDataService
     {
         var entity = new ImageProductData
         {
+            TenantId = _tenantProvider.TenantId,
             Title = request.Title,
             Description = request.Description,
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
@@ -70,6 +74,7 @@ public sealed class ProductDataService : IProductDataService
     {
         var entity = new VideoProductData
         {
+            TenantId = _tenantProvider.TenantId,
             Title = request.Title,
             Description = request.Description,
             CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
@@ -90,6 +95,7 @@ public sealed class ProductDataService : IProductDataService
 
         var deletedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
         var actorId = _actorProvider.ActorId;
+        var tenantId = _tenantProvider.TenantId;
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -97,9 +103,22 @@ public sealed class ProductDataService : IProductDataService
         }, ct);
 
         var pipeline = _resiliencePipelineProvider.GetPipeline(ResiliencePipelineKeys.MongoProductDataDelete);
-        await pipeline.ExecuteAsync(async token =>
+        try
         {
-            await _repository.SoftDeleteAsync(data.Id, actorId, deletedAtUtc, token);
-        }, ct);
+            // This logs partial failures between Postgres and Mongo until a full outbox-based flow is introduced.
+            await pipeline.ExecuteAsync(async token =>
+            {
+                await _repository.SoftDeleteAsync(data.Id, actorId, deletedAtUtc, token);
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to soft-delete ProductData document {ProductDataId} for tenant {TenantId}. Related ProductDataLinks may already be soft-deleted in PostgreSQL.",
+                data.Id,
+                tenantId);
+            throw;
+        }
     }
 }

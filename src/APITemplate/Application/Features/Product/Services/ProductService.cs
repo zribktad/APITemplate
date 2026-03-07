@@ -53,7 +53,7 @@ public sealed class ProductService : IProductService
                 Price = request.Price,
                 CategoryId = request.CategoryId,
                 ProductDataLinks = productDataIds
-                    .Select(productDataId => ProductDataLink.Create(productId, productDataId, Guid.Empty))
+                    .Select(productDataId => ProductDataLink.Create(productId, productDataId))
                     .ToList()
             };
 
@@ -73,13 +73,17 @@ public sealed class ProductService : IProductService
                 ErrorCatalog.Products.NotFound);
 
         await ValidateCategoryExistsAsync(request.CategoryId, ct);
-        var productDataIds = await ValidateAndNormalizeProductDataIdsAsync(request.ProductDataIds ?? [], ct);
-        var allLinks = await _productDataLinkRepository.ListByProductIdAsync(id, includeDeleted: true, ct);
 
         await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             product.UpdateDetails(request.Name, request.Description, request.Price, request.CategoryId);
-            product.SyncProductDataLinks(productDataIds, allLinks);
+
+            if (request.ProductDataIds is not null)
+            {
+                var productDataIds = await ValidateAndNormalizeProductDataIdsAsync(request.ProductDataIds, ct);
+                var allLinks = await _productDataLinkRepository.ListByProductIdAsync(id, includeDeleted: true, ct);
+                product.SyncProductDataLinks(productDataIds, allLinks);
+            }
 
             await _repository.UpdateAsync(product, ct);
         }, ct);

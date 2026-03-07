@@ -65,7 +65,7 @@ public sealed class Product
         {
             if (!existingById.TryGetValue(productDataId, out var existingLink))
             {
-                ProductDataLinks.Add(ProductDataLink.Create(Id, productDataId, TenantId));
+                ProductDataLinks.Add(ProductDataLink.Create(Id, productDataId));
                 continue;
             }
 

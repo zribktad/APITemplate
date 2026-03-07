@@ -9,6 +9,7 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
+[Collection("Integration.ProductDataController")]
 public class GraphQLTests
 {
     private readonly HttpClient _client;

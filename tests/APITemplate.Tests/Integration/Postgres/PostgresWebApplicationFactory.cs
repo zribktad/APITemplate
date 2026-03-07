@@ -62,7 +62,6 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
             services.AddDbContext<AppDbContext>(options =>
                 PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(options, connectionString, transactionDefaults));
 
-            TestServiceHelper.RemoveBackgroundWorkers(services);
             TestServiceHelper.RemoveExternalHealthChecks(services);
 
             services.AddHealthChecks()

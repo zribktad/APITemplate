@@ -837,7 +837,12 @@ public sealed class PostgresDataIntegrityTests
             seedContext.Tenants.Add(tenant);
             seedContext.Categories.Add(category);
             seedContext.Products.Add(product);
-            seedContext.ProductDataLinks.Add(ProductDataLink.Create(product.Id, productDataId, tenantId));
+            seedContext.ProductDataLinks.Add(new ProductDataLink
+            {
+                ProductId = product.Id,
+                ProductDataId = productDataId,
+                TenantId = tenantId
+            });
             await seedContext.SaveChangesAsync(ct);
         }
 

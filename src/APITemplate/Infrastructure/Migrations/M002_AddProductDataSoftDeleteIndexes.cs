@@ -15,18 +15,22 @@ public sealed class M002_AddProductDataSoftDeleteIndexes : MongoMigration
         return collection.Indexes.CreateManyAsync(
         [
             new CreateIndexModel<ProductData>(
-                Builders<ProductData>.IndexKeys.Ascending(x => x.IsDeleted).Ascending("_t"),
-                new CreateIndexOptions { Name = "idx_is_deleted_type" }),
+                Builders<ProductData>.IndexKeys.Ascending(x => x.TenantId).Ascending(x => x.IsDeleted).Ascending("_t"),
+                new CreateIndexOptions { Name = "idx_tenant_is_deleted_type" }),
             new CreateIndexModel<ProductData>(
-                Builders<ProductData>.IndexKeys.Ascending(x => x.IsDeleted).Descending(x => x.CreatedAt),
-                new CreateIndexOptions { Name = "idx_is_deleted_created" })
+                Builders<ProductData>.IndexKeys.Ascending(x => x.TenantId).Ascending(x => x.IsDeleted).Descending(x => x.CreatedAt),
+                new CreateIndexOptions { Name = "idx_tenant_is_deleted_created" }),
+            new CreateIndexModel<ProductData>(
+                Builders<ProductData>.IndexKeys.Ascending(x => x.TenantId).Ascending(x => x.Id).Ascending(x => x.IsDeleted),
+                new CreateIndexOptions { Name = "idx_tenant_id_is_deleted" })
         ], ct);
     }
 
     public override async Task DownAsync(IMongoDatabase db, IClientSessionHandle session, CancellationToken ct)
     {
         var collection = db.GetCollection<ProductData>("product_data");
-        await collection.Indexes.DropOneAsync("idx_is_deleted_type", ct);
-        await collection.Indexes.DropOneAsync("idx_is_deleted_created", ct);
+        await collection.Indexes.DropOneAsync("idx_tenant_is_deleted_type", ct);
+        await collection.Indexes.DropOneAsync("idx_tenant_is_deleted_created", ct);
+        await collection.Indexes.DropOneAsync("idx_tenant_id_is_deleted", ct);
     }
 }

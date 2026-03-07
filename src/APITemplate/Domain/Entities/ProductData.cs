@@ -9,6 +9,8 @@ public abstract class ProductData
     [BsonId]
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    public Guid TenantId { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }

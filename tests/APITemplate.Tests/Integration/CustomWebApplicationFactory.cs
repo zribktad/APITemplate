@@ -54,7 +54,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 options.UseInMemoryDatabase(_dbName)
                     .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning)));
 
-            TestServiceHelper.RemoveBackgroundWorkers(services);
             TestServiceHelper.MockMongoServices(services);
             TestServiceHelper.RemoveExternalHealthChecks(services);
             TestServiceHelper.ReplaceOutputCacheWithInMemory(services);

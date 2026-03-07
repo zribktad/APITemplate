@@ -99,8 +99,4 @@ internal static class TestServiceHelper
         services.AddSingleton(mock);
         services.AddSingleton(mock.Object);
     }
-
-    internal static void RemoveBackgroundWorkers(IServiceCollection services)
-    {
-    }
 }

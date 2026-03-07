@@ -10,6 +10,7 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
+[Collection("Integration.ProductDataController")]
 public class ProductsControllerTests
 {
     private readonly HttpClient _client;
@@ -86,5 +87,51 @@ public class ProductsControllerTests
 
         var body = await response.Content.ReadAsStringAsync(ct);
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, body);
+    }
+
+    [Fact]
+    public async Task Update_WithoutProductDataIds_PreservesExistingLinks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var productDataId = Guid.NewGuid();
+        IntegrationAuthHelper.Authenticate(_client);
+
+        _productDataRepositoryMock
+            .Setup(r => r.GetByIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ImageProductData { Id = productDataId, Title = "Image" }]);
+
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/v1/products",
+            new
+            {
+                name = "Product with data",
+                description = "Test product",
+                price = 25,
+                productDataIds = new[] { productDataId }
+            },
+            ct);
+
+        var createBody = await createResponse.Content.ReadAsStringAsync(ct);
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created, createBody);
+        var created = JsonSerializer.Deserialize<JsonElement>(createBody);
+        var productId = created.GetProperty("id").GetGuid();
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/v1/products/{productId}",
+            new
+            {
+                name = "Renamed product",
+                description = "Updated",
+                price = 30
+            },
+            ct);
+
+        var updateBody = await updateResponse.Content.ReadAsStringAsync(ct);
+        updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent, updateBody);
+
+        var getResponse = await _client.GetAsync($"/api/v1/products/{productId}", ct);
+        getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+        fetched.GetProperty("productDataIds").EnumerateArray().Select(x => x.GetGuid()).ShouldBe([productDataId]);
     }
 }

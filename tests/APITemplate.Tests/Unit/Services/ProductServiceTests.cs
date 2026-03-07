@@ -226,9 +226,6 @@ public class ProductServiceTests
         _repositoryMock
             .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ProductByIdWithLinksSpecification>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
-        _productDataLinkRepositoryMock
-            .Setup(r => r.ListByProductIdAsync(product.Id, true, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
 
         await _sut.UpdateAsync(product.Id, new UpdateProductRequest("New Name", "New Desc", 20m), TestContext.Current.CancellationToken);
 
@@ -242,6 +239,9 @@ public class ProductServiceTests
         _unitOfWorkMock.Verify(
             u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
+        _productDataLinkRepositoryMock.Verify(
+            r => r.ListByProductIdAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -303,6 +303,36 @@ public class ProductServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_WithNullProductDataIds_KeepsExistingLinks()
+    {
+        var existingId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            Name = "Old Name",
+            Price = 10m,
+            ProductDataLinks =
+            [
+                new ProductDataLink { ProductId = Guid.NewGuid(), ProductDataId = existingId }
+            ]
+        };
+
+        _repositoryMock
+            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ProductByIdWithLinksSpecification>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(product);
+
+        await _sut.UpdateAsync(product.Id, new UpdateProductRequest("New Name", "New Desc", 20m, null, null), TestContext.Current.CancellationToken);
+
+        product.ProductDataLinks.Select(x => x.ProductDataId).ShouldBe([existingId]);
+        _productDataRepositoryMock.Verify(
+            r => r.GetByIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _productDataLinkRepositoryMock.Verify(
+            r => r.ListByProductIdAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateAsync_RestoresSoftDeletedProductDataLink()
     {
         var restoredId = Guid.NewGuid();
@@ -314,7 +344,7 @@ public class ProductServiceTests
             Price = 10m,
             ProductDataLinks = []
         };
-        var deletedLink = ProductDataLink.Create(product.Id, restoredId, product.TenantId);
+        var deletedLink = ProductDataLink.Create(product.Id, restoredId);
         deletedLink.IsDeleted = true;
         deletedLink.DeletedAtUtc = DateTime.UtcNow;
         deletedLink.DeletedBy = Guid.NewGuid();

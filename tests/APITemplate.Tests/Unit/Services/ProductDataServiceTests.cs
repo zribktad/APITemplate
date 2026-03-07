@@ -2,9 +2,10 @@ using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
+using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Resilience;
 using APITemplate.Application.Features.ProductData.Services;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Polly;
 using Polly.Registry;
@@ -17,16 +18,22 @@ public class ProductDataServiceTests
 {
     private readonly Mock<IProductDataRepository> _repositoryMock;
     private readonly Mock<IProductDataLinkRepository> _productDataLinkRepositoryMock;
-    private readonly Mock<APITemplate.Application.Common.Context.IActorProvider> _actorProviderMock;
+    private readonly Mock<ITenantProvider> _tenantProviderMock;
+    private readonly Mock<IActorProvider> _actorProviderMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<ILogger<ProductDataService>> _loggerMock;
     private readonly ProductDataService _sut;
+    private readonly Guid _tenantId = Guid.NewGuid();
 
     public ProductDataServiceTests()
     {
         _repositoryMock = new Mock<IProductDataRepository>();
         _productDataLinkRepositoryMock = new Mock<IProductDataLinkRepository>();
-        _actorProviderMock = new Mock<APITemplate.Application.Common.Context.IActorProvider>();
+        _tenantProviderMock = new Mock<ITenantProvider>();
+        _actorProviderMock = new Mock<IActorProvider>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _loggerMock = new Mock<ILogger<ProductDataService>>();
+        _tenantProviderMock.SetupGet(x => x.TenantId).Returns(_tenantId);
         _actorProviderMock.SetupGet(x => x.ActorId).Returns(Guid.NewGuid());
         _unitOfWorkMock.SetupImmediateTransactionExecution();
 
@@ -36,11 +43,12 @@ public class ProductDataServiceTests
         _sut = new ProductDataService(
             _repositoryMock.Object,
             _productDataLinkRepositoryMock.Object,
+            _tenantProviderMock.Object,
             _actorProviderMock.Object,
             _unitOfWorkMock.Object,
             TimeProvider.System,
             registry,
-            NullLogger<ProductDataService>.Instance);
+            _loggerMock.Object);
     }
 
     [Fact]
@@ -156,7 +164,7 @@ public class ProductDataServiceTests
         imageResult.FileSizeBytes.ShouldBe(500000);
 
         _repositoryMock.Verify(
-            r => r.CreateAsync(It.Is<ImageProductData>(e => e.Title == "Banner"), It.IsAny<CancellationToken>()),
+            r => r.CreateAsync(It.Is<ImageProductData>(e => e.Title == "Banner" && e.TenantId == _tenantId), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -181,6 +189,10 @@ public class ProductDataServiceTests
         videoResult.Resolution.ShouldBe("1080p");
         videoResult.Format.ShouldBe("mp4");
         videoResult.FileSizeBytes.ShouldBe(10000000);
+
+        _repositoryMock.Verify(
+            r => r.CreateAsync(It.Is<VideoProductData>(e => e.Title == "Intro" && e.TenantId == _tenantId), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -211,6 +223,32 @@ public class ProductDataServiceTests
             Times.Once);
         _unitOfWorkMock.Verify(
             u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenMongoSoftDeleteFails_LogsAndRethrows()
+    {
+        var id = Guid.NewGuid();
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageProductData { Id = id, TenantId = _tenantId, Title = "Image" });
+        _repositoryMock
+            .Setup(r => r.SoftDeleteAsync(id, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("mongo failed"));
+
+        var act = () => _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(act);
+
+        ex.Message.ShouldBe("mongo failed");
+        _loggerMock.Verify(
+            logger => logger.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("Failed to soft-delete ProductData document")),
+                It.IsAny<InvalidOperationException>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
 }

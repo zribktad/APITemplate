@@ -18,12 +18,11 @@ public sealed class ProductDataLink : IAuditableTenantEntity
 
     public Product Product { get; set; } = null!;
 
-    public static ProductDataLink Create(Guid productId, Guid productDataId, Guid tenantId) =>
+    public static ProductDataLink Create(Guid productId, Guid productDataId) =>
         new()
         {
             ProductId = productId,
-            ProductDataId = productDataId,
-            TenantId = tenantId
+            ProductDataId = productDataId
         };
 
     public void Restore()
