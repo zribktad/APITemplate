@@ -22,6 +22,8 @@ For relational persistence, the service layer owns commit orchestration:
 - `ExecuteTransactionalWriteAsync(...)` delegates to `IUnitOfWork.ExecuteInTransactionAsync(...)`.
 - `IUnitOfWork.CommitAsync()` remains the low-level commit primitive used by `UnitOfWork` itself.
 - Command-side validation lookups can still happen before the wrapper when that keeps the command flow clearer.
+- Transient PostgreSQL retry behavior is configured through `Persistence:PostgresRetry`.
+- Explicit transaction flows run inside EF Core's execution strategy so the whole transaction delegate can be replayed on transient provider failures.
 
 > **MongoDB note:** MongoDB multi-document ACID transactions require a replica set or sharded cluster. See the [MongoDB transaction section](#mongodb-transactions) at the end of this guide.
 
@@ -55,6 +57,8 @@ public async Task<ProductResponse> CreateAsync(CreateProductRequest request, Can
 ```
 
 This helper keeps all relational writes on one entry point, even when the underlying write is only a single staged repository operation.
+
+For simple `CommitAsync()` paths, retry behavior comes from the Npgsql provider configuration. Business exceptions, validation failures, and authorization failures are not retried.
 
 ---
 
@@ -91,6 +95,8 @@ public async Task TransferCategoryAsync(
 ```
 
 If any statement inside the lambda throws, `ExecuteInTransactionAsync` calls `RollbackAsync` and re-throws the exception — the database is left unchanged. Do not call `CommitAsync` inside the transaction lambda; the wrapper saves and commits after the delegate completes successfully.
+
+When PostgreSQL retry is enabled, `UnitOfWork` executes the transaction block through EF Core's execution strategy. That allows transient provider/database failures to replay the full transaction delegate instead of retrying only the final save.
 
 ### How `ExecuteInTransactionAsync` Works
 
