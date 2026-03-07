@@ -105,7 +105,10 @@ public sealed class ProductDataService : IProductDataService
         var pipeline = _resiliencePipelineProvider.GetPipeline(ResiliencePipelineKeys.MongoProductDataDelete);
         try
         {
-            // This logs partial failures between Postgres and Mongo until a full outbox-based flow is introduced.
+            // TODO: This cross-store delete flow is still not fully correct.
+            // PostgreSQL link soft-delete and MongoDB document soft-delete are not atomic,
+            // so partial failure can still leave the system inconsistent.
+            // Logging below is only a mitigation until an outbox/eventual-consistency flow is introduced.
             await pipeline.ExecuteAsync(async token =>
             {
                 await _repository.SoftDeleteAsync(data.Id, actorId, deletedAtUtc, token);
