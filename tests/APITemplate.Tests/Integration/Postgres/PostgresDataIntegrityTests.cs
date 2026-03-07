@@ -157,11 +157,11 @@ public sealed class PostgresDataIntegrityTests
             // Mark one review and one product as soft-deleted to verify SQL function filtering.
             reviewA2.IsDeleted = true;
             reviewA2.DeletedAtUtc = DateTime.UtcNow;
-            reviewA2.DeletedBy = "test";
+            reviewA2.DeletedBy = Guid.NewGuid();
 
             productA2.IsDeleted = true;
             productA2.DeletedAtUtc = DateTime.UtcNow;
-            productA2.DeletedBy = "test";
+            productA2.DeletedBy = Guid.NewGuid();
             await db.SaveChangesAsync();
 
             categoryAId = categoryA.Id;

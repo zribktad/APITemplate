@@ -126,6 +126,6 @@ public class ProductRepositoryTests : IDisposable
 
     private sealed class TestActorProvider : IActorProvider
     {
-        public string ActorId => "test";
+        public Guid ActorId => Guid.Empty;
     }
 }

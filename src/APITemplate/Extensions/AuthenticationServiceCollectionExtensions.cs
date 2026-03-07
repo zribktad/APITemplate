@@ -52,10 +52,6 @@ public static class AuthenticationServiceCollectionExtensions
 
         services.AddOptions<SystemIdentityOptions>()
             .Bind(configuration.GetSection("SystemIdentity"))
-            .ValidateDataAnnotations()
-            .Validate(
-                o => !string.IsNullOrWhiteSpace(o.DefaultActorId),
-                "SystemIdentity:DefaultActorId is required")
             .ValidateOnStart();
 
         services.AddOptions<BootstrapTenantOptions>()

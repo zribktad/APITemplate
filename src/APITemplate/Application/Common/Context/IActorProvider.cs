@@ -2,5 +2,5 @@ namespace APITemplate.Application.Common.Context;
 
 public interface IActorProvider
 {
-    string ActorId { get; }
+    Guid ActorId { get; }
 }

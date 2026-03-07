@@ -1,6 +1,7 @@
 using APITemplate.Domain.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace APITemplate.Api.ExceptionHandling;
 
@@ -88,6 +89,16 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 appException.Message,
                 errorCode,
                 appException.Metadata);
+        }
+
+        if (exception is DbUpdateConcurrencyException)
+        {
+            return (
+                StatusCodes.Status409Conflict,
+                "Conflict",
+                "The resource was modified by another request. Please retrieve the latest version and retry.",
+                ErrorCatalog.General.ConcurrencyConflict,
+                null);
         }
 
         return (

@@ -22,7 +22,6 @@ internal static class TenantAuditableEntityConfigurationExtensions
             audit.Property(a => a.CreatedBy)
                 .HasColumnName("CreatedBy")
                 .IsRequired()
-                .HasMaxLength(200)
                 .HasDefaultValue(AuditDefaults.SystemActorId);
 
             audit.Property(a => a.UpdatedAtUtc)
@@ -33,7 +32,6 @@ internal static class TenantAuditableEntityConfigurationExtensions
             audit.Property(a => a.UpdatedBy)
                 .HasColumnName("UpdatedBy")
                 .IsRequired()
-                .HasMaxLength(200)
                 .HasDefaultValue(AuditDefaults.SystemActorId);
         });
 
@@ -44,9 +42,9 @@ internal static class TenantAuditableEntityConfigurationExtensions
         builder.Property(e => e.DeletedAtUtc)
             .HasColumnType("timestamp with time zone");
 
-        builder.Property(e => e.DeletedBy)
-            .HasMaxLength(200);
+        builder.Property(e => e.DeletedBy);
 
+        // PostgreSQL native optimistic concurrency using the built-in xmin system column (transaction ID)
         builder.Property<uint>("xmin")
             .HasColumnType("xid")
             .ValueGeneratedOnAddOrUpdate()

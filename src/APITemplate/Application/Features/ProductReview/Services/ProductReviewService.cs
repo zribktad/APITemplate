@@ -38,7 +38,7 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {
-        var userId = Guid.Parse(_actorProvider.ActorId);
+        var userId = _actorProvider.ActorId;
 
         var review = await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
@@ -67,7 +67,7 @@ public sealed class ProductReviewService : IProductReviewService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var userId = Guid.Parse(_actorProvider.ActorId);
+        var userId = _actorProvider.ActorId;
 
         var review = await _reviewRepository.GetByIdAsync(id, ct)
             ?? throw new NotFoundException("ProductReview", id, ErrorCatalog.Reviews.ReviewNotFound);

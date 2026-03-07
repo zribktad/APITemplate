@@ -5,6 +5,7 @@ using APITemplate.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Shouldly;
@@ -63,6 +64,14 @@ public class ApiExceptionHandlerTests
             "Internal Server Error",
             "An unexpected error occurred.",
             ErrorCatalog.General.Unknown
+        ];
+        yield return
+        [
+            new DbUpdateConcurrencyException("Concurrency conflict"),
+            HttpStatusCode.Conflict,
+            "Conflict",
+            "The resource was modified by another request. Please retrieve the latest version and retry.",
+            ErrorCatalog.General.ConcurrencyConflict
         ];
     }
 

@@ -41,5 +41,5 @@ public sealed class Product
     public AuditInfo Audit { get; set; } = new();
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAtUtc { get; set; }
-    public string? DeletedBy { get; set; }
+    public Guid? DeletedBy { get; set; }
 }

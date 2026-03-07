@@ -17,7 +17,7 @@ internal static class TestConfigurationHelper
             ["Keycloak:resource"] = "api-template",
             ["Keycloak:credentials:secret"] = "test-secret",
             ["Keycloak:SkipReadinessCheck"] = "true",
-            ["SystemIdentity:DefaultActorId"] = "system",
+            ["SystemIdentity:DefaultActorId"] = "00000000-0000-0000-0000-000000000000",
             ["Bootstrap:Tenant:Code"] = "default",
             ["Bootstrap:Tenant:Name"] = "Default Tenant",
             ["ReverseProxy:Routes:bff-proxy:ClusterId"] = "api-self",

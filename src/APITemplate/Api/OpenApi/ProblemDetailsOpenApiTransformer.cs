@@ -30,6 +30,7 @@ public sealed class ProblemDetailsOpenApiTransformer : IOpenApiDocumentTransform
                 OpenApiErrorResponseHelper.AddErrorResponse(operation, StatusCodes.Status401Unauthorized);
                 OpenApiErrorResponseHelper.AddErrorResponse(operation, StatusCodes.Status403Forbidden);
                 OpenApiErrorResponseHelper.AddErrorResponse(operation, StatusCodes.Status404NotFound);
+                OpenApiErrorResponseHelper.AddErrorResponse(operation, StatusCodes.Status409Conflict);
                 OpenApiErrorResponseHelper.AddErrorResponse(operation, StatusCodes.Status500InternalServerError);
             }
         }

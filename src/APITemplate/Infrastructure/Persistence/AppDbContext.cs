@@ -164,7 +164,7 @@ public sealed class AppDbContext : DbContext
     /// <summary>
     /// Fills creation/update metadata for newly added entities and assigns tenant identity when missing.
     /// </summary>
-    private void StampAddedEntity(EntityEntry entry, IAuditableTenantEntity entity, DateTime now, string actor)
+    private void StampAddedEntity(EntityEntry entry, IAuditableTenantEntity entity, DateTime now, Guid actor)
     {
         if (entity is Tenant tenant && tenant.TenantId == Guid.Empty)
             tenant.TenantId = tenant.Id;
@@ -184,7 +184,7 @@ public sealed class AppDbContext : DbContext
     /// Converts a hard delete into a soft delete update and performs soft-cascade for dependent rows.
     /// </summary>
     private async Task StampSoftDeletedEntityAsync(
-        EntityEntry entry, IAuditableTenantEntity entity, DateTime now, string actor, CancellationToken cancellationToken)
+        EntityEntry entry, IAuditableTenantEntity entity, DateTime now, Guid actor, CancellationToken cancellationToken)
     {
         var visited = new HashSet<IAuditableTenantEntity>(ReferenceEqualityComparer.Instance);
         await SoftDeleteWithRulesAsync(entry, entity, now, actor, visited, cancellationToken);
@@ -198,7 +198,7 @@ public sealed class AppDbContext : DbContext
         EntityEntry entry,
         IAuditableTenantEntity entity,
         DateTime now,
-        string actor,
+        Guid actor,
         HashSet<IAuditableTenantEntity> visited,
         CancellationToken cancellationToken)
     {
@@ -228,7 +228,7 @@ public sealed class AppDbContext : DbContext
     /// For table-split owned Audit this would null-out required columns on update.
     /// Force the owned Audit entry back to Modified and stamp updated metadata.
     /// </summary>
-    private static void EnsureAuditOwnedEntryState(EntityEntry ownerEntry, DateTime now, string actor)
+    private static void EnsureAuditOwnedEntryState(EntityEntry ownerEntry, DateTime now, Guid actor)
     {
         var auditEntry = ownerEntry.Reference(nameof(IAuditableTenantEntity.Audit)).TargetEntry;
         if (auditEntry is null)
@@ -241,7 +241,7 @@ public sealed class AppDbContext : DbContext
         auditEntry.Property(nameof(AuditInfo.UpdatedBy)).CurrentValue = actor;
     }
 
-    private static void MarkUpdated(IAuditableTenantEntity entity, DateTime now, string actor)
+    private static void MarkUpdated(IAuditableTenantEntity entity, DateTime now, Guid actor)
     {
         entity.Audit.UpdatedAtUtc = now;
         entity.Audit.UpdatedBy = actor;
@@ -262,7 +262,7 @@ public sealed class AppDbContext : DbContext
         entity.DeletedBy = null;
     }
 
-    private static void MarkSoftDeleted(IAuditableTenantEntity entity, DateTime now, string actor)
+    private static void MarkSoftDeleted(IAuditableTenantEntity entity, DateTime now, Guid actor)
     {
         entity.IsDeleted = true;
         entity.DeletedAtUtc = now;

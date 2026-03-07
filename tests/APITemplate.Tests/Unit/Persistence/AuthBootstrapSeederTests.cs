@@ -24,7 +24,7 @@ public class AuthBootstrapSeederTests
             IsActive = false,
             IsDeleted = true,
             DeletedAtUtc = DateTime.UtcNow,
-            DeletedBy = "test"
+            DeletedBy = Guid.NewGuid()
         };
 
         dbContext.Tenants.Add(tenant);
@@ -88,6 +88,6 @@ public class AuthBootstrapSeederTests
 
     private sealed class TestActorProvider : IActorProvider
     {
-        public string ActorId => "test";
+        public Guid ActorId => Guid.Empty;
     }
 }

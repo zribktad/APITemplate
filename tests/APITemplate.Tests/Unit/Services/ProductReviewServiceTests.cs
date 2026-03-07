@@ -26,7 +26,7 @@ public class ProductReviewServiceTests
         _productRepoMock = new Mock<IProductRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _actorProviderMock = new Mock<IActorProvider>();
-        _actorProviderMock.Setup(a => a.ActorId).Returns(_currentUserId.ToString());
+        _actorProviderMock.Setup(a => a.ActorId).Returns(_currentUserId);
         _unitOfWorkMock
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<ProductReview>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<Task<ProductReview>> action, CancellationToken _) => action());

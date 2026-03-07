@@ -26,17 +26,18 @@ public sealed class HttpActorProvider : IActorProvider
         _systemIdentity = systemIdentityOptions.Value;
     }
 
-    public string ActorId
+    public Guid ActorId
     {
         get
         {
             var user = _httpContextAccessor.HttpContext?.User;
             // Prefer stable subject-style identifiers first, then name-like claims, then configured system fallback.
-            return user?.FindFirstValue(ClaimTypes.NameIdentifier)
+            var raw = user?.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? user?.FindFirstValue(JwtRegisteredClaimNames.Sub)
                 ?? user?.FindFirstValue("sub")
-                ?? user?.FindFirstValue(ClaimTypes.Name)
-                ?? _systemIdentity.DefaultActorId;
+                ?? user?.FindFirstValue(ClaimTypes.Name);
+
+            return Guid.TryParse(raw, out var id) ? id : _systemIdentity.DefaultActorId;
         }
     }
 }
