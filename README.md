@@ -297,7 +297,7 @@ Authentication is handled by **Keycloak** using a hybrid approach that supports 
 | Flow | Use Case | How it works |
 |------|----------|-------------|
 | **JWT Bearer** | Scalar UI, API clients, service-to-service | `Authorization: Bearer <token>` header |
-| **BFF Cookie** | SPA frontend | `/api/v1/bff/login` → Keycloak login → session cookie → YARP proxy attaches token |
+| **BFF Cookie** | SPA frontend | `/api/v1/bff/login` → Keycloak login → session cookie → direct API calls with cookie |
 
 ### BFF Endpoints
 
@@ -329,7 +329,7 @@ Authentication is handled by **Keycloak** using a hybrid approach that supports 
 
 1. Open `http://localhost:5174/api/v1/bff/login` in a browser
 2. Log in with `admin` / `Admin123` on the Keycloak page
-3. After redirect, call API endpoints directly in the browser — the session cookie is sent automatically
+3. After redirect, call API endpoints directly in the browser — the session cookie is sent automatically with every request
 4. Check your session: `http://localhost:5174/api/v1/bff/user`
 
 #### Option C: Direct token via cURL

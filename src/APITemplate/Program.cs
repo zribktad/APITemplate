@@ -19,8 +19,7 @@ try
     builder.Services.AddApplicationServices(); // Register application services + validators.
     builder.Services.AddMongoDB(builder.Configuration); // Register Mongo context/services + Mongo health checks.
     builder.Services.AddKeycloakBffAuthentication(builder.Configuration, builder.Environment); // Register Keycloak hybrid JWT + BFF authentication.
-    builder.Services.AddBffReverseProxy(builder.Configuration); // Register YARP reverse proxy for BFF token forwarding.
-    builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
+builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
     builder.Services.AddGraphQLConfiguration(); // Register GraphQL schema and server services.
 
     var app = builder.Build(); // Materialize the web app from configured services.

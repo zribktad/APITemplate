@@ -143,8 +143,7 @@ public static class ApplicationBuilderExtensions
         app.MapControllers().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
         app.MapGraphQL();
         app.MapNitroApp("/graphql/ui");
-        app.MapReverseProxy().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
-        app.UseHealthChecks();
+app.UseHealthChecks();
 
         return app;
     }

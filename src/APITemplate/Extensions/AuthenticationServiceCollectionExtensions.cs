@@ -136,16 +136,12 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddKeycloakAuthorization(configuration)
             .AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
+                .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
                 .RequireAuthenticatedUser()
                 .Build())
             .AddPolicy(
                 AuthorizationPolicies.PlatformAdminOnly,
-                policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()))
-            .AddPolicy(
-                AuthorizationPolicies.BffProxy,
-                policy => policy
-                    .AddAuthenticationSchemes(BffAuthenticationSchemes.Cookie)
-                    .RequireAuthenticatedUser());
+                policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()));
 
         services.AddHttpClient(nameof(KeycloakHealthCheck));
         services.AddHealthChecks()

@@ -85,14 +85,12 @@ The API supports 4 authentication methods. Each serves a different client type:
 | **Scalar OAuth2** | `appsettings.json` → `Keycloak` section, realm JSON → client `api-template-scalar` | `Api/OpenApi/BearerSecuritySchemeDocumentTransformer.cs` — registers OAuth2 flow in OpenAPI spec using `IOptions<KeycloakOptions>` |
 | **JWT Bearer** | `appsettings.Development.json` → `Keycloak` section (realm, auth-server-url, resource, credentials.secret) | `Extensions/AuthenticationServiceCollectionExtensions.cs:90-105` — `.AddJwtBearer()` with Authority, Audience, token validation |
 | **Client Credentials** | realm JSON → `api-template` client: `serviceAccountsEnabled: true` | Same JWT Bearer validation — token is issued by Keycloak, API doesn't distinguish grant type |
-| **BFF Cookie** | `appsettings.json` → `Bff` section (CookieName, SessionTimeoutMinutes, Scopes, PostLogoutRedirectUri) | `Extensions/AuthenticationServiceCollectionExtensions.cs:106-138` — `.AddCookie()` + `.AddOpenIdConnect()`, `Api/Controllers/V1/BffController.cs` — login/logout/user endpoints |
-| **BFF + YARP Proxy** | `appsettings.json` → `ReverseProxy` section (Routes, Clusters, AuthorizationPolicy: `BffProxy`) | `Extensions/ServiceCollectionExtensions.cs:50-58` — `.AddReverseProxy().LoadFromConfig()`, `Infrastructure/Security/BffTokenTransformProvider.cs` — extracts cookie token → Bearer header |
+| **BFF Cookie** | `appsettings.json` → `Bff` section (CookieName, SessionTimeoutMinutes, Scopes, PostLogoutRedirectUri) | `Extensions/AuthenticationServiceCollectionExtensions.cs:106-138` — `.AddCookie()` + `.AddOpenIdConnect()`, `Api/Controllers/V1/BffController.cs` — login/logout/user endpoints. Fallback auth policy accepts both Bearer and Cookie schemes — SPA calls API endpoints directly with session cookie |
 
 **Registration order in `Program.cs`:**
 ```
 AddAuthenticationOptions()          → binds IOptions<KeycloakOptions>, IOptions<BffOptions>, CORS
 AddKeycloakBffAuthentication()      → registers JWT Bearer + Cookie + OIDC schemes, authorization policies
-AddBffReverseProxy()                → registers YARP with BffTokenTransformProvider
 ```
 
 **Keycloak realm** is defined in `infrastructure/keycloak/realms/api-template-realm.json` and auto-imported on `docker-compose up`. It configures clients, roles, protocol mappers, users, password policy, and brute force protection.
@@ -106,7 +104,7 @@ AddBffReverseProxy()                → registers YARP with BffTokenTransformPro
 | Mobile app (iOS/Android) | **JWT Bearer** (Authorization Code + PKCE) | PKCE enforced (`S256`), standard OAuth2 mobile flow |
 | Service-to-service communication | **Client Credentials** | No user involved, machine-to-machine, `serviceAccountsEnabled: true` |
 | SPA frontend — login/logout/user info | **BFF Cookie** | Secure, no token exposure to JavaScript |
-| SPA frontend — calling API endpoints | **BFF + YARP Proxy** | Cookie → Bearer translation, transparent for SPA |
+| SPA frontend — calling API endpoints | **BFF Cookie** | Session cookie accepted directly by API (fallback policy includes Cookie scheme) |
 
 ### Keycloak Standard Endpoints
 

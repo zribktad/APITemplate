@@ -94,7 +94,6 @@ services:
       Keycloak__resource: "api-template"
       Keycloak__credentials__secret: "${KC_DEV_CLIENT_SECRET:-dev-client-secret}"
       Valkey__ConnectionString: "valkey:6379"
-      ReverseProxy__Clusters__api-self__Destinations__self__Address: "http://localhost:8080/"
     depends_on:
       postgres:
         condition: service_healthy
