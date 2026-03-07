@@ -21,6 +21,10 @@ public sealed class ProductType : ObjectType<ProductResponse>
         descriptor.Field(p => p.Description)
             .Description("The optional description of the product.");
 
+        descriptor.Field(p => p.ProductDataIds)
+            .Type<NonNullType<ListType<NonNullType<UuidType>>>>()
+            .Description("The ids of related ProductData documents.");
+
         descriptor.Field(p => p.CreatedAtUtc)
             .Description("The UTC timestamp of when the product was created.");
 

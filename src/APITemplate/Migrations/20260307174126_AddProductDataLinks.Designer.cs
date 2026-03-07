@@ -3,6 +3,7 @@ using System;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APITemplate.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260307174126_AddProductDataLinks")]
+    partial class AddProductDataLinks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -238,38 +241,11 @@ namespace APITemplate.Migrations
                     b.Property<Guid>("ProductDataId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
                     b.HasKey("ProductId", "ProductDataId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("ProductDataId");
 
-                    b.HasIndex("TenantId", "IsDeleted");
-
-                    b.HasIndex("TenantId", "ProductDataId", "IsDeleted");
-
-                    b.ToTable("ProductDataLinks", t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductDataLinks_SoftDeleteConsistency", "\"IsDeleted\" OR (\"DeletedAtUtc\" IS NULL AND \"DeletedBy\" IS NULL)");
-                        });
+                    b.ToTable("ProductDataLinks");
                 });
 
             modelBuilder.Entity("APITemplate.Domain.Entities.ProductReview", b =>
@@ -548,50 +524,7 @@ namespace APITemplate.Migrations
                     b.HasOne("APITemplate.Domain.Entities.Product", "Product")
                         .WithMany("ProductDataLinks")
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.OwnsOne("APITemplate.Domain.Entities.AuditInfo", "Audit", b1 =>
-                        {
-                            b1.Property<Guid>("ProductDataLinkProductId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<Guid>("ProductDataLinkProductDataId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<DateTime>("CreatedAtUtc")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("timestamp with time zone")
-                                .HasColumnName("CreatedAtUtc")
-                                .HasDefaultValueSql("now()");
-
-                            b1.Property<Guid>("CreatedBy")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid")
-                                .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
-                                .HasColumnName("CreatedBy");
-
-                            b1.Property<DateTime>("UpdatedAtUtc")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("timestamp with time zone")
-                                .HasColumnName("UpdatedAtUtc")
-                                .HasDefaultValueSql("now()");
-
-                            b1.Property<Guid>("UpdatedBy")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid")
-                                .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
-                                .HasColumnName("UpdatedBy");
-
-                            b1.HasKey("ProductDataLinkProductId", "ProductDataLinkProductDataId");
-
-                            b1.ToTable("ProductDataLinks");
-
-                            b1.WithOwner()
-                                .HasForeignKey("ProductDataLinkProductId", "ProductDataLinkProductDataId");
-                        });
-
-                    b.Navigation("Audit")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Product");

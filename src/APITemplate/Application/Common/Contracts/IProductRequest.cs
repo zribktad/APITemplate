@@ -4,4 +4,5 @@ public interface IProductRequest
     string Name { get; }
     string? Description { get; }
     decimal Price { get; }
+    IReadOnlyCollection<Guid>? ProductDataIds { get; }
 }

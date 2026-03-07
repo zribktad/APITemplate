@@ -1,0 +1,6 @@
+namespace APITemplate.Application.Common.Resilience;
+
+public static class ResiliencePipelineKeys
+{
+    public const string MongoProductDataDelete = "mongo-productdata-delete";
+}

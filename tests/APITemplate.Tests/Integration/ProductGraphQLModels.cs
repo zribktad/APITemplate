@@ -1,6 +1,6 @@
 namespace APITemplate.Tests.Integration;
 
-public sealed record ProductItem(Guid Id, string Name, decimal Price);
+public sealed record ProductItem(Guid Id, string Name, decimal Price, List<Guid>? ProductDataIds = null);
 
 public sealed record ProductPage(List<ProductItem> Items, int TotalCount, int PageNumber, int PageSize);
 

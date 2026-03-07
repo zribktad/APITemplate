@@ -1,20 +1,28 @@
 using System.Net;
 using APITemplate.Tests.Integration.Helpers;
+using APITemplate.Domain.Entities;
+using APITemplate.Domain.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using Shouldly;
 using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
+[Collection("Integration.ProductDataController")]
 public class GraphQLTests
 {
     private readonly HttpClient _client;
     private readonly GraphQLTestHelper _graphql;
     private readonly Guid _tenantId = Guid.NewGuid();
+    private readonly Mock<IProductDataRepository> _productDataRepositoryMock;
 
     public GraphQLTests(CustomWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
         _graphql = new GraphQLTestHelper(_client);
+        _productDataRepositoryMock = factory.Services.GetRequiredService<Mock<IProductDataRepository>>();
+        _productDataRepositoryMock.Reset();
     }
 
     [Fact]
@@ -71,6 +79,45 @@ public class GraphQLTests
     }
 
     [Fact]
+    public async Task GraphQL_CreateProduct_WithProductDataIds_ReturnsIds()
+    {
+        var productDataId = Guid.NewGuid();
+        IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
+
+        _productDataRepositoryMock
+            .Setup(r => r.GetByIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ImageProductData { Id = productDataId, Title = "Image" }]);
+        var query = new
+        {
+            query = @"
+                mutation($input: CreateProductRequestInput!) {
+                    createProduct(input: $input) {
+                        id
+                        name
+                        price
+                        productDataIds
+                    }
+                }",
+            variables = new
+            {
+                input = new
+                {
+                    name = "GraphQL Product",
+                    price = 49.99,
+                    productDataIds = new[] { productDataId }
+                }
+            }
+        };
+
+        var response = await _graphql.PostAsync(query);
+        var createProduct = await _graphql.ReadRequiredGraphQLFieldAsync<CreateProductData, ProductItem>(
+            response,
+            data => data.CreateProduct,
+            "createProduct");
+        createProduct.ProductDataIds.ShouldBe([productDataId]);
+    }
+
+    [Fact]
     public async Task GraphQL_GetProductById_WhenExists_ReturnsProduct()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -80,7 +127,7 @@ public class GraphQLTests
 
         var getQuery = new
         {
-            query = $@"{{ productById(id: ""{productId}"") {{ id name }} }}"
+            query = $@"{{ productById(id: ""{productId}"") {{ id name productDataIds }} }}"
         };
 
         var getResponse = await _graphql.PostAsync(getQuery);

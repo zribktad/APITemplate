@@ -22,8 +22,8 @@ public sealed class ProductDataController : ControllerBase
         return Ok(items);
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<ProductDataResponse>> GetById(string id, CancellationToken ct)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ProductDataResponse>> GetById(Guid id, CancellationToken ct)
     {
         var item = await _service.GetByIdAsync(id, ct);
         return item is null ? NotFound() : Ok(item);
@@ -45,8 +45,8 @@ public sealed class ProductDataController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = created.Id, version = "1.0" }, created);
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id, CancellationToken ct)
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _service.DeleteAsync(id, ct);
         return NoContent();

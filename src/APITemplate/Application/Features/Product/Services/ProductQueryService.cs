@@ -22,7 +22,6 @@ public sealed class ProductQueryService : IProductQueryService
 
     public async Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var item = await _repository.GetByIdAsync(id, ct);
-        return item?.ToResponse();
+        return await _repository.FirstOrDefaultAsync(new ProductByIdSpecification(id), ct);
     }
 }

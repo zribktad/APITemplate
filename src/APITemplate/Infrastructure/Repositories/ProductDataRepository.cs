@@ -1,7 +1,7 @@
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Application.Common.Context;
 using APITemplate.Infrastructure.Persistence;
-using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace APITemplate.Infrastructure.Repositories;
@@ -9,27 +9,46 @@ namespace APITemplate.Infrastructure.Repositories;
 public sealed class ProductDataRepository : IProductDataRepository
 {
     private readonly IMongoCollection<ProductData> _collection;
+    private readonly ITenantProvider _tenantProvider;
 
-    public ProductDataRepository(MongoDbContext context)
+    public ProductDataRepository(MongoDbContext context, ITenantProvider tenantProvider)
     {
         _collection = context.ProductData;
+        _tenantProvider = tenantProvider;
     }
 
-    public async Task<ProductData?> GetByIdAsync(string id, CancellationToken ct = default)
+    public async Task<ProductData?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => await _collection
+            .Find(x => x.Id == id && x.TenantId == _tenantProvider.TenantId && !x.IsDeleted)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<List<ProductData>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
     {
-        if (!ObjectId.TryParse(id, out _))
-            return null;
+        var idArray = ids
+            .Distinct()
+            .ToArray();
+
+        if (idArray.Length == 0)
+            return [];
 
         return await _collection
-            .Find(x => x.Id == id)
-            .FirstOrDefaultAsync(ct);
+            .Find(Builders<ProductData>.Filter.And(
+                Builders<ProductData>.Filter.In(x => x.Id, idArray),
+                Builders<ProductData>.Filter.Eq(x => x.TenantId, _tenantProvider.TenantId),
+                Builders<ProductData>.Filter.Eq(x => x.IsDeleted, false)))
+            .ToListAsync(ct);
     }
 
     public async Task<List<ProductData>> GetAllAsync(string? type = null, CancellationToken ct = default)
     {
         var filter = type is null
-            ? Builders<ProductData>.Filter.Empty
-            : Builders<ProductData>.Filter.Eq("_t", type);
+            ? Builders<ProductData>.Filter.And(
+                Builders<ProductData>.Filter.Eq(x => x.TenantId, _tenantProvider.TenantId),
+                Builders<ProductData>.Filter.Eq(x => x.IsDeleted, false))
+            : Builders<ProductData>.Filter.And(
+                Builders<ProductData>.Filter.Eq(x => x.TenantId, _tenantProvider.TenantId),
+                Builders<ProductData>.Filter.Eq("_t", type),
+                Builders<ProductData>.Filter.Eq(x => x.IsDeleted, false));
 
         return await _collection.Find(filter).ToListAsync(ct);
     }
@@ -40,8 +59,16 @@ public sealed class ProductDataRepository : IProductDataRepository
         return productData;
     }
 
-    public async Task DeleteAsync(string id, CancellationToken ct = default)
+    public async Task SoftDeleteAsync(Guid id, Guid actorId, DateTime deletedAtUtc, CancellationToken ct = default)
     {
-        await _collection.DeleteOneAsync(x => x.Id == id, ct);
+        var update = Builders<ProductData>.Update
+            .Set(x => x.IsDeleted, true)
+            .Set(x => x.DeletedAtUtc, deletedAtUtc)
+            .Set(x => x.DeletedBy, actorId);
+
+        await _collection.UpdateOneAsync(
+            x => x.Id == id && x.TenantId == _tenantProvider.TenantId && !x.IsDeleted,
+            update,
+            cancellationToken: ct);
     }
 }

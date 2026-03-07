@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
+
 using APITemplate.Application.Features.ProductReview.Services;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
@@ -412,6 +413,56 @@ public sealed class PostgresDataIntegrityTests
     }
 
     [Fact]
+    public async Task DeleteProduct_SoftDeletesProductDataLinks()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var actorId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant { Id = tenantId, Code = $"tenant-links-{Guid.NewGuid():N}", Name = "Tenant Links" };
+        var category = new Category { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Category-Links-{Guid.NewGuid():N}" };
+        var product = new Product { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Product-Links-{Guid.NewGuid():N}", Price = 50m, CategoryId = category.Id };
+        var productDataId = Guid.NewGuid();
+
+        await using (var seedContext = await CreateDbContextAsync(hasTenant: false, Guid.Empty, actorId, ct))
+        {
+            seedContext.Tenants.Add(tenant);
+            seedContext.Categories.Add(category);
+            seedContext.Products.Add(product);
+            seedContext.ProductDataLinks.Add(new ProductDataLink
+            {
+                ProductId = product.Id,
+                ProductDataId = productDataId,
+                TenantId = tenantId
+            });
+            await seedContext.SaveChangesAsync(ct);
+        }
+
+        await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
+        {
+            var service = new APITemplate.Application.Features.Product.Services.ProductService(
+                new ProductRepository(deleteContext),
+                Mock.Of<IProductQueryService>(),
+                Mock.Of<ICategoryRepository>(),
+                Mock.Of<IProductDataRepository>(),
+                new ProductDataLinkRepository(deleteContext, new TestTenantProvider(tenantId, true)),
+                new UnitOfWork(deleteContext));
+
+            await service.DeleteAsync(product.Id, ct);
+        }
+
+        await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
+        var remainingLinks = await verifyContext.ProductDataLinks
+            .IgnoreQueryFilters()
+            .Where(link => link.ProductId == product.Id)
+            .ToListAsync(ct);
+
+        remainingLinks.Count.ShouldBe(1);
+        remainingLinks[0].IsDeleted.ShouldBeTrue();
+        remainingLinks[0].DeletedAtUtc.ShouldNotBeNull();
+        remainingLinks[0].DeletedBy.ShouldBe(actorId);
+    }
+
+    [Fact]
     public async Task ProductReviewCreate_WhenRepositoryThrowsAfterTracking_RollsBackTransaction()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -762,6 +813,52 @@ public sealed class PostgresDataIntegrityTests
         payload.GetProperty("productCount").GetInt64().ShouldBe(0);
         payload.GetProperty("averagePrice").GetDecimal().ShouldBe(0m);
         payload.GetProperty("totalReviews").GetInt64().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task DeleteProductData_SoftDeletesLinksAndMongoDocument()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var actorId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var productDataId = Guid.NewGuid();
+        var mongoRepositoryMock = _factory.Services.GetRequiredService<Mock<IProductDataRepository>>();
+        mongoRepositoryMock.Reset();
+        mongoRepositoryMock
+            .Setup(r => r.GetByIdAsync(productDataId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageProductData { Id = productDataId, Title = "Image" });
+
+        var tenant = new Tenant { Id = tenantId, Code = $"tenant-pd-{Guid.NewGuid():N}", Name = "Tenant ProductData" };
+        var category = new Category { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Category-PD-{Guid.NewGuid():N}" };
+        var product = new Product { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Product-PD-{Guid.NewGuid():N}", Price = 50m, CategoryId = category.Id };
+
+        await using (var seedContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct))
+        {
+            seedContext.Tenants.Add(tenant);
+            seedContext.Categories.Add(category);
+            seedContext.Products.Add(product);
+            seedContext.ProductDataLinks.Add(new ProductDataLink
+            {
+                ProductId = product.Id,
+                ProductDataId = productDataId,
+                TenantId = tenantId
+            });
+            await seedContext.SaveChangesAsync(ct);
+        }
+
+        IntegrationAuthHelper.Authenticate(_client, tenantId: tenantId);
+        var response = await _client.DeleteAsync($"/api/v1/product-data/{productDataId}", ct);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
+        var link = await verifyContext.ProductDataLinks
+            .IgnoreQueryFilters()
+            .SingleAsync(existing => existing.ProductId == product.Id && existing.ProductDataId == productDataId, ct);
+
+        link.IsDeleted.ShouldBeTrue();
+        mongoRepositoryMock.Verify(
+            r => r.SoftDeleteAsync(productDataId, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     private async Task<AppDbContext> CreateDbContextAsync(bool hasTenant, Guid tenantId, Guid actorId, CancellationToken ct)

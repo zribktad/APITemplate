@@ -35,6 +35,8 @@ public sealed class Product
 
     public Category? Category { get; set; }
 
+    public ICollection<ProductDataLink> ProductDataLinks { get; set; } = [];
+
     public ICollection<ProductReview> Reviews { get; set; } = [];
 
     public Guid TenantId { get; set; }
@@ -42,4 +44,42 @@ public sealed class Product
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedBy { get; set; }
+
+    public void UpdateDetails(string name, string? description, decimal price, Guid? categoryId)
+    {
+        Name = name;
+        Description = description;
+        Price = price;
+        CategoryId = categoryId;
+    }
+
+    public void SyncProductDataLinks(IReadOnlyCollection<Guid> productDataIds, IReadOnlyCollection<ProductDataLink> allLinks)
+    {
+        var targetIds = productDataIds.ToHashSet();
+        var existingById = allLinks.ToDictionary(link => link.ProductDataId);
+
+        foreach (var link in ProductDataLinks.Where(link => !targetIds.Contains(link.ProductDataId)).ToArray())
+            ProductDataLinks.Remove(link);
+
+        foreach (var productDataId in productDataIds)
+        {
+            if (!existingById.TryGetValue(productDataId, out var existingLink))
+            {
+                ProductDataLinks.Add(ProductDataLink.Create(Id, productDataId));
+                continue;
+            }
+
+            if (existingLink.IsDeleted)
+            {
+                existingLink.Restore();
+                ProductDataLinks.Add(existingLink);
+            }
+        }
+    }
+
+    public void SoftDeleteProductDataLinks()
+    {
+        foreach (var link in ProductDataLinks.ToArray())
+            ProductDataLinks.Remove(link);
+    }
 }
