@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
@@ -97,5 +98,9 @@ internal static class TestServiceHelper
         var mock = new Mock<IProductDataRepository>();
         services.AddSingleton(mock);
         services.AddSingleton(mock.Object);
+    }
+
+    internal static void RemoveBackgroundWorkers(IServiceCollection services)
+    {
     }
 }

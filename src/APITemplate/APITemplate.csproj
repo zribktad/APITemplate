@@ -60,6 +60,9 @@
     <PackageReference Include="Asp.Versioning.Mvc" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
 
+    <!-- Resilience (Polly) -->
+    <PackageReference Include="Microsoft.Extensions.Resilience" />
+
     <!-- Logging -->
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" />
     <PackageReference Include="Microsoft.Extensions.Telemetry" />

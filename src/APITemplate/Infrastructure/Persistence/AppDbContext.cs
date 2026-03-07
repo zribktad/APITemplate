@@ -65,6 +65,7 @@ public sealed class AppDbContext : DbContext
     }
 
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductDataLink> ProductDataLinks => Set<ProductDataLink>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Tenant> Tenants => Set<Tenant>();

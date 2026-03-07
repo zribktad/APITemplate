@@ -1,7 +1,13 @@
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
+using APITemplate.Application.Common.Resilience;
 using APITemplate.Application.Features.ProductData.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Polly;
+using Polly.Registry;
 using Shouldly;
 using Xunit;
 
@@ -10,12 +16,31 @@ namespace APITemplate.Tests.Unit.Services;
 public class ProductDataServiceTests
 {
     private readonly Mock<IProductDataRepository> _repositoryMock;
+    private readonly Mock<IProductDataLinkRepository> _productDataLinkRepositoryMock;
+    private readonly Mock<APITemplate.Application.Common.Context.IActorProvider> _actorProviderMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly ProductDataService _sut;
 
     public ProductDataServiceTests()
     {
         _repositoryMock = new Mock<IProductDataRepository>();
-        _sut = new ProductDataService(_repositoryMock.Object, TimeProvider.System);
+        _productDataLinkRepositoryMock = new Mock<IProductDataLinkRepository>();
+        _actorProviderMock = new Mock<APITemplate.Application.Common.Context.IActorProvider>();
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _actorProviderMock.SetupGet(x => x.ActorId).Returns(Guid.NewGuid());
+        _unitOfWorkMock.SetupImmediateTransactionExecution();
+
+        var registry = new ResiliencePipelineRegistry<string>();
+        registry.TryAddBuilder(ResiliencePipelineKeys.MongoProductDataDelete, (builder, _) => { });
+
+        _sut = new ProductDataService(
+            _repositoryMock.Object,
+            _productDataLinkRepositoryMock.Object,
+            _actorProviderMock.Object,
+            _unitOfWorkMock.Object,
+            TimeProvider.System,
+            registry,
+            NullLogger<ProductDataService>.Instance);
     }
 
     [Fact]
@@ -100,10 +125,10 @@ public class ProductDataServiceTests
     {
         var ct = TestContext.Current.CancellationToken;
         _repositoryMock
-            .Setup(r => r.GetByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductData?)null);
 
-        var result = await _sut.GetByIdAsync("nonexistent", ct);
+        var result = await _sut.GetByIdAsync(Guid.NewGuid(), ct);
 
         result.ShouldBeNull();
     }
@@ -159,12 +184,33 @@ public class ProductDataServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_CallsRepositoryDelete()
+    public async Task DeleteAsync_WhenProductDataMissing_ThrowsNotFoundException()
     {
-        var id = "507f1f77bcf86cd799439011";
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ProductData?)null);
+
+        await Should.ThrowAsync<NotFoundException>(() => _sut.DeleteAsync(Guid.NewGuid(), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_SoftDeletesLinksAndMongoDocument()
+    {
+        var id = Guid.NewGuid();
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageProductData { Id = id, Title = "Image" });
 
         await _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
-        _repositoryMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()), Times.Once);
+        _productDataLinkRepositoryMock.Verify(
+            r => r.SoftDeleteActiveLinksForProductDataAsync(id, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _repositoryMock.Verify(
+            r => r.SoftDeleteAsync(id, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        _unitOfWorkMock.Verify(
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
+            Times.Once);
     }
 }

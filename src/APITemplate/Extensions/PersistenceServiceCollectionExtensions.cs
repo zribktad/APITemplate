@@ -1,4 +1,4 @@
-using APITemplate.Application.Common.Options;
+using APITemplate.Application.Common.Resilience;
 using APITemplate.Application.Features.ProductData.Services;
 using APITemplate.Infrastructure.Health;
 using APITemplate.Infrastructure.Persistence;
@@ -8,6 +8,7 @@ using APITemplate.Infrastructure.StoredProcedures;
 using Kot.MongoDB.Migrations;
 using Kot.MongoDB.Migrations.DI;
 using Microsoft.EntityFrameworkCore;
+using Polly;
 
 namespace APITemplate.Extensions;
 
@@ -27,6 +28,7 @@ public static class PersistenceServiceCollectionExtensions
             ConfigurePostgresDbContext(options, connectionString, transactionDefaults));
 
         services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IProductDataLinkRepository, ProductDataLinkRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IStoredProcedureExecutor, StoredProcedureExecutor>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
@@ -59,6 +61,17 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<MongoDbContext>();
         services.AddScoped<IProductDataRepository, ProductDataRepository>();
         services.AddScoped<IProductDataService, ProductDataService>();
+
+        services.AddResiliencePipeline(ResiliencePipelineKeys.MongoProductDataDelete, builder =>
+        {
+            builder.AddRetry(new()
+            {
+                MaxRetryAttempts = 3,
+                BackoffType = DelayBackoffType.Exponential,
+                Delay = TimeSpan.FromSeconds(1),
+                UseJitter = true
+            });
+        });
 
         services.AddMongoMigrations(
             mongoSettings.ConnectionString,

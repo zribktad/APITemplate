@@ -5,7 +5,13 @@ namespace APITemplate.Application.Features.Product.Mappings;
 public static class ProductMappings
 {
     public static readonly Expression<Func<ProductEntity, ProductResponse>> Projection =
-        p => new ProductResponse(p.Id, p.Name, p.Description, p.Price, p.Audit.CreatedAtUtc);
+        p => new ProductResponse(
+            p.Id,
+            p.Name,
+            p.Description,
+            p.Price,
+            p.Audit.CreatedAtUtc,
+            p.ProductDataLinks.Select(link => link.ProductDataId).ToArray());
 
     private static readonly Func<ProductEntity, ProductResponse> CompiledProjection = Projection.Compile();
 

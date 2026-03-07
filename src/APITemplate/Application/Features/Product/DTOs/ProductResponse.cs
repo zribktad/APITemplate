@@ -4,4 +4,5 @@ public sealed record ProductResponse(
     string Name,
     string? Description,
     decimal Price,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    IReadOnlyCollection<Guid> ProductDataIds);

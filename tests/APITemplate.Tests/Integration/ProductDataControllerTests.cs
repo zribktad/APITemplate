@@ -11,6 +11,7 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
+[Collection("Integration.ProductDataController")]
 public class ProductDataControllerTests
 {
     private readonly HttpClient _client;
@@ -84,10 +85,10 @@ public class ProductDataControllerTests
         IntegrationAuthHelper.Authenticate(_client);
 
         _repositoryMock
-            .Setup(r => r.GetByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductData?)null);
 
-        var response = await _client.GetAsync("/api/v1/product-data/507f1f77bcf86cd799439011", ct);
+        var response = await _client.GetAsync($"/api/v1/product-data/{Guid.NewGuid()}", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
@@ -119,8 +120,9 @@ public class ProductDataControllerTests
 
         var response = await _client.PostAsJsonAsync($"/api/v1/product-data/{type}", payload, ct);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, body);
+        var json = JsonSerializer.Deserialize<JsonElement>(body);
         json.GetProperty("type").GetString().ShouldBe(type);
     }
 
@@ -147,15 +149,17 @@ public class ProductDataControllerTests
         var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client);
 
-        var id = "507f1f77bcf86cd799439011";
+        var id = Guid.NewGuid();
 
         _repositoryMock
-            .Setup(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ImageProductData { Id = id, Title = "Image" });
 
         var response = await _client.DeleteAsync($"/api/v1/product-data/{id}", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        _repositoryMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>()), Times.Once);
+        _repositoryMock.Verify(
+            r => r.SoftDeleteAsync(id, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }

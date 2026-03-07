@@ -18,6 +18,13 @@ public static class ErrorCatalog
     public static class Products
     {
         public const string NotFound = "PRD-0404";
+        public const string ProductDataNotFound = "PRD-2404";
+    }
+
+    public static class ProductData
+    {
+        public const string NotFound = "PDT-0404";
+        public const string InUse = "PDT-0409";
     }
 
     public static class Categories
