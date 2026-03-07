@@ -1,5 +1,7 @@
+using APITemplate.Application.Common.Options;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Tests.Integration.Helpers;
+using APITemplate.Extensions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -7,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -54,8 +57,10 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
                 services.Remove(d);
 
             var connectionString = _postgresContainer.GetConnectionString();
+            using var bootstrapProvider = services.BuildServiceProvider();
+            var retryOptions = bootstrapProvider.GetRequiredService<IOptions<PostgresRetryOptions>>().Value;
             services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(connectionString));
+                PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(options, connectionString, retryOptions));
 
             TestServiceHelper.RemoveExternalHealthChecks(services);
 

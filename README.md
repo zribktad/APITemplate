@@ -342,6 +342,9 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 | `Caching:ProductsExpirationSeconds`   | `30`                                                                                | Output cache TTL for the Products policy                                                               |
 | `Caching:CategoriesExpirationSeconds` | `60`                                                                                | Output cache TTL for the Categories policy                                                             |
 | `Caching:ReviewsExpirationSeconds`    | `30`                                                                                | Output cache TTL for the Reviews policy                                                                |
+| `Persistence:PostgresRetry:Enabled`  | `true`                                                                              | Enables transient PostgreSQL retry behavior for EF Core/Npgsql                                         |
+| `Persistence:PostgresRetry:MaxRetryCount` | `3`                                                                           | Maximum retry attempts for transient PostgreSQL failures                                               |
+| `Persistence:PostgresRetry:MaxRetryDelaySeconds` | `5`                                                                     | Maximum delay between transient PostgreSQL retry attempts in seconds                                   |
 | `SystemIdentity:DefaultActorId`       | `00000000-0000-0000-0000-000000000000`                                              | Default actor GUID used when no request actor context is available                                     |
 | `Bootstrap:Tenant:Code`               | `default`                                                                           | Bootstrap tenant code seeded at startup                                                                |
 | `Bootstrap:Tenant:Name`               | `Default Tenant`                                                                    | Bootstrap tenant display name                                                                          |
@@ -481,6 +484,8 @@ Every data-store interaction is hidden behind a typed interface defined in `Doma
 - Write services load entities they intend to mutate through repositories, not query services.
 - `ExecuteTransactionalWriteAsync(...)` is the service-layer write wrapper used by the template.
 - Some single-write flows do not strictly require an explicit transaction; the wrapper is still used to keep one consistent write shape across relational features.
+- `Persistence:PostgresRetry` configures transient PostgreSQL retries at the provider level.
+- Explicit transactional writes run inside EF Core's execution strategy so the full transaction block can be replayed on transient provider failures.
 
 ```csharp
 // Wraps two repository writes in a single database transaction
