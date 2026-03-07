@@ -4,7 +4,9 @@ using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace APITemplate.Infrastructure.Persistence;
 
@@ -18,6 +20,7 @@ public sealed class UnitOfWork : IUnitOfWork
 
     private readonly AppDbContext _dbContext;
     private readonly TransactionDefaultsOptions _transactionDefaults;
+    private readonly ILogger<UnitOfWork> _logger;
     private readonly Func<TransactionOptions, IExecutionStrategy> _executionStrategyFactory;
     private readonly Func<IDbContextTransaction?> _currentTransactionAccessor;
     private readonly Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> _beginTransactionAsync;
@@ -33,7 +36,7 @@ public sealed class UnitOfWork : IUnitOfWork
     /// </summary>
     /// <param name="dbContext">EF Core context that tracks staged relational changes for the current scope.</param>
     public UnitOfWork(AppDbContext dbContext)
-        : this(dbContext, Options.Create(new TransactionDefaultsOptions()))
+        : this(dbContext, Options.Create(new TransactionDefaultsOptions()), NullLogger<UnitOfWork>.Instance)
     {
     }
 
@@ -46,9 +49,27 @@ public sealed class UnitOfWork : IUnitOfWork
     /// for outermost <see cref="ExecuteInTransactionAsync"/> calls.
     /// </param>
     public UnitOfWork(AppDbContext dbContext, IOptions<TransactionDefaultsOptions> transactionDefaults)
+        : this(dbContext, transactionDefaults, NullLogger<UnitOfWork>.Instance)
+    {
+    }
+
+    /// <summary>
+    /// Creates a <see cref="UnitOfWork"/> that uses configured transaction defaults for explicit transactions.
+    /// </summary>
+    /// <param name="dbContext">EF Core context that tracks staged relational changes for the current scope.</param>
+    /// <param name="transactionDefaults">
+    /// Configured defaults used to resolve the effective isolation level, timeout, and retry policy
+    /// for outermost <see cref="ExecuteInTransactionAsync"/> calls.
+    /// </param>
+    /// <param name="logger">Logger used for transaction orchestration diagnostics.</param>
+    public UnitOfWork(
+        AppDbContext dbContext,
+        IOptions<TransactionDefaultsOptions> transactionDefaults,
+        ILogger<UnitOfWork> logger)
         : this(
             dbContext,
             transactionDefaults.Value,
+            logger,
             options => CreateExecutionStrategy(dbContext, options),
             () => dbContext.Database.CurrentTransaction,
             dbContext.Database.BeginTransactionAsync)
@@ -58,12 +79,14 @@ public sealed class UnitOfWork : IUnitOfWork
     internal UnitOfWork(
         AppDbContext dbContext,
         TransactionDefaultsOptions transactionDefaults,
+        ILogger<UnitOfWork> logger,
         Func<TransactionOptions, IExecutionStrategy> executionStrategyFactory,
         Func<IDbContextTransaction?> currentTransactionAccessor,
         Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> beginTransactionAsync)
     {
         _dbContext = dbContext;
         _transactionDefaults = transactionDefaults;
+        _logger = logger;
         _executionStrategyFactory = executionStrategyFactory;
         _currentTransactionAccessor = currentTransactionAccessor;
         _beginTransactionAsync = beginTransactionAsync;
@@ -85,14 +108,19 @@ public sealed class UnitOfWork : IUnitOfWork
     public Task CommitAsync(CancellationToken ct = default)
     {
         if (_managedTransactionScope.IsActive)
+        {
+            _logger.CommitRejectedInsideManagedTransaction();
             throw new InvalidOperationException(CommitWithinTransactionMessage);
+        }
 
         var effectiveOptions = _transactionDefaults.Resolve(null);
+        _logger.CommitStarted(effectiveOptions.RetryEnabled ?? true, effectiveOptions.TimeoutSeconds);
         var strategy = _executionStrategyFactory(effectiveOptions);
         return strategy.ExecuteAsync(
             async cancellationToken =>
             {
                 await _dbContext.SaveChangesAsync(cancellationToken);
+                _logger.CommitCompleted();
             },
             ct);
     }
@@ -179,18 +207,21 @@ public sealed class UnitOfWork : IUnitOfWork
         var snapshot = _trackedStateManager.Capture();
 
         // Nested work reuses the active transaction and isolates rollback via a savepoint.
+        _logger.SavepointCreating(savepointName);
         await transaction.CreateSavepointAsync(savepointName, ct);
         try
         {
             using var scope = _managedTransactionScope.Enter();
             var result = await action();
             await ReleaseSavepointIfSupportedAsync(transaction, savepointName, ct);
+            _logger.SavepointReleased(savepointName);
             return result;
         }
         catch
         {
             await transaction.RollbackToSavepointAsync(savepointName, ct);
             _trackedStateManager.Restore(snapshot);
+            _logger.SavepointRolledBack(savepointName);
             throw;
         }
     }
@@ -218,6 +249,10 @@ public sealed class UnitOfWork : IUnitOfWork
             {
                 _activeTransactionOptions = effectiveOptions;
                 using var timeoutScope = _commandTimeoutScope.Apply(effectiveOptions.TimeoutSeconds);
+                _logger.OutermostTransactionStarted(
+                    effectiveOptions.IsolationLevel!.Value,
+                    effectiveOptions.TimeoutSeconds,
+                    effectiveOptions.RetryEnabled ?? true);
 
                 IDbContextTransaction? transaction = null;
                 try
@@ -225,11 +260,13 @@ public sealed class UnitOfWork : IUnitOfWork
                     transaction = await _beginTransactionAsync(
                         effectiveOptions.IsolationLevel!.Value,
                         cancellationToken);
+                    _logger.DatabaseTransactionOpened();
                 }
                 catch (Exception ex) when (IsTransactionNotSupported(ex))
                 {
                     // Providers without transaction support still use the same unit-of-work flow,
                     // but save without an explicit database transaction.
+                    _logger.DatabaseTransactionUnsupported(ex);
                 }
 
                 var snapshot = _trackedStateManager.Capture();
@@ -241,14 +278,21 @@ public sealed class UnitOfWork : IUnitOfWork
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     if (transaction is not null)
+                    {
                         await transaction.CommitAsync(cancellationToken);
+                        _logger.DatabaseTransactionCommitted();
+                    }
 
+                    _logger.OutermostTransactionCompleted();
                     return result;
                 }
-                catch
+                catch (Exception ex)
                 {
                     if (transaction is not null)
+                    {
                         await transaction.RollbackAsync(cancellationToken);
+                        _logger.DatabaseTransactionRolledBack(ex);
+                    }
 
                     _trackedStateManager.Restore(snapshot);
                     throw;

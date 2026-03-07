@@ -8,6 +8,7 @@ using APITemplate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
 
@@ -32,6 +33,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             defaults,
+            NullLogger<UnitOfWork>.Instance,
             options =>
             {
                 capturedOptions = options;
@@ -71,6 +73,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             options =>
             {
                 capturedOptions = options;
@@ -121,6 +124,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             defaults,
+            NullLogger<UnitOfWork>.Instance,
             options =>
             {
                 capturedOptions = options;
@@ -178,6 +182,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -214,6 +219,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -266,6 +272,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -301,6 +308,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -337,6 +345,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -375,6 +384,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
@@ -406,6 +416,7 @@ public class UnitOfWorkTests
         var sut = new UnitOfWork(
             dbContext,
             new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => currentTransaction,
             (_, _) =>
