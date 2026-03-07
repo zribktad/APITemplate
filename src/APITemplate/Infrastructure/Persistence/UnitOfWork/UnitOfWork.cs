@@ -3,10 +3,8 @@ using APITemplate.Application.Common.Options;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace APITemplate.Infrastructure.Persistence;
 
@@ -23,8 +21,10 @@ public sealed class UnitOfWork : IUnitOfWork
     private readonly Func<TransactionOptions, IExecutionStrategy> _executionStrategyFactory;
     private readonly Func<IDbContextTransaction?> _currentTransactionAccessor;
     private readonly Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> _beginTransactionAsync;
+    private readonly ManagedTransactionScope _managedTransactionScope = new();
+    private readonly DbContextTrackedStateManager _trackedStateManager;
+    private readonly DbContextCommandTimeoutScope _commandTimeoutScope;
     private int _savepointCounter;
-    private int _managedTransactionDepth;
     private TransactionOptions? _activeTransactionOptions;
 
     /// <summary>
@@ -67,6 +67,8 @@ public sealed class UnitOfWork : IUnitOfWork
         _executionStrategyFactory = executionStrategyFactory;
         _currentTransactionAccessor = currentTransactionAccessor;
         _beginTransactionAsync = beginTransactionAsync;
+        _trackedStateManager = new DbContextTrackedStateManager(dbContext);
+        _commandTimeoutScope = new DbContextCommandTimeoutScope(dbContext);
     }
 
     /// <summary>
@@ -82,7 +84,7 @@ public sealed class UnitOfWork : IUnitOfWork
     /// </exception>
     public Task CommitAsync(CancellationToken ct = default)
     {
-        if (IsInsideManagedTransactionScope())
+        if (_managedTransactionScope.IsActive)
             throw new InvalidOperationException(CommitWithinTransactionMessage);
 
         var effectiveOptions = _transactionDefaults.Resolve(null);
@@ -174,20 +176,21 @@ public sealed class UnitOfWork : IUnitOfWork
     {
         ValidateNestedTransactionOptions(options);
         var savepointName = $"uow_sp_{Interlocked.Increment(ref _savepointCounter)}";
-        var snapshot = CaptureTrackedState();
+        var snapshot = _trackedStateManager.Capture();
 
         // Nested work reuses the active transaction and isolates rollback via a savepoint.
         await transaction.CreateSavepointAsync(savepointName, ct);
         try
         {
-            var result = await ExecuteWithinManagedTransactionScopeAsync(action);
+            using var scope = _managedTransactionScope.Enter();
+            var result = await action();
             await ReleaseSavepointIfSupportedAsync(transaction, savepointName, ct);
             return result;
         }
         catch
         {
             await transaction.RollbackToSavepointAsync(savepointName, ct);
-            RestoreTrackedState(snapshot);
+            _trackedStateManager.Restore(snapshot);
             throw;
         }
     }
@@ -208,14 +211,13 @@ public sealed class UnitOfWork : IUnitOfWork
     {
         var strategy = _executionStrategyFactory(effectiveOptions);
         var previousActiveOptions = _activeTransactionOptions;
-        var previousTimeout = GetCommandTimeoutIfSupported();
 
         return await strategy.ExecuteAsync(
             state: action,
             operation: async (_, transactionalAction, cancellationToken) =>
             {
                 _activeTransactionOptions = effectiveOptions;
-                SetCommandTimeoutIfSupported(effectiveOptions.TimeoutSeconds);
+                using var timeoutScope = _commandTimeoutScope.Apply(effectiveOptions.TimeoutSeconds);
 
                 IDbContextTransaction? transaction = null;
                 try
@@ -230,11 +232,12 @@ public sealed class UnitOfWork : IUnitOfWork
                     // but save without an explicit database transaction.
                 }
 
-                var snapshot = CaptureTrackedState();
+                var snapshot = _trackedStateManager.Capture();
 
                 try
                 {
-                    var result = await ExecuteWithinManagedTransactionScopeAsync(transactionalAction);
+                    using var scope = _managedTransactionScope.Enter();
+                    var result = await transactionalAction();
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     if (transaction is not null)
@@ -247,7 +250,7 @@ public sealed class UnitOfWork : IUnitOfWork
                     if (transaction is not null)
                         await transaction.RollbackAsync(cancellationToken);
 
-                    RestoreTrackedState(snapshot);
+                    _trackedStateManager.Restore(snapshot);
                     throw;
                 }
                 finally
@@ -255,8 +258,6 @@ public sealed class UnitOfWork : IUnitOfWork
                     if (transaction is not null)
                         await transaction.DisposeAsync();
 
-                    // Timeout and active policy are scoped to the outermost transaction boundary.
-                    SetCommandTimeoutIfSupported(previousTimeout);
                     _activeTransactionOptions = previousActiveOptions;
                 }
             },
@@ -307,53 +308,6 @@ public sealed class UnitOfWork : IUnitOfWork
     }
 
     /// <summary>
-    /// Captures the tracked entity state before entering a transaction/savepoint boundary so EF state can be restored
-    /// after rollback. This prevents failed staged changes from leaking into later saves on the same context.
-    /// </summary>
-    /// <returns>
-    /// Snapshot of tracked entities keyed by reference identity, including entity state plus current/original values.
-    /// </returns>
-    private IReadOnlyDictionary<object, TrackedEntitySnapshot> CaptureTrackedState()
-    {
-        return _dbContext.ChangeTracker
-            .Entries()
-            .Where(entry => entry.State != EntityState.Detached)
-            .ToDictionary(
-                entry => entry.Entity,
-                entry => new TrackedEntitySnapshot(
-                    entry.State,
-                    entry.CurrentValues.Clone(),
-                    entry.OriginalValues.Clone()),
-                ReferenceEqualityComparer.Instance);
-    }
-
-    /// <summary>
-    /// Restores tracked entity state captured before a failed transaction/savepoint.
-    /// Entities introduced after the snapshot are detached; existing tracked entities return to their previous values/state.
-    /// </summary>
-    /// <param name="snapshot">Previously captured EF tracking snapshot for the current context.</param>
-    private void RestoreTrackedState(IReadOnlyDictionary<object, TrackedEntitySnapshot> snapshot)
-    {
-        foreach (var entry in _dbContext.ChangeTracker.Entries().ToList())
-        {
-            if (!snapshot.TryGetValue(entry.Entity, out var entitySnapshot))
-            {
-                entry.State = EntityState.Detached;
-                continue;
-            }
-
-            entry.CurrentValues.SetValues(entitySnapshot.CurrentValues);
-            entry.OriginalValues.SetValues(entitySnapshot.OriginalValues);
-            entry.State = entitySnapshot.State;
-        }
-    }
-
-    private sealed record TrackedEntitySnapshot(
-        EntityState State,
-        PropertyValues CurrentValues,
-        PropertyValues OriginalValues);
-
-    /// <summary>
     /// Builds the EF Core execution strategy for the effective transaction policy.
     /// Retry-enabled transactions use Npgsql's retrying strategy; disabled retries fall back to a non-retrying strategy.
     /// </summary>
@@ -363,61 +317,8 @@ public sealed class UnitOfWork : IUnitOfWork
     private static IExecutionStrategy CreateExecutionStrategy(
         DbContext dbContext,
         TransactionOptions effectiveOptions)
-    {
-        if (effectiveOptions.RetryEnabled == false)
-            return new NonRetryingExecutionStrategy(dbContext);
-
-        if (!dbContext.Database.IsNpgsql())
-            return dbContext.Database.CreateExecutionStrategy();
-
-        return new NpgsqlRetryingExecutionStrategy(
-            dbContext,
-            effectiveOptions.RetryCount ?? 3,
-            TimeSpan.FromSeconds(effectiveOptions.RetryDelaySeconds ?? 5),
-            errorCodesToAdd: null);
-    }
+        => UnitOfWorkExecutionStrategyFactory.Create(dbContext, effectiveOptions);
 
     private static bool IsTransactionNotSupported(Exception ex)
-        => ex is InvalidOperationException or NotSupportedException;
-
-    private bool IsInsideManagedTransactionScope() => Volatile.Read(ref _managedTransactionDepth) > 0;
-
-    private async Task<T> ExecuteWithinManagedTransactionScopeAsync<T>(Func<Task<T>> action)
-    {
-        Interlocked.Increment(ref _managedTransactionDepth);
-        try
-        {
-            return await action();
-        }
-        finally
-        {
-            Interlocked.Decrement(ref _managedTransactionDepth);
-        }
-    }
-
-    private int? GetCommandTimeoutIfSupported()
-    {
-        try
-        {
-            return _dbContext.Database.GetCommandTimeout();
-        }
-        catch (Exception ex) when (IsCommandTimeoutNotSupported(ex))
-        {
-            return null;
-        }
-    }
-
-    private void SetCommandTimeoutIfSupported(int? timeoutSeconds)
-    {
-        try
-        {
-            _dbContext.Database.SetCommandTimeout(timeoutSeconds);
-        }
-        catch (Exception ex) when (IsCommandTimeoutNotSupported(ex))
-        {
-        }
-    }
-
-    private static bool IsCommandTimeoutNotSupported(Exception ex)
         => ex is InvalidOperationException or NotSupportedException;
 }
