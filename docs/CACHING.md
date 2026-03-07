@@ -31,6 +31,44 @@ Client Request
 
 The Output Cache middleware runs **after** authentication and authorization, so unauthenticated or unauthorized requests are rejected before reaching the cache layer.
 
+## Rate Limiting
+
+The application uses **ASP.NET Core Rate Limiting** with a per-client fixed window policy.
+
+### How it works
+
+Each client gets its own independent request counter (bucket). The partition key is resolved per request:
+
+1. **JWT username** (`httpContext.User.Identity.Name`) — for authenticated users
+2. **Remote IP address** — for anonymous users
+3. **`"anonymous"`** — shared fallback bucket when neither is available
+
+This means a single misbehaving client cannot exhaust the limit for all other clients.
+
+### Configuration
+
+```json
+{
+  "RateLimiting": {
+    "Fixed": {
+      "PermitLimit": 100,
+      "WindowMinutes": 1
+    }
+  }
+}
+```
+
+| Setting | Default | Description |
+|---|---|---|
+| `PermitLimit` | `100` | Max requests per client per window |
+| `WindowMinutes` | `1` | Window duration in minutes |
+
+Requests exceeding the limit receive **HTTP 429 Too Many Requests**. The counter resets at the end of each window.
+
+Options are registered as `IOptions<RateLimitingOptions>` and validated on startup — invalid values (e.g. `PermitLimit: 0`) will prevent the application from starting.
+
+---
+
 ## Configuration
 
 ### Valkey Connection (Optional)
@@ -61,6 +99,17 @@ Defined in `ApiServiceCollectionExtensions.cs`:
 | `Reviews` | 30 seconds | `Reviews` | `ProductReviewsController` GET endpoints |
 
 The base policy disables caching for all endpoints. Only endpoints explicitly decorated with `[OutputCache(PolicyName = "...")]` are cached.
+
+> **Important:** By default ASP.NET Core Output Cache does not cache responses that carry an `Authorization` header. All named policies include `TenantAwareOutputCachePolicy` (see [Tenant Isolation](#tenant-isolation)) which overrides this behaviour and segments the cache per tenant.
+
+### Tenant Isolation
+
+All named cache policies apply `TenantAwareOutputCachePolicy`, which does two things:
+
+1. **Enables caching for authenticated requests** — overrides the ASP.NET Core default that skips caching when an `Authorization` header is present.
+2. **Varies the cache key by `tenant_id` claim** — each tenant gets its own isolated cache partition. A request from tenant A will never be served a cached response generated for tenant B.
+
+This means adding a new cache policy **must** include `.AddPolicy<TenantAwareOutputCachePolicy>()` to remain safe in a multi-tenant deployment.
 
 ### Instance Name
 

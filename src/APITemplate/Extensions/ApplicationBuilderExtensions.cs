@@ -1,3 +1,4 @@
+using APITemplate.Api.Cache;
 using APITemplate.Application.Common.Options;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Security;
@@ -139,7 +140,7 @@ public static class ApplicationBuilderExtensions
 
     public static WebApplication MapApplicationEndpoints(this WebApplication app)
     {
-        app.MapControllers();
+        app.MapControllers().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
         app.MapGraphQL();
         app.MapNitroApp("/graphql/ui");
         app.MapReverseProxy();

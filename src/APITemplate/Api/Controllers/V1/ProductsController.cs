@@ -1,3 +1,4 @@
+using APITemplate.Api.Cache;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
@@ -19,7 +20,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    [OutputCache(PolicyName = "Products")]
+    [OutputCache(PolicyName = CachePolicyNames.Products)]
     public async Task<ActionResult<PagedResponse<ProductResponse>>> GetAll([FromQuery] ProductFilter filter, CancellationToken ct)
     {
         var products = await _productService.GetAllAsync(filter, ct);
@@ -27,7 +28,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [OutputCache(PolicyName = "Products")]
+    [OutputCache(PolicyName = CachePolicyNames.Products)]
     public async Task<ActionResult<ProductResponse>> GetById(Guid id, CancellationToken ct)
     {
         var product = await _productService.GetByIdAsync(id, ct);
@@ -38,7 +39,7 @@ public sealed class ProductsController : ControllerBase
     public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken ct)
     {
         var product = await _productService.CreateAsync(request, ct);
-        await _outputCacheStore.EvictByTagAsync("Products", ct);
+        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
         return CreatedAtAction(nameof(GetById), new { id = product.Id, version = "1.0" }, product);
     }
 
@@ -46,7 +47,7 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct)
     {
         await _productService.UpdateAsync(id, request, ct);
-        await _outputCacheStore.EvictByTagAsync("Products", ct);
+        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
         return NoContent();
     }
 
@@ -54,8 +55,8 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _productService.DeleteAsync(id, ct);
-        await _outputCacheStore.EvictByTagAsync("Products", ct);
-        await _outputCacheStore.EvictByTagAsync("Reviews", ct);
+        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
+        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Reviews, ct);
         return NoContent();
     }
 }

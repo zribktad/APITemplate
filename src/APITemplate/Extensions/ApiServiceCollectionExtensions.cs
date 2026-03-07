@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using APITemplate.Api.Cache;
 using APITemplate.Api.ExceptionHandling;
 using APITemplate.Api.Filters;
 using APITemplate.Api.OpenApi;
@@ -37,14 +38,30 @@ public static class ApiServiceCollectionExtensions
             options.AddOperationTransformer<AuthorizationResponsesOperationTransformer>();
         });
 
+        services.AddOptions<RateLimitingOptions>()
+            .Bind(configuration.GetSection("RateLimiting:Fixed"))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        var rateLimitOpts = configuration.GetSection("RateLimiting:Fixed").Get<RateLimitingOptions>()
+            ?? new RateLimitingOptions();
+        // Per-client fixed window rate limiter. Partition key priority:
+        //   1. JWT username (authenticated users)
+        //   2. Remote IP address (anonymous users)
+        //   3. "anonymous" fallback (shared bucket when neither is available)
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.AddFixedWindowLimiter("fixed", o =>
-            {
-                o.PermitLimit = 100;
-                o.Window = TimeSpan.FromMinutes(1);
-            });
+            options.AddPolicy(CachePolicyNames.RateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.User.Identity?.Name
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "anonymous",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rateLimitOpts.PermitLimit,
+                        Window = TimeSpan.FromMinutes(rateLimitOpts.WindowMinutes)
+                    }));
         });
 
         // Output Cache with optional Valkey backing store.
@@ -77,12 +94,24 @@ public static class ApiServiceCollectionExtensions
                         "This is not suitable for multi-instance deployments");
         }
 
+        services.AddSingleton<TenantAwareOutputCachePolicy>();
+
+        var cachingSection = configuration.GetSection("Caching");
         services.AddOutputCache(options =>
         {
             options.AddBasePolicy(builder => builder.NoCache());
-            options.AddPolicy("Products", builder => builder.Expire(TimeSpan.FromSeconds(30)).Tag("Products"));
-            options.AddPolicy("Categories", builder => builder.Expire(TimeSpan.FromSeconds(60)).Tag("Categories"));
-            options.AddPolicy("Reviews", builder => builder.Expire(TimeSpan.FromSeconds(30)).Tag("Reviews"));
+            options.AddPolicy(CachePolicyNames.Products, builder => builder
+                .AddPolicy<TenantAwareOutputCachePolicy>()
+                .Expire(TimeSpan.FromSeconds(cachingSection.GetValue<int>("ProductsExpirationSeconds", 30)))
+                .Tag(CachePolicyNames.Products));
+            options.AddPolicy(CachePolicyNames.Categories, builder => builder
+                .AddPolicy<TenantAwareOutputCachePolicy>()
+                .Expire(TimeSpan.FromSeconds(cachingSection.GetValue<int>("CategoriesExpirationSeconds", 60)))
+                .Tag(CachePolicyNames.Categories));
+            options.AddPolicy(CachePolicyNames.Reviews, builder => builder
+                .AddPolicy<TenantAwareOutputCachePolicy>()
+                .Expire(TimeSpan.FromSeconds(cachingSection.GetValue<int>("ReviewsExpirationSeconds", 30)))
+                .Tag(CachePolicyNames.Reviews));
         });
 
         return services;

@@ -86,12 +86,15 @@ public sealed class AppDbContext : DbContext
     }
 
     /// <summary>
-    /// Applies audit/soft-delete rules before committing changes.
+    /// Not supported — use <see cref="SaveChangesAsync(bool, CancellationToken)"/> instead.
     /// </summary>
+    /// <exception cref="NotSupportedException">Always thrown to prevent sync-over-async deadlocks
+    /// caused by the async soft-delete cascade rules.</exception>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        ApplyEntityAuditingAsync(CancellationToken.None).GetAwaiter().GetResult();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        throw new NotSupportedException(
+            "Use SaveChangesAsync to avoid deadlocks from async soft-delete cascade rules. " +
+            "All application paths should go through IUnitOfWork.CommitAsync().");
     }
 
     /// <summary>

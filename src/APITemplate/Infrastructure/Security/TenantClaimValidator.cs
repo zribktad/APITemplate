@@ -16,7 +16,7 @@ public static class TenantClaimValidator
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
-            context.Fail("Missing required tenant_id claim.");
+            context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 
         LogTokenValidated(context.HttpContext, context.Principal, "JwtBearer");
@@ -32,7 +32,7 @@ public static class TenantClaimValidator
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
-            context.Fail("Missing required tenant_id claim.");
+            context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 
         LogTokenValidated(context.HttpContext, context.Principal, "OIDC");
