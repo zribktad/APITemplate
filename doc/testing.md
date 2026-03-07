@@ -297,7 +297,7 @@ All integration test classes share `CustomWebApplicationFactory`, which delegate
 | `MockMongoServices` | Removes `MongoDbContext`; mocks `IProductDataRepository` |
 | `RemoveExternalHealthChecks` | Removes `postgresql`, `mongodb`, `keycloak`, `valkey` health registrations |
 | `ReplaceOutputCacheWithInMemory` | Swaps Valkey-backed output cache for in-memory |
-| `ReplaceDataProtectionWithInMemory` | Overrides Valkey-backed DataProtection with ephemeral in-memory keys |
+| `ReplaceDataProtectionWithInMemory` | Replaces Valkey-backed DataProtection with `EphemeralDataProtectionProvider` (no key persistence) |
 | `ReplaceTicketStoreWithInMemory` | Replaces Redis-backed `IDistributedCache` with in-memory; re-registers `ValkeyTicketStore` against it |
 | `ConfigureTestAuthentication` | Overrides JWT validation to use a local RSA test key; stubs the OIDC metadata |
 

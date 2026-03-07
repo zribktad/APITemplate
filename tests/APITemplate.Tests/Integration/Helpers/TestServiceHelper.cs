@@ -75,9 +75,9 @@ internal static class TestServiceHelper
 
     internal static void ReplaceDataProtectionWithInMemory(IServiceCollection services)
     {
-        // Override Valkey-backed DataProtection with ephemeral in-memory keys for tests.
-        services.AddDataProtection()
-            .SetApplicationName("APITemplate");
+        // Replace Valkey-backed DataProtection with EphemeralDataProtectionProvider (no key persistence).
+        services.RemoveAll<IDataProtectionProvider>();
+        services.AddSingleton<IDataProtectionProvider, EphemeralDataProtectionProvider>();
     }
 
     internal static void ReplaceTicketStoreWithInMemory(IServiceCollection services)

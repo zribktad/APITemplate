@@ -10,7 +10,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration.Bff")]
 public sealed class BffSecurityTests
 {
     private readonly BffSecurityWebApplicationFactory _factory;
@@ -37,12 +36,14 @@ public sealed class BffSecurityTests
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Test-Cookie-Auth", "1");
-        client.DefaultRequestHeaders.Add("X-CSRF", "1");
+        client.DefaultRequestHeaders.Add(CsrfConstants.HeaderName, CsrfConstants.HeaderValue);
 
         var response = await client.PostAsync("/api/v1/products",
             new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
 
-        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        // CSRF passes; authorization middleware rejects the fake cookie identity (no real session),
+        // so we expect 401 rather than 403 (which would mean CSRF blocked the request).
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -54,7 +55,7 @@ public sealed class BffSecurityTests
         var response = await client.PostAsync("/api/v1/products",
             new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
 
-        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

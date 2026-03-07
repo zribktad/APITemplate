@@ -1,14 +1,10 @@
-using System.Net.Mime;
-using System.Text.Json;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Diagnostics;
 
 namespace APITemplate.Api.Middleware;
 
-public sealed class CsrfValidationMiddleware(RequestDelegate next)
+public sealed class CsrfValidationMiddleware(RequestDelegate next, IProblemDetailsService problemDetailsService)
 {
-    private const string CsrfHeaderName = "X-CSRF";
-    private const string CsrfHeaderValue = "1";
-
     public async Task InvokeAsync(HttpContext context)
     {
         if (HttpMethods.IsGet(context.Request.Method) ||
@@ -28,21 +24,24 @@ public sealed class CsrfValidationMiddleware(RequestDelegate next)
             return;
         }
 
-        if (context.Request.Headers.TryGetValue(CsrfHeaderName, out var value) &&
-            value == CsrfHeaderValue)
+        if (context.Request.Headers.TryGetValue(CsrfConstants.HeaderName, out var value) &&
+            value == CsrfConstants.HeaderValue)
         {
             await next(context);
             return;
         }
 
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        context.Response.ContentType = MediaTypeNames.Application.Json;
-        await context.Response.WriteAsync(JsonSerializer.Serialize(new
+        await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
-            type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
-            title = "Forbidden",
-            status = 403,
-            detail = $"Cookie-authenticated requests must include the '{CsrfHeaderName}: {CsrfHeaderValue}' header."
-        }));
+            HttpContext = context,
+            ProblemDetails =
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+                Title = "Forbidden",
+                Status = StatusCodes.Status403Forbidden,
+                Detail = $"Cookie-authenticated requests must include the '{CsrfConstants.HeaderName}: {CsrfConstants.HeaderValue}' header."
+            }
+        });
     }
 }

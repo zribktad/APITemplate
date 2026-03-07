@@ -4,7 +4,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class ProductsControllerTests
 {
     private readonly HttpClient _client;

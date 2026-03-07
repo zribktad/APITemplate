@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using APITemplate.Application.Common.Options;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace APITemplate.Infrastructure.Security;
@@ -37,20 +38,28 @@ internal static class CookieSessionRefresher
             .GetRequiredService<IHttpClientFactory>();
         using var client = httpClientFactory.CreateClient("KeycloakTokenClient");
 
+        var ct = context.HttpContext.RequestAborted;
+
         HttpResponseMessage response;
         try
         {
-            var form = new FormUrlEncodedContent(new Dictionary<string, string>
+            var formParams = new Dictionary<string, string>
             {
                 ["grant_type"] = "refresh_token",
                 ["client_id"] = keycloakOptions.Resource,
-                ["client_secret"] = keycloakOptions.Credentials.Secret,
                 ["refresh_token"] = refreshToken
-            });
-            response = await client.PostAsync(tokenEndpoint, form);
+            };
+            if (!string.IsNullOrEmpty(keycloakOptions.Credentials.Secret))
+                formParams["client_secret"] = keycloakOptions.Credentials.Secret;
+            var form = new FormUrlEncodedContent(formParams);
+            response = await client.PostAsync(tokenEndpoint, form, ct);
         }
-        catch
+        catch (Exception ex)
         {
+            var logger = context.HttpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(nameof(CookieSessionRefresher));
+            logger.LogWarning(ex, "Token refresh failed, rejecting principal.");
             context.RejectPrincipal();
             return;
         }
@@ -61,7 +70,7 @@ internal static class CookieSessionRefresher
             return;
         }
 
-        var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>();
+        var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(ct);
         if (tokenResponse is null)
         {
             context.RejectPrincipal();

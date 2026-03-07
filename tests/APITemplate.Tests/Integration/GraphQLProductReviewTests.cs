@@ -6,7 +6,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class GraphQLProductReviewTests
 {
     private readonly HttpClient _client;

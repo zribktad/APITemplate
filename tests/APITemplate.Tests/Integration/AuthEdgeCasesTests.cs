@@ -3,7 +3,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class AuthEdgeCasesTests
 {
     private readonly HttpClient _client;

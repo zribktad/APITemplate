@@ -7,7 +7,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class AuthenticatedCrudTests
 {
     private readonly HttpClient _client;
