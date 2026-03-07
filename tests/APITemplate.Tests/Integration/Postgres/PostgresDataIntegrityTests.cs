@@ -7,6 +7,7 @@ using APITemplate.Application.Common.Options;
 using APITemplate.Application.Features.ProductReview.Services;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
 using APITemplate.Extensions;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Persistence.SoftDelete;
@@ -589,6 +590,49 @@ public sealed class PostgresDataIntegrityTests
     }
 
     [Fact]
+    public async Task UnitOfWork_WithPerCallTransactionOptions_CommitsSuccessfully()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var actorId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var tenant = new Tenant { Id = tenantId, Code = $"tenant-options-{Guid.NewGuid():N}", Name = "Tenant Options" };
+        var categoryId = Guid.NewGuid();
+
+        await using (var seedContext = await CreateDbContextAsync(hasTenant: false, Guid.Empty, actorId, ct))
+        {
+            seedContext.Tenants.Add(tenant);
+            await seedContext.SaveChangesAsync(ct);
+        }
+
+        await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
+        {
+            var unitOfWork = new UnitOfWork(dbContext);
+
+            await unitOfWork.ExecuteInTransactionAsync(async () =>
+            {
+                dbContext.Categories.Add(new Category
+                {
+                    Id = categoryId,
+                    TenantId = tenantId,
+                    Name = $"Options-Category-{Guid.NewGuid():N}"
+                });
+
+                await Task.CompletedTask;
+            },
+            ct,
+            new TransactionOptions
+            {
+                IsolationLevel = System.Data.IsolationLevel.Serializable,
+                TimeoutSeconds = 15,
+                RetryEnabled = false
+            });
+        }
+
+        await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
+        (await verifyContext.Categories.IgnoreQueryFilters().CountAsync(c => c.Id == categoryId, ct)).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task CategoryStats_FunctionCallable_ReturnsZeroValuesForEmptyCategory()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -634,10 +678,10 @@ public sealed class PostgresDataIntegrityTests
         await using var scope = _factory.Services.CreateAsyncScope();
         var connectionString = scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.GetConnectionString()
             ?? throw new InvalidOperationException("Postgres connection string was not available.");
-        var retryOptions = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<PostgresRetryOptions>>().Value;
+        var transactionDefaults = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TransactionDefaultsOptions>>().Value;
 
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(optionsBuilder, connectionString, retryOptions);
+        PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(optionsBuilder, connectionString, transactionDefaults);
         var options = optionsBuilder.Options;
 
         var context = new AppDbContext(

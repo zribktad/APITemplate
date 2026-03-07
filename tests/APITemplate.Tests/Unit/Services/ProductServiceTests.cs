@@ -1,6 +1,7 @@
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
 using APITemplate.Application.Features.Product.Services;
 using Moq;
 using Shouldly;
@@ -81,7 +82,7 @@ public class ProductServiceTests
             r => r.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Product>>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Product>>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 
@@ -144,7 +145,7 @@ public class ProductServiceTests
             r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()),
             Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 
@@ -174,7 +175,7 @@ public class ProductServiceTests
             r => r.UpdateAsync(product, It.IsAny<CancellationToken>()),
             Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 

@@ -58,9 +58,9 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
 
             var connectionString = _postgresContainer.GetConnectionString();
             using var bootstrapProvider = services.BuildServiceProvider();
-            var retryOptions = bootstrapProvider.GetRequiredService<IOptions<PostgresRetryOptions>>().Value;
+            var transactionDefaults = bootstrapProvider.GetRequiredService<IOptions<TransactionDefaultsOptions>>().Value;
             services.AddDbContext<AppDbContext>(options =>
-                PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(options, connectionString, retryOptions));
+                PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(options, connectionString, transactionDefaults));
 
             TestServiceHelper.RemoveExternalHealthChecks(services);
 

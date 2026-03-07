@@ -22,7 +22,7 @@ For relational features, keep these boundaries explicit:
 - Put paginated, filtered, cross-aggregate, or batched reads in the query service.
 - Keep command-side validation lookups in the write service and use repositories for them.
 - Load entities you intend to update/delete through repositories, not query services.
-- Use `ExecuteTransactionalWriteAsync(...)` for relational write flows in services.
+- Use `IUnitOfWork.ExecuteInTransactionAsync(...)` for explicit relational transaction flows in services.
 
 ---
 
@@ -182,7 +182,7 @@ public sealed class OrderService : IOrderService
 
     public async Task<OrderResponse> CreateAsync(CreateOrderRequest request, CancellationToken ct = default)
     {
-        var order = await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        var order = await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             var entity = new Order
             {
@@ -201,7 +201,7 @@ public sealed class OrderService : IOrderService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.DeleteAsync(id, ct);
         }, ct);

@@ -2,6 +2,7 @@ using APITemplate.Application.Common.Context;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
 using APITemplate.Application.Features.ProductReview.Services;
 using Moq;
 using Shouldly;
@@ -140,7 +141,7 @@ public class ProductReviewServiceTests
 
         _reviewRepoMock.Verify(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<ProductReview>>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<ProductReview>>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 
@@ -172,7 +173,7 @@ public class ProductReviewServiceTests
 
         _reviewRepoMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 

@@ -342,9 +342,11 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 | `Caching:ProductsExpirationSeconds`   | `30`                                                                                | Output cache TTL for the Products policy                                                               |
 | `Caching:CategoriesExpirationSeconds` | `60`                                                                                | Output cache TTL for the Categories policy                                                             |
 | `Caching:ReviewsExpirationSeconds`    | `30`                                                                                | Output cache TTL for the Reviews policy                                                                |
-| `Persistence:PostgresRetry:Enabled`  | `true`                                                                              | Enables transient PostgreSQL retry behavior for EF Core/Npgsql                                         |
-| `Persistence:PostgresRetry:MaxRetryCount` | `3`                                                                           | Maximum retry attempts for transient PostgreSQL failures                                               |
-| `Persistence:PostgresRetry:MaxRetryDelaySeconds` | `5`                                                                     | Maximum delay between transient PostgreSQL retry attempts in seconds                                   |
+| `Persistence:Transactions:IsolationLevel` | `ReadCommitted`                                                                  | Default isolation level for explicit `UnitOfWork` transactions                                         |
+| `Persistence:Transactions:TimeoutSeconds` | `30`                                                                             | Default command timeout applied while an explicit `UnitOfWork` transaction is running                  |
+| `Persistence:Transactions:RetryEnabled` | `true`                                                                             | Enables transient PostgreSQL retry behavior for EF Core/Npgsql                                         |
+| `Persistence:Transactions:RetryCount` | `3`                                                                                 | Maximum retry attempts for transient PostgreSQL failures                                               |
+| `Persistence:Transactions:RetryDelaySeconds` | `5`                                                                           | Maximum delay between transient PostgreSQL retry attempts in seconds                                   |
 | `SystemIdentity:DefaultActorId`       | `00000000-0000-0000-0000-000000000000`                                              | Default actor GUID used when no request actor context is available                                     |
 | `Bootstrap:Tenant:Code`               | `default`                                                                           | Bootstrap tenant code seeded at startup                                                                |
 | `Bootstrap:Tenant:Name`               | `Default Tenant`                                                                    | Bootstrap tenant display name                                                                          |
@@ -475,18 +477,20 @@ Every data-store interaction is hidden behind a typed interface defined in `Doma
 
 ### 2 — Unit of Work Pattern
 
-`IUnitOfWork` (implemented by `UnitOfWork`) is the only commit boundary for relational persistence. Repositories stage changes in EF Core's change tracker, but they never call `SaveChangesAsync` directly. In this template, relational write services use `ExecuteTransactionalWriteAsync(...)`, which wraps `ExecuteInTransactionAsync(...)` behind one uniform application-level entry point.
+`IUnitOfWork` (implemented by `UnitOfWork`) is the only commit boundary for relational persistence. Repositories stage changes in EF Core's change tracker, but they never call `SaveChangesAsync` directly. Relational write services call `ExecuteInTransactionAsync(...)` directly when they need an explicit transaction boundary.
 
 **Rules:**
 - Query services own API/read-model reads that return DTOs.
 - Paginated, filtered, cross-aggregate, and batching reads belong in query services, usually backed by specifications or projections.
 - Command-side validation lookups stay in the write service and use repositories directly.
 - Write services load entities they intend to mutate through repositories, not query services.
-- `ExecuteTransactionalWriteAsync(...)` is the service-layer write wrapper used by the template.
-- Some single-write flows do not strictly require an explicit transaction; the wrapper is still used to keep one consistent write shape across relational features.
-- `Persistence:PostgresRetry` configures transient PostgreSQL retries at the provider level.
+- `ExecuteInTransactionAsync(...)` is the explicit relational transaction entry point used by services.
+- Some single-write flows do not strictly require an explicit transaction; use `CommitAsync()` when a direct save is enough and `ExecuteInTransactionAsync(...)` when you want one explicit transaction shape.
+- `Persistence:Transactions` configures the default isolation level, timeout, and retry policy for explicit relational transactions.
 - Explicit transactional writes run inside EF Core's execution strategy so the full transaction block can be replayed on transient provider failures.
 - Nested transactional writes use savepoints inside the current `UnitOfWork` transaction instead of opening a second top-level transaction.
+- Per-call overrides use `ExecuteInTransactionAsync(action, ct, new TransactionOptions { ... })`; effective policy is `configured defaults + per-call override`.
+- Nested transaction calls inherit the active outer policy. Passing conflicting nested options fails fast instead of silently changing isolation, timeout, or retry behavior.
 
 ```csharp
 // Wraps two repository writes in a single database transaction
@@ -498,10 +502,26 @@ await _unitOfWork.ExecuteInTransactionAsync(async () =>
 // Both rows committed or both rolled back
 ```
 
-Service code uses the helper below to keep a single write pattern:
+```csharp
+await _unitOfWork.ExecuteInTransactionAsync(
+    async () =>
+    {
+        await _productRepository.AddAsync(product, ct);
+        await _reviewRepository.AddAsync(review, ct);
+    },
+    ct,
+    new TransactionOptions
+    {
+        IsolationLevel = IsolationLevel.Serializable,
+        TimeoutSeconds = 15,
+        RetryEnabled = false
+    });
+```
+
+Service code can call `IUnitOfWork` directly for explicit transactional writes:
 
 ```csharp
-await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+await _unitOfWork.ExecuteInTransactionAsync(async () =>
 {
     await _repository.AddAsync(product, ct);
     return product;

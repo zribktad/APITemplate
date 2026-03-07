@@ -1,6 +1,7 @@
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
 using APITemplate.Application.Features.Category.Services;
 using Moq;
 using Shouldly;
@@ -113,7 +114,7 @@ public class CategoryServiceTests
 
         _repositoryMock.Verify(r => r.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Category>>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Category>>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 
@@ -156,7 +157,7 @@ public class CategoryServiceTests
             It.IsAny<CancellationToken>()), Times.Once);
 
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 
@@ -171,7 +172,7 @@ public class CategoryServiceTests
 
         await Should.ThrowAsync<NotFoundException>(act);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Never);
     }
 
@@ -184,7 +185,7 @@ public class CategoryServiceTests
 
         _repositoryMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>()),
+            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
             Times.Once);
     }
 

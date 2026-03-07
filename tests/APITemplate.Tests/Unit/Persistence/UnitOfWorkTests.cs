@@ -1,5 +1,9 @@
+using System.Data;
 using APITemplate.Application.Common.Context;
+using APITemplate.Application.Common.Options;
 using APITemplate.Domain.Entities;
+using APITemplate.Domain.Interfaces;
+using APITemplate.Domain.Options;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -12,17 +16,25 @@ namespace APITemplate.Tests.Unit.Persistence;
 public class UnitOfWorkTests
 {
     [Fact]
-    public async Task ExecuteInTransactionAsync_UsesExecutionStrategy_AndPersistsChanges()
+    public async Task ExecuteInTransactionAsync_WithLegacyCallShape_UsesExecutionStrategy_AndPersistsChanges()
     {
         var executionStrategy = new RecordingExecutionStrategy();
         await using var dbContext = CreateDbContext();
         IDbContextTransaction? currentTransaction = null;
+        IsolationLevel? begunIsolationLevel = null;
+        TransactionOptions? capturedOptions = null;
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
-            () => currentTransaction,
-            _ =>
+            new TransactionDefaultsOptions(),
+            options =>
             {
+                capturedOptions = options;
+                return executionStrategy;
+            },
+            () => currentTransaction,
+            (isolationLevel, _) =>
+            {
+                begunIsolationLevel = isolationLevel;
                 currentTransaction = new RecordingTransaction();
                 return Task.FromResult(currentTransaction);
             });
@@ -39,40 +51,76 @@ public class UnitOfWorkTests
         }, TestContext.Current.CancellationToken);
 
         executionStrategy.ExecuteAsyncCallCount.ShouldBe(1);
+        begunIsolationLevel.ShouldBe(IsolationLevel.ReadCommitted);
+        capturedOptions.ShouldNotBeNull();
+        capturedOptions.TimeoutSeconds.ShouldBe(30);
         (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(1);
     }
 
     [Fact]
-    public async Task ExecuteInTransactionAsyncOfT_UsesExecutionStrategy_AndReturnsResult()
+    public async Task ExecuteInTransactionAsync_WithPerCallOptions_MergesOverridesWithDefaults()
     {
         var executionStrategy = new RecordingExecutionStrategy();
         await using var dbContext = CreateDbContext();
         IDbContextTransaction? currentTransaction = null;
+        IsolationLevel? begunIsolationLevel = null;
+        TransactionOptions? capturedOptions = null;
+        var defaults = new TransactionDefaultsOptions
+        {
+            IsolationLevel = IsolationLevel.ReadCommitted,
+            TimeoutSeconds = 30,
+            RetryEnabled = true,
+            RetryCount = 3,
+            RetryDelaySeconds = 5
+        };
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
-            () => currentTransaction,
-            _ =>
+            defaults,
+            options =>
             {
+                capturedOptions = options;
+                return executionStrategy;
+            },
+            () => currentTransaction,
+            (isolationLevel, _) =>
+            {
+                begunIsolationLevel = isolationLevel;
                 currentTransaction = new RecordingTransaction();
                 return Task.FromResult(currentTransaction);
             });
 
-        var createdId = await sut.ExecuteInTransactionAsync(async () =>
-        {
-            var category = new Category
+        var result = await sut.ExecuteInTransactionAsync(
+            async () =>
             {
-                Id = Guid.NewGuid(),
-                Name = "Games"
-            };
+                var category = new Category
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Games"
+                };
 
-            dbContext.Categories.Add(category);
-            await Task.CompletedTask;
-            return category.Id;
-        }, TestContext.Current.CancellationToken);
+                dbContext.Categories.Add(category);
+                await Task.CompletedTask;
+                return category.Id;
+            },
+            TestContext.Current.CancellationToken,
+            new TransactionOptions
+            {
+                IsolationLevel = IsolationLevel.Serializable,
+                TimeoutSeconds = 12,
+                RetryEnabled = false
+            });
 
         executionStrategy.ExecuteAsyncCallCount.ShouldBe(1);
-        (await dbContext.Categories.SingleAsync(c => c.Id == createdId, TestContext.Current.CancellationToken)).Name.ShouldBe("Games");
+        begunIsolationLevel.ShouldBe(IsolationLevel.Serializable);
+        capturedOptions.ShouldBe(new TransactionOptions
+        {
+            IsolationLevel = IsolationLevel.Serializable,
+            TimeoutSeconds = 12,
+            RetryEnabled = false,
+            RetryCount = 3,
+            RetryDelaySeconds = 5
+        });
+        (await dbContext.Categories.SingleAsync(c => c.Id == result, TestContext.Current.CancellationToken)).Name.ShouldBe("Games");
     }
 
     [Fact]
@@ -84,9 +132,10 @@ public class UnitOfWorkTests
         var transaction = new RecordingTransaction();
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
             () => currentTransaction,
-            _ =>
+            (_, _) =>
             {
                 currentTransaction = transaction;
                 return Task.FromResult<IDbContextTransaction>(transaction);
@@ -119,9 +168,10 @@ public class UnitOfWorkTests
         var transaction = new RecordingTransaction();
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
             () => currentTransaction,
-            _ =>
+            (_, _) =>
             {
                 currentTransaction = transaction;
                 return Task.FromResult<IDbContextTransaction>(transaction);
@@ -170,9 +220,10 @@ public class UnitOfWorkTests
         var transaction = new RecordingTransaction();
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
             () => currentTransaction,
-            _ =>
+            (_, _) =>
             {
                 currentTransaction = transaction;
                 return Task.FromResult<IDbContextTransaction>(transaction);
@@ -196,6 +247,42 @@ public class UnitOfWorkTests
     }
 
     [Fact]
+    public async Task ExecuteInTransactionAsync_WhenNestedOptionsConflict_Throws()
+    {
+        var executionStrategy = new RecordingExecutionStrategy();
+        await using var dbContext = CreateDbContext();
+        IDbContextTransaction? currentTransaction = null;
+        var transaction = new RecordingTransaction();
+        var sut = new UnitOfWork(
+            dbContext,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
+            () => currentTransaction,
+            (_, _) =>
+            {
+                currentTransaction = transaction;
+                return Task.FromResult<IDbContextTransaction>(transaction);
+            });
+
+        var act = () => sut.ExecuteInTransactionAsync(async () =>
+        {
+            await sut.ExecuteInTransactionAsync(
+                async () =>
+                {
+                    await Task.CompletedTask;
+                    return true;
+                },
+                TestContext.Current.CancellationToken,
+                new TransactionOptions { IsolationLevel = IsolationLevel.Serializable });
+
+            return true;
+        }, TestContext.Current.CancellationToken);
+
+        var ex = await Should.ThrowAsync<InvalidOperationException>(act);
+        ex.Message.ShouldContain("Nested transactions inherit");
+    }
+
+    [Fact]
     public async Task ExecuteInTransactionAsync_WhenNestedFailureBubbles_RollsBackOuterTransaction()
     {
         var executionStrategy = new RecordingExecutionStrategy();
@@ -204,9 +291,10 @@ public class UnitOfWorkTests
         var transaction = new RecordingTransaction();
         var sut = new UnitOfWork(
             dbContext,
-            () => executionStrategy,
+            new TransactionDefaultsOptions(),
+            _ => executionStrategy,
             () => currentTransaction,
-            _ =>
+            (_, _) =>
             {
                 currentTransaction = transaction;
                 return Task.FromResult<IDbContextTransaction>(transaction);
@@ -308,6 +396,7 @@ public class UnitOfWorkTests
         public int ReleaseSavepointCount { get; private set; }
 
         public void Commit() => CommitCount++;
+
         public Task CommitAsync(CancellationToken cancellationToken = default)
         {
             CommitCount++;
@@ -315,6 +404,7 @@ public class UnitOfWorkTests
         }
 
         public void Rollback() => RollbackCount++;
+
         public Task RollbackAsync(CancellationToken cancellationToken = default)
         {
             RollbackCount++;
@@ -322,6 +412,7 @@ public class UnitOfWorkTests
         }
 
         public void CreateSavepoint(string name) => CreateSavepointCount++;
+
         public Task CreateSavepointAsync(string name, CancellationToken cancellationToken = default)
         {
             CreateSavepointCount++;
@@ -329,6 +420,7 @@ public class UnitOfWorkTests
         }
 
         public void RollbackToSavepoint(string name) => RollbackToSavepointCount++;
+
         public Task RollbackToSavepointAsync(string name, CancellationToken cancellationToken = default)
         {
             RollbackToSavepointCount++;
@@ -336,6 +428,7 @@ public class UnitOfWorkTests
         }
 
         public void ReleaseSavepoint(string name) => ReleaseSavepointCount++;
+
         public Task ReleaseSavepointAsync(string name, CancellationToken cancellationToken = default)
         {
             ReleaseSavepointCount++;
@@ -343,6 +436,9 @@ public class UnitOfWorkTests
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }

@@ -1,5 +1,4 @@
 using APITemplate.Application.Features.Category.Mappings;
-using APITemplate.Application.Common.Persistence;
 using CategoryEntity = APITemplate.Domain.Entities.Category;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -30,7 +29,7 @@ public sealed class CategoryService : ICategoryService
 
     public async Task<CategoryResponse> CreateAsync(CreateCategoryRequest request, CancellationToken ct = default)
     {
-        var category = await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        var category = await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             var entity = new CategoryEntity
             {
@@ -54,7 +53,7 @@ public sealed class CategoryService : ICategoryService
                 id,
                 ErrorCatalog.Categories.NotFound);
 
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             category.Name = request.Name;
             category.Description = request.Description;
@@ -65,7 +64,7 @@ public sealed class CategoryService : ICategoryService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.DeleteAsync(id, ct, ErrorCatalog.Categories.NotFound);
         }, ct);

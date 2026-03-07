@@ -13,18 +13,18 @@ namespace APITemplate.Extensions;
 
 public static class PersistenceServiceCollectionExtensions
 {
-    public const string PostgresRetrySectionName = "Persistence:PostgresRetry";
+    public const string TransactionsSectionName = "Persistence:Transactions";
 
     public static IServiceCollection AddPersistence(
         this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")!;
-        var retryOptions = configuration.GetSection(PostgresRetrySectionName).Get<PostgresRetryOptions>() ?? new PostgresRetryOptions();
+        var transactionDefaults = configuration.GetSection(TransactionsSectionName).Get<TransactionDefaultsOptions>() ?? new TransactionDefaultsOptions();
 
-        services.Configure<PostgresRetryOptions>(configuration.GetSection(PostgresRetrySectionName));
+        services.Configure<TransactionDefaultsOptions>(configuration.GetSection(TransactionsSectionName));
 
         services.AddDbContext<AppDbContext>(options =>
-            ConfigurePostgresDbContext(options, connectionString, retryOptions));
+            ConfigurePostgresDbContext(options, connectionString, transactionDefaults));
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
@@ -44,16 +44,16 @@ public static class PersistenceServiceCollectionExtensions
     internal static void ConfigurePostgresDbContext(
         DbContextOptionsBuilder options,
         string connectionString,
-        PostgresRetryOptions retryOptions)
+        TransactionDefaultsOptions transactionDefaults)
     {
         options.UseNpgsql(connectionString, npgsqlOptions =>
         {
-            if (!retryOptions.Enabled)
+            if (!transactionDefaults.RetryEnabled)
                 return;
 
             npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: retryOptions.MaxRetryCount,
-                maxRetryDelay: TimeSpan.FromSeconds(retryOptions.MaxRetryDelaySeconds),
+                maxRetryCount: transactionDefaults.RetryCount,
+                maxRetryDelay: TimeSpan.FromSeconds(transactionDefaults.RetryDelaySeconds),
                 errorCodesToAdd: null);
         });
     }

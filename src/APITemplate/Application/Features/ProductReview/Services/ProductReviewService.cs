@@ -1,5 +1,4 @@
 using APITemplate.Application.Common.Context;
-using APITemplate.Application.Common.Persistence;
 using APITemplate.Application.Features.ProductReview.Mappings;
 using ProductReviewEntity = APITemplate.Domain.Entities.ProductReview;
 using APITemplate.Domain.Exceptions;
@@ -48,7 +47,7 @@ public sealed class ProductReviewService : IProductReviewService
                 request.ProductId,
                 ErrorCatalog.Reviews.ProductNotFoundForReview);
 
-        var review = await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        var review = await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             var entity = new ProductReviewEntity
             {
@@ -78,7 +77,7 @@ public sealed class ProductReviewService : IProductReviewService
                 "You can only delete your own reviews.",
                 ErrorCatalog.Auth.Forbidden);
 
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _reviewRepository.DeleteAsync(id, ct, ErrorCatalog.Reviews.ReviewNotFound);
         }, ct);

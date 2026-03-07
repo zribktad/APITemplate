@@ -1,5 +1,4 @@
 using APITemplate.Application.Features.Product.Mappings;
-using APITemplate.Application.Common.Persistence;
 using ProductEntity = APITemplate.Domain.Entities.Product;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -34,7 +33,7 @@ public sealed class ProductService : IProductService
     {
         await ValidateCategoryExistsAsync(request.CategoryId, ct);
 
-        var product = await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        var product = await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             var entity = new ProductEntity
             {
@@ -62,7 +61,7 @@ public sealed class ProductService : IProductService
 
         await ValidateCategoryExistsAsync(request.CategoryId, ct);
 
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             product.Name = request.Name;
             product.Description = request.Description;
@@ -75,7 +74,7 @@ public sealed class ProductService : IProductService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        await _unitOfWork.ExecuteTransactionalWriteAsync(async () =>
+        await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await _repository.DeleteAsync(id, ct, ErrorCatalog.Products.NotFound);
         }, ct);
