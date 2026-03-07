@@ -4,9 +4,11 @@ using APITemplate.Api.ExceptionHandling;
 using APITemplate.Api.Filters;
 using APITemplate.Api.OpenApi;
 using APITemplate.Application.Common.Options;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Serilog;
+using StackExchange.Redis;
 
 namespace APITemplate.Extensions;
 
@@ -85,10 +87,29 @@ public static class ApiServiceCollectionExtensions
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
+            // Lazy singleton: the TCP connection is established on first use, not at registration time.
+            // This keeps startup fast and allows tests to replace Redis services before the
+            // connection is ever attempted.
+            var lazyMultiplexer = new Lazy<IConnectionMultiplexer>(
+                () => ConnectionMultiplexer.Connect(valkeyConnectionString));
+            services.AddSingleton<IConnectionMultiplexer>(_ => lazyMultiplexer.Value);
+
             services.AddStackExchangeRedisOutputCache(options =>
             {
-                options.Configuration = valkeyConnectionString;
+                options.ConnectionMultiplexerFactory = () => Task.FromResult(lazyMultiplexer.Value);
                 options.InstanceName = "ApiTemplate:OutputCache:";
+            });
+
+            services.AddDataProtection()
+                .SetApplicationName("APITemplate")
+                .PersistKeysToStackExchangeRedis(
+                    () => lazyMultiplexer.Value.GetDatabase(),
+                    "DataProtection:Keys");
+
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.ConnectionMultiplexerFactory = () => Task.FromResult(lazyMultiplexer.Value);
+                options.InstanceName = "ApiTemplate:Session:";
             });
 
             services.AddHealthChecks()
@@ -98,6 +119,7 @@ public static class ApiServiceCollectionExtensions
         {
             Log.Warning("Valkey:ConnectionString is not configured — using in-memory output cache. " +
                         "This is not suitable for multi-instance deployments");
+            services.AddDistributedMemoryCache();
         }
 
         services.AddSingleton<TenantAwareOutputCachePolicy>();

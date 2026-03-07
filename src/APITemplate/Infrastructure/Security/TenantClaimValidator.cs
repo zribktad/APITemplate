@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Logging;
 using JwtTokenValidatedContext = Microsoft.AspNetCore.Authentication.JwtBearer.TokenValidatedContext;
 using OidcTokenValidatedContext = Microsoft.AspNetCore.Authentication.OpenIdConnect.TokenValidatedContext;
@@ -19,7 +21,7 @@ public static class TenantClaimValidator
             context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 
-        LogTokenValidated(context.HttpContext, context.Principal, "JwtBearer");
+        LogTokenValidated(context.HttpContext, context.Principal, JwtBearerDefaults.AuthenticationScheme);
 
         return Task.CompletedTask;
     }
@@ -35,7 +37,7 @@ public static class TenantClaimValidator
             context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 
-        LogTokenValidated(context.HttpContext, context.Principal, "OIDC");
+        LogTokenValidated(context.HttpContext, context.Principal, OpenIdConnectDefaults.AuthenticationScheme);
 
         return Task.CompletedTask;
     }
@@ -50,8 +52,8 @@ public static class TenantClaimValidator
 
     private static bool IsServiceAccount(ClaimsPrincipal? principal)
     {
-        var username = principal?.FindFirstValue("preferred_username");
-        return username != null && username.StartsWith("service-account-", StringComparison.OrdinalIgnoreCase);
+        var username = principal?.FindFirstValue(AuthConstants.Claims.PreferredUsername);
+        return username != null && username.StartsWith(AuthConstants.Claims.ServiceAccountUsernamePrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void LogTokenValidated(HttpContext httpContext, ClaimsPrincipal? principal, string scheme)

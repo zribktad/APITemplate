@@ -21,9 +21,9 @@ public sealed class PostgresWebApplicationFactory : WebApplicationFactory<Progra
         .WithCleanUp(true)
         .Build();
 
-    public Task InitializeAsync() => _postgresContainer.StartAsync();
+    public ValueTask InitializeAsync() => new(_postgresContainer.StartAsync());
 
-    public new async Task DisposeAsync()
+    public new async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
         await _postgresContainer.DisposeAsync();

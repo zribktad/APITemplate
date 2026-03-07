@@ -290,11 +290,16 @@ Integration tests live in `tests/APITemplate.Tests/Integration/`. They start the
 
 ### The `CustomWebApplicationFactory`
 
-All integration test classes share `CustomWebApplicationFactory`, which:
+All integration test classes share `CustomWebApplicationFactory`, which delegates to helpers in `TestServiceHelper`:
 
-- Replaces **PostgreSQL** with `EF Core InMemory` (isolated per factory instance)
-- Removes **MongoDbContext** and replaces `IProductDataRepository` with a no-op Moq mock
-- Sets `ASPNETCORE_ENVIRONMENT=Development` so Scalar/OpenAPI are mounted
+| Helper | What it replaces |
+|--------|-----------------|
+| `MockMongoServices` | Removes `MongoDbContext`; mocks `IProductDataRepository` |
+| `RemoveExternalHealthChecks` | Removes `postgresql`, `mongodb`, `keycloak`, `valkey` health registrations |
+| `ReplaceOutputCacheWithInMemory` | Swaps Valkey-backed output cache for in-memory |
+| `ReplaceDataProtectionWithInMemory` | Replaces Valkey-backed DataProtection with `EphemeralDataProtectionProvider` (no key persistence) |
+| `ReplaceTicketStoreWithInMemory` | Replaces Redis-backed `IDistributedCache` with in-memory; re-registers `ValkeyTicketStore` against it |
+| `ConfigureTestAuthentication` | Overrides JWT validation to use a local RSA test key; stubs the OIDC metadata |
 
 ```csharp
 // tests/APITemplate.Tests/Integration/CustomWebApplicationFactory.cs
@@ -304,6 +309,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((_, configBuilder) =>
+            configBuilder.AddInMemoryCollection(TestConfigurationHelper.GetBaseConfiguration()));
+
         builder.ConfigureTestServices(services =>
         {
             // Swap PostgreSQL for InMemory
@@ -311,16 +319,42 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.AddDbContext<AppDbContext>(o =>
                 o.UseInMemoryDatabase(_dbName));
 
-            // Remove MongoDB (unavailable in CI)
-            services.RemoveAll(typeof(MongoDbContext));
-            services.RemoveAll(typeof(IProductDataRepository));
-            services.AddSingleton(new Mock<IProductDataRepository>().Object);
+            TestServiceHelper.MockMongoServices(services);
+            TestServiceHelper.RemoveExternalHealthChecks(services);
+            TestServiceHelper.ReplaceOutputCacheWithInMemory(services);
+            TestServiceHelper.ReplaceDataProtectionWithInMemory(services);
+            TestServiceHelper.ReplaceTicketStoreWithInMemory(services);
+            TestServiceHelper.ConfigureTestAuthentication(services);
         });
 
         builder.UseEnvironment("Development");
     }
 }
 ```
+
+### BFF / CSRF Integration Tests
+
+Tests that need to simulate a **cookie-authenticated** session extend `CustomWebApplicationFactory` with `BffSecurityWebApplicationFactory`. It registers a `FakeCookieAuthStartupFilter` that, when the request includes `X-Test-Cookie-Auth: 1`, pre-populates `HttpContext.User` with an identity whose `AuthenticationType` equals `BffAuthenticationSchemes.Cookie`. Because `UseAuthentication` does not overwrite a pre-set user when the default JWT Bearer scheme finds no token, the CSRF middleware sees the correct cookie identity.
+
+```csharp
+// tests/APITemplate.Tests/Integration/BffSecurityTests.cs
+public sealed class BffSecurityTests : IClassFixture<BffSecurityWebApplicationFactory>
+{
+    [Fact]
+    public async Task PostWithCookieAuth_WithoutCsrfHeader_Returns403()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Cookie-Auth", "1");
+
+        var response = await client.PostAsync("/api/v1/products",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+}
+```
+
+> **CSRF contract:** SPA clients must call `GET /api/v1/bff/csrf` on startup to retrieve the required header (`X-CSRF: 1`) and include it on every non-safe mutation request authenticated with the session cookie.
 
 ---
 

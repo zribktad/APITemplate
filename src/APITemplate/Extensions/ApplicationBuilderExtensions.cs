@@ -1,5 +1,6 @@
 using APITemplate.Api.Cache;
 using APITemplate.Application.Common.Options;
+using APITemplate.Application.Common.Security;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Security;
 using APITemplate.Api.Middleware;
@@ -37,9 +38,13 @@ public static class ApplicationBuilderExtensions
         }
     }
 
-    public static WebApplication UseCustomMiddleware(this WebApplication app)
+    /// <summary>
+    /// Cross-cutting request context: correlation ID stamping, elapsed-time header, and
+    /// structured Serilog request logging. Runs first so every downstream log entry is enriched.
+    /// </summary>
+    public static WebApplication UseRequestContextPipeline(this WebApplication app)
     {
-        app.UseMiddleware<RequestContextMiddleware>(); // Enrich request/response context (correlation headers, elapsed time, log context).
+        app.UseMiddleware<RequestContextMiddleware>();
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate =
@@ -61,7 +66,22 @@ public static class ApplicationBuilderExtensions
                 diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
                 diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
             };
-        }); // Add structured request logging for each HTTP request/response.
+        });
+
+        return app;
+    }
+
+    /// <summary>
+    /// Identity and access-control pipeline: CORS preflight handling, token/cookie
+    /// authentication, CSRF enforcement for BFF cookie sessions, and authorization policy
+    /// evaluation. Order is fixed — each step depends on the one before it.
+    /// </summary>
+    public static WebApplication UseSecurityPipeline(this WebApplication app)
+    {
+        app.UseCors();            // CORS preflight must precede authentication.
+        app.UseAuthentication();  // Populate HttpContext.User from JWT / cookie.
+        app.UseMiddleware<CsrfValidationMiddleware>(); // Require X-CSRF header for cookie-authenticated mutations.
+        app.UseAuthorization();   // Enforce endpoint authorization policies.
 
         return app;
     }
@@ -125,15 +145,13 @@ public static class ApplicationBuilderExtensions
     /// </remarks>
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
-        app.UseExceptionHandler(); // Runtime activation of global exception middleware/handlers (registered during service setup).
-        app.UseCustomMiddleware(); // Cross-cutting request context + structured request logging.
-        app.UseApiDocumentation(); // Expose OpenAPI/Scalar only in development.
-        app.UseHttpsRedirection(); // Redirect HTTP requests to HTTPS.
-        app.UseCors(); // Apply global CORS policy before authentication middleware.
-        app.UseAuthentication(); // Build HttpContext.User from token/identity handlers.
-        app.UseAuthorization(); // Enforce endpoint authorization policies against the authenticated principal.
-        app.UseRateLimiter(); // Apply rate limiting after authorization.
-        app.UseOutputCache(); // Serve cached GET responses after auth/rate limiting.
+        app.UseExceptionHandler();         // Global exception handling — must be outermost.
+        app.UseRequestContextPipeline();   // Correlation enrichment + structured request logging.
+        app.UseApiDocumentation();         // Scalar / OpenAPI — development only.
+        app.UseHttpsRedirection();
+        app.UseSecurityPipeline();         // CORS → Authentication → CSRF → Authorization.
+        app.UseRateLimiter();
+        app.UseOutputCache();
 
         return app;
     }
@@ -143,7 +161,7 @@ public static class ApplicationBuilderExtensions
         app.MapControllers().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
         app.MapGraphQL();
         app.MapNitroApp("/graphql/ui");
-app.UseHealthChecks();
+        app.UseHealthChecks();
 
         return app;
     }
@@ -158,11 +176,11 @@ app.UseHealthChecks();
         {
             options.WithTitle("APITemplate");
             options
-                .AddPreferredSecuritySchemes("OAuth2")
-                .AddAuthorizationCodeFlow("OAuth2", flow =>
+                .AddPreferredSecuritySchemes(AuthConstants.OpenApi.OAuth2Scheme)
+                .AddAuthorizationCodeFlow(AuthConstants.OpenApi.OAuth2Scheme, flow =>
                 {
-                    flow.ClientId = "api-template-scalar";
-                    flow.SelectedScopes = ["openid", "profile", "email"];
+                    flow.ClientId = AuthConstants.OpenApi.ScalarClientId;
+                    flow.SelectedScopes = [.. AuthConstants.Scopes.Default];
                 });
         }).AllowAnonymous();
 

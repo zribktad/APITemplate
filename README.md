@@ -45,7 +45,7 @@ Step-by-step guides for the most common workflows in this project:
     *   **Validation:** Pipelined model validation using `FluentValidation.AspNetCore`.
     *   **Cross-Cutting Concerns:** Unified configuration via `Serilog` (structured logging with `MachineName` and `ThreadId` enrichers) and centralized exception handling via `IExceptionHandler` + RFC 7807 `ProblemDetails`.
     *   **Data Redaction:** Sensitive log properties (PII, secrets) are classified with `Microsoft.Extensions.Compliance` (`[PersonalData]`, `[SensitiveData]`) and HMAC-redacted before writing.
-    *   **Authentication:** Pre-configured Keycloak JWT + BFF Cookie dual-auth.
+    *   **Authentication:** Pre-configured Keycloak JWT + BFF Cookie dual-auth with production hardening: secure-only cookies in production, server-side session store (`ValkeyTicketStore`) backed by Valkey, silent token refresh before expiry, and CSRF protection (`X-CSRF: 1` header required for cookie-authenticated mutations).
     *   **Observability:** Health Checks (`/health`) natively tracking PostgreSQL, MongoDB, and Valkey state.
 *   **Robust Testing Engine:** Provides isolated internal `Integration` tests using `UseInMemoryDatabase` combined with `WebApplicationFactory`, plus a comprehensive `Unit` test suite.
 
@@ -336,6 +336,7 @@ All configuration lives in `appsettings.json` (production defaults) and is overr
 | `Bff:SessionTimeoutMinutes` | `60` | BFF cookie session lifetime |
 | `Bff:PostLogoutRedirectUri` | `/` | Redirect URI after BFF logout |
 | `Bff:Scopes` | `["openid","profile","email","offline_access"]` | OIDC scopes requested during BFF login |
+| `Bff:TokenRefreshThresholdMinutes` | `2` | Refresh the access token this many minutes before expiry |
 | `RateLimiting:Fixed:PermitLimit` | `100` | Maximum requests allowed per window |
 | `RateLimiting:Fixed:WindowMinutes` | `1` | Fixed window duration in minutes |
 | `Caching:ProductsExpirationSeconds` | `30` | Output cache TTL for the Products policy |
@@ -357,7 +358,17 @@ Authentication is handled by **Keycloak** using a hybrid approach that supports 
 | Flow | Use Case | How it works |
 |------|----------|-------------|
 | **JWT Bearer** | Scalar UI, API clients, service-to-service | `Authorization: Bearer <token>` header |
-| **BFF Cookie** | SPA frontend | `/api/v1/bff/login` → Keycloak login → session cookie → direct API calls with cookie |
+| **BFF Cookie** | SPA frontend | `/api/v1/bff/login` → Keycloak login → session cookie → direct API calls with cookie + `X-CSRF: 1` header |
+
+#### BFF Production Hardening
+
+| Feature | Detail |
+|---------|--------|
+| **Secure cookie** | `CookieSecurePolicy.Always` in production; `SameAsRequest` in development |
+| **Server-side session store** | `ValkeyTicketStore` serialises the auth ticket to Valkey — the cookie contains only a GUID key, keeping cookie size small and preventing token leakage |
+| **Shared DataProtection keys** | Keys persisted to Valkey under `DataProtection:Keys` so multiple instances can decrypt each other's cookies |
+| **Silent token refresh** | `CookieSessionRefresher.OnValidatePrincipal` exchanges the refresh token with Keycloak when the access token is within `Bff:TokenRefreshThresholdMinutes` (default 2 min) of expiry |
+| **CSRF protection** | `CsrfValidationMiddleware` requires the `X-CSRF: 1` header on all non-GET/HEAD/OPTIONS requests authenticated via the cookie scheme. JWT Bearer requests are exempt. Call `GET /api/v1/bff/csrf` to retrieve the expected header name/value |
 
 ### BFF Endpoints
 
@@ -366,6 +377,7 @@ Authentication is handled by **Keycloak** using a hybrid approach that supports 
 | `GET` | `/api/v1/bff/login` | ❌ | Redirects to Keycloak login page |
 | `GET` | `/api/v1/bff/logout` | 🍪 | Signs out from both cookie and Keycloak |
 | `GET` | `/api/v1/bff/user` | 🍪 | Returns current user info (id, username, email, tenantId, roles) |
+| `GET` | `/api/v1/bff/csrf` | ❌ | Returns the required CSRF header name and value (`X-CSRF: 1`) |
 
 ### Manual Testing Guide
 

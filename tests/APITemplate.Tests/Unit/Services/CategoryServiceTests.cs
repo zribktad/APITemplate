@@ -24,6 +24,7 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllCategories()
     {
+        var ct = TestContext.Current.CancellationToken;
         var categories = new List<Category>
         {
             new() { Id = Guid.NewGuid(), Name = "Electronics", Audit = new() { CreatedAtUtc = DateTime.UtcNow } },
@@ -34,7 +35,7 @@ public class CategoryServiceTests
             .Setup(r => r.ListAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(categories);
 
-        var result = await _sut.GetAllAsync();
+        var result = await _sut.GetAllAsync(ct);
 
         result.Count.ShouldBe(2);
         result[0].Name.ShouldBe("Electronics");
@@ -45,11 +46,12 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetAllAsync_WhenEmpty_ReturnsEmptyList()
     {
+        var ct = TestContext.Current.CancellationToken;
         _repositoryMock
             .Setup(r => r.ListAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var result = await _sut.GetAllAsync();
+        var result = await _sut.GetAllAsync(ct);
 
         result.ShouldBeEmpty();
     }
@@ -57,6 +59,7 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetByIdAsync_WhenCategoryExists_ReturnsResponse()
     {
+        var ct = TestContext.Current.CancellationToken;
         var category = new Category
         {
             Id = Guid.NewGuid(),
@@ -69,7 +72,7 @@ public class CategoryServiceTests
             .Setup(r => r.GetByIdAsync(category.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
-        var result = await _sut.GetByIdAsync(category.Id);
+        var result = await _sut.GetByIdAsync(category.Id, ct);
 
         result.ShouldNotBeNull();
         result!.Id.ShouldBe(category.Id);
@@ -80,11 +83,12 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetByIdAsync_WhenCategoryDoesNotExist_ReturnsNull()
     {
+        var ct = TestContext.Current.CancellationToken;
         _repositoryMock
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
-        var result = await _sut.GetByIdAsync(Guid.NewGuid());
+        var result = await _sut.GetByIdAsync(Guid.NewGuid(), ct);
 
         result.ShouldBeNull();
     }
@@ -98,7 +102,7 @@ public class CategoryServiceTests
             .Setup(r => r.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category c, CancellationToken _) => c);
 
-        var result = await _sut.CreateAsync(request);
+        var result = await _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         result.ShouldNotBeNull();
         result.Id.ShouldNotBe(Guid.Empty);
@@ -118,7 +122,7 @@ public class CategoryServiceTests
             .Setup(r => r.AddAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category c, CancellationToken _) => c);
 
-        var result = await _sut.CreateAsync(request);
+        var result = await _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         result.Name.ShouldBe("Books");
         result.Description.ShouldBeNull();
@@ -141,7 +145,7 @@ public class CategoryServiceTests
             .Setup(r => r.GetByIdAsync(category.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
-        await _sut.UpdateAsync(category.Id, request);
+        await _sut.UpdateAsync(category.Id, request, TestContext.Current.CancellationToken);
 
         _repositoryMock.Verify(r => r.UpdateAsync(
             It.Is<Category>(c => c.Name == "New Name" && c.Description == "New Description"),
@@ -157,7 +161,7 @@ public class CategoryServiceTests
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
-        var act = () => _sut.UpdateAsync(Guid.NewGuid(), new UpdateCategoryRequest("Name", null));
+        var act = () => _sut.UpdateAsync(Guid.NewGuid(), new UpdateCategoryRequest("Name", null), TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
@@ -168,7 +172,7 @@ public class CategoryServiceTests
     {
         var id = Guid.NewGuid();
 
-        await _sut.DeleteAsync(id);
+        await _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
         _repositoryMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -177,6 +181,7 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetStatsAsync_WhenStatsExist_ReturnsMappedResponse()
     {
+        var ct = TestContext.Current.CancellationToken;
         var categoryId = Guid.NewGuid();
         var stats = new ProductCategoryStats
         {
@@ -191,7 +196,7 @@ public class CategoryServiceTests
             .Setup(r => r.GetStatsByIdAsync(categoryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(stats);
 
-        var result = await _sut.GetStatsAsync(categoryId);
+        var result = await _sut.GetStatsAsync(categoryId, ct);
 
         result.ShouldNotBeNull();
         result!.CategoryId.ShouldBe(categoryId);
@@ -204,11 +209,12 @@ public class CategoryServiceTests
     [Fact]
     public async Task GetStatsAsync_WhenCategoryDoesNotExist_ReturnsNull()
     {
+        var ct = TestContext.Current.CancellationToken;
         _repositoryMock
             .Setup(r => r.GetStatsByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductCategoryStats?)null);
 
-        var result = await _sut.GetStatsAsync(Guid.NewGuid());
+        var result = await _sut.GetStatsAsync(Guid.NewGuid(), ct);
 
         result.ShouldBeNull();
     }

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Shouldly;
+using Xunit;
 
 namespace APITemplate.Tests.Integration.Helpers;
 
@@ -17,13 +18,15 @@ internal sealed class GraphQLTestHelper
 
     internal async Task<HttpResponseMessage> PostAsync(object query)
     {
+        var ct = TestContext.Current.CancellationToken;
         var json = JsonSerializer.Serialize(query);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        return await _client.PostAsync("/graphql", content);
+        return await _client.PostAsync("/graphql", content, ct);
     }
 
     internal async Task<Guid> CreateProductAsync(string name, decimal price)
     {
+        var ct = TestContext.Current.CancellationToken;
         var mutation = new
         {
             query = @"
@@ -39,12 +42,13 @@ internal sealed class GraphQLTestHelper
         var response = await PostAsync(mutation);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default, ct);
         return result!.Data.CreateProduct.Id;
     }
 
     internal async Task<Guid> CreateReviewAsync(Guid productId, int rating)
     {
+        var ct = TestContext.Current.CancellationToken;
         var mutation = new
         {
             query = @"
@@ -60,7 +64,7 @@ internal sealed class GraphQLTestHelper
         var response = await PostAsync(mutation);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default, ct);
         return result!.Data.CreateProductReview.Id;
     }
 }

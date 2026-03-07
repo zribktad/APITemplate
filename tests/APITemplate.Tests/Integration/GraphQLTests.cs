@@ -6,7 +6,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class GraphQLTests
 {
     private readonly HttpClient _client;
@@ -22,6 +21,7 @@ public class GraphQLTests
     [Fact]
     public async Task GraphQL_GetProducts_ReturnsEmptyList()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var query = new { query = "{ products { items { id name price } totalCount pageNumber pageSize } }" };
@@ -30,7 +30,7 @@ public class GraphQLTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default, ct);
         result!.Data.Products.Items.Count.ShouldBeGreaterThanOrEqualTo(0);
         result.Data.Products.PageNumber.ShouldBeGreaterThan(0);
     }
@@ -38,6 +38,7 @@ public class GraphQLTests
     [Fact]
     public async Task GraphQL_CreateProduct_ReturnsNewProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var query = new
@@ -65,7 +66,7 @@ public class GraphQLTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductData>>(GraphQLJsonOptions.Default, ct);
         result!.Data.CreateProduct.Name.ShouldBe("GraphQL Product");
         result.Data.CreateProduct.Price.ShouldBe(49.99m);
     }
@@ -73,6 +74,7 @@ public class GraphQLTests
     [Fact]
     public async Task GraphQL_GetProductById_WhenExists_ReturnsProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var productId = await _graphql.CreateProductAsync("Findable Product", 10.0m);
@@ -86,13 +88,14 @@ public class GraphQLTests
 
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var getResult = await getResponse.Content.ReadFromJsonAsync<GraphQLResponse<ProductByIdData>>(GraphQLJsonOptions.Default);
+        var getResult = await getResponse.Content.ReadFromJsonAsync<GraphQLResponse<ProductByIdData>>(GraphQLJsonOptions.Default, ct);
         getResult!.Data.ProductById!.Name.ShouldBe("Findable Product");
     }
 
     [Fact]
     public async Task GraphQL_DeleteProduct_ReturnsTrue()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var productId = await _graphql.CreateProductAsync("To Delete", 5.0m);
@@ -106,13 +109,14 @@ public class GraphQLTests
 
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductData>>(GraphQLJsonOptions.Default);
+        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductData>>(GraphQLJsonOptions.Default, ct);
         deleteResult!.Data.DeleteProduct.ShouldBeTrue();
     }
 
     [Fact]
     public async Task GraphQL_GetProducts_WithFilterSortAndPaging_ReturnsExpectedOrderAndSlice()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var prefix = $"sort-{Guid.NewGuid():N}";
@@ -147,7 +151,7 @@ public class GraphQLTests
         var response = await _graphql.PostAsync(query);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsData>>(GraphQLJsonOptions.Default, ct);
         var items = result!.Data.Products.Items;
 
         items.Count.ShouldBe(2);
@@ -160,6 +164,7 @@ public class GraphQLTests
     [Fact]
     public async Task GraphQL_ProductReviewsField_UsesBatchResolverAndReturnsReviewsPerProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var prefix = $"dl-{Guid.NewGuid():N}";
@@ -200,7 +205,7 @@ public class GraphQLTests
         var response = await _graphql.PostAsync(query);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsWithReviewsData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ProductsWithReviewsData>>(GraphQLJsonOptions.Default, ct);
         var items = result!.Data.Products.Items;
 
         items.Count.ShouldBeGreaterThanOrEqualTo(2);

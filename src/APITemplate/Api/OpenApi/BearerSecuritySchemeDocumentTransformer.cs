@@ -1,6 +1,8 @@
 using APITemplate.Application.Common.Options;
+using APITemplate.Application.Common.Security;
 using APITemplate.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -26,7 +28,7 @@ public sealed class BearerSecuritySchemeDocumentTransformer : IOpenApiDocumentTr
         CancellationToken cancellationToken)
     {
         var schemes = await _schemeProvider.GetAllSchemesAsync();
-        if (!schemes.Any(s => s.Name == "Bearer"))
+        if (!schemes.Any(s => s.Name == JwtBearerDefaults.AuthenticationScheme))
             return;
 
         var authority = KeycloakUrlHelper.BuildAuthority(_keycloak.AuthServerUrl, _keycloak.Realm);
@@ -39,13 +41,13 @@ public sealed class BearerSecuritySchemeDocumentTransformer : IOpenApiDocumentTr
             {
                 AuthorizationCode = new OpenApiOAuthFlow
                 {
-                    AuthorizationUrl = new Uri($"{authority}/protocol/openid-connect/auth"),
-                    TokenUrl = new Uri($"{authority}/protocol/openid-connect/token"),
+                    AuthorizationUrl = new Uri($"{authority}/{AuthConstants.OpenIdConnect.AuthorizationEndpointPath}"),
+                    TokenUrl = new Uri($"{authority}/{AuthConstants.OpenIdConnect.TokenEndpointPath}"),
                     Scopes = new Dictionary<string, string>
                     {
-                        ["openid"] = "OpenID Connect",
-                        ["profile"] = "User profile",
-                        ["email"] = "Email address"
+                        [AuthConstants.Scopes.OpenId] = "OpenID Connect",
+                        [AuthConstants.Scopes.Profile] = "User profile",
+                        [AuthConstants.Scopes.Email] = "Email address"
                     }
                 }
             }
@@ -53,10 +55,10 @@ public sealed class BearerSecuritySchemeDocumentTransformer : IOpenApiDocumentTr
 
         var components = document.Components ??= new OpenApiComponents();
         components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
-        components.SecuritySchemes["OAuth2"] = securityScheme;
+        components.SecuritySchemes[AuthConstants.OpenApi.OAuth2Scheme] = securityScheme;
 
         var requirement = new OpenApiSecurityRequirement();
-        requirement[new OpenApiSecuritySchemeReference("OAuth2")] = new List<string> { "openid" };
+        requirement[new OpenApiSecuritySchemeReference(AuthConstants.OpenApi.OAuth2Scheme)] = [AuthConstants.Scopes.OpenId];
 
         document.Security ??= [];
         document.Security.Add(requirement);

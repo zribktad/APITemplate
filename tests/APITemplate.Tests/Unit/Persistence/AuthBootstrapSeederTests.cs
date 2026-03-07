@@ -14,6 +14,7 @@ public class AuthBootstrapSeederTests
     [Fact]
     public async Task SeedAsync_WhenTenantExistsButInactiveOrDeleted_RestoresTenant()
     {
+        var ct = TestContext.Current.CancellationToken;
         await using var dbContext = CreateDbContext();
         var tenant = new Tenant
         {
@@ -28,14 +29,14 @@ public class AuthBootstrapSeederTests
         };
 
         dbContext.Tenants.Add(tenant);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(ct);
 
         var sut = CreateSeeder(dbContext);
-        await sut.SeedAsync();
+        await sut.SeedAsync(ct);
 
         var restoredTenant = await dbContext.Tenants
             .IgnoreQueryFilters()
-            .SingleAsync(t => t.Code == "default");
+            .SingleAsync(t => t.Code == "default", ct);
 
         restoredTenant.IsActive.ShouldBeTrue();
         restoredTenant.IsDeleted.ShouldBeFalse();
@@ -46,14 +47,15 @@ public class AuthBootstrapSeederTests
     [Fact]
     public async Task SeedAsync_WhenNoTenantExists_CreatesTenant()
     {
+        var ct = TestContext.Current.CancellationToken;
         await using var dbContext = CreateDbContext();
 
         var sut = CreateSeeder(dbContext);
-        await sut.SeedAsync();
+        await sut.SeedAsync(ct);
 
         var tenant = await dbContext.Tenants
             .IgnoreQueryFilters()
-            .SingleAsync(t => t.Code == "default");
+            .SingleAsync(t => t.Code == "default", ct);
 
         tenant.ShouldNotBeNull();
         tenant.IsActive.ShouldBeTrue();

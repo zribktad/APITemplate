@@ -34,6 +34,7 @@ public class ProductServiceTests
     [InlineData(false)]
     public async Task GetByIdAsync_ReturnsExpectedResult(bool productExists)
     {
+        var ct = TestContext.Current.CancellationToken;
         var productId = Guid.NewGuid();
         ProductResponse? response = null;
         if (productExists)
@@ -45,7 +46,7 @@ public class ProductServiceTests
             .Setup(q => q.GetByIdAsync(productId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
-        var result = await _sut.GetByIdAsync(productId);
+        var result = await _sut.GetByIdAsync(productId, ct);
 
         if (productExists)
         {
@@ -68,7 +69,7 @@ public class ProductServiceTests
             .Setup(r => r.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Product p, CancellationToken _) => p);
 
-        var result = await _sut.CreateAsync(request);
+        var result = await _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         result.Name.ShouldBe("New Product");
         result.Price.ShouldBe(19.99m);
@@ -95,7 +96,7 @@ public class ProductServiceTests
             .Setup(r => r.AddAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Product p, CancellationToken _) => p);
 
-        var result = await _sut.CreateAsync(request);
+        var result = await _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         result.Name.ShouldBe("New Product");
         _categoryRepositoryMock.Verify(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()), Times.Once);
@@ -111,7 +112,7 @@ public class ProductServiceTests
             .Setup(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Category?)null);
 
-        var act = () => _sut.CreateAsync(request);
+        var act = () => _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -123,7 +124,7 @@ public class ProductServiceTests
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Product?)null);
 
-        var act = () => _sut.UpdateAsync(Guid.NewGuid(), new UpdateProductRequest("Name", null, 10m));
+        var act = () => _sut.UpdateAsync(Guid.NewGuid(), new UpdateProductRequest("Name", null, 10m), TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -133,7 +134,7 @@ public class ProductServiceTests
     {
         var id = Guid.NewGuid();
 
-        await _sut.DeleteAsync(id);
+        await _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
         _repositoryMock.Verify(
             r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()),
@@ -157,7 +158,7 @@ public class ProductServiceTests
             .Setup(r => r.GetByIdAsync(product.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(product);
 
-        await _sut.UpdateAsync(product.Id, new UpdateProductRequest("New Name", "New Desc", 20m));
+        await _sut.UpdateAsync(product.Id, new UpdateProductRequest("New Name", "New Desc", 20m), TestContext.Current.CancellationToken);
 
         product.Name.ShouldBe("New Name");
         product.Description.ShouldBe("New Desc");
@@ -172,6 +173,7 @@ public class ProductServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllProducts()
     {
+        var ct = TestContext.Current.CancellationToken;
         var responses = new List<ProductResponse>
         {
             new(Guid.NewGuid(), "Product 1", null, 10m, DateTime.UtcNow),
@@ -182,7 +184,7 @@ public class ProductServiceTests
             .Setup(q => q.GetPagedAsync(It.IsAny<ProductFilter>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResponse<ProductResponse>(responses, 2, 1, 10));
 
-        var result = await _sut.GetAllAsync(new ProductFilter());
+        var result = await _sut.GetAllAsync(new ProductFilter(), ct);
 
         result.Items.Count().ShouldBe(2);
         result.TotalCount.ShouldBe(2);

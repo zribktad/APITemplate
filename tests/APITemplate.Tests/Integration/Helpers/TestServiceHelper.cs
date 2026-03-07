@@ -1,9 +1,12 @@
 using APITemplate.Application.Common.Security;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -70,10 +73,29 @@ internal static class TestServiceHelper
         services.RemoveAll<IOptionsChangeTokenSource<Application.Common.Options.ValkeyOptions>>();
     }
 
+    internal static void ReplaceDataProtectionWithInMemory(IServiceCollection services)
+    {
+        // Replace Valkey-backed DataProtection with EphemeralDataProtectionProvider (no key persistence).
+        services.RemoveAll<IDataProtectionProvider>();
+        services.AddSingleton<IDataProtectionProvider, EphemeralDataProtectionProvider>();
+    }
+
+    internal static void ReplaceTicketStoreWithInMemory(IServiceCollection services)
+    {
+        // Replace Redis-backed IDistributedCache with in-memory so ValkeyTicketStore
+        // works without a real Valkey instance in tests.
+        services.RemoveAll<IDistributedCache>();
+        services.AddDistributedMemoryCache();
+        services.RemoveAll<ValkeyTicketStore>();
+        services.AddSingleton<ValkeyTicketStore>();
+    }
+
     internal static void MockMongoServices(IServiceCollection services)
     {
         services.RemoveAll(typeof(MongoDbContext));
         services.RemoveAll(typeof(IProductDataRepository));
-        services.AddSingleton(new Mock<IProductDataRepository>().Object);
+        var mock = new Mock<IProductDataRepository>();
+        services.AddSingleton(mock);
+        services.AddSingleton(mock.Object);
     }
 }

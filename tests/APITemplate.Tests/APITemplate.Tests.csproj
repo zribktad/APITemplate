@@ -10,15 +10,15 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Shouldly" Version="4.3.0" />
-    <PackageReference Include="xunit" Version="*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="*" />
-    <PackageReference Include="Moq" Version="*" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="*" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="*" />
-    <PackageReference Include="MockQueryable.Moq" Version="*" />
-    <PackageReference Include="DotNet.Testcontainers" Version="*" />
-    <PackageReference Include="Testcontainers.PostgreSql" Version="*" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.3" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
+    <PackageReference Include="MockQueryable.Moq" Version="10.0.2" />
+    <PackageReference Include="DotNet.Testcontainers" Version="1.6.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.10.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,7 +5,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class UnauthorizedAccessTests
 {
     private readonly HttpClient _client;
@@ -23,7 +22,7 @@ public class UnauthorizedAccessTests
     [InlineData("/api/v1/categories/00000000-0000-0000-0000-000000000001/stats")]
     public async Task GetEndpoint_WithoutToken_ReturnsUnauthorized(string endpoint)
     {
-        var response = await _client.GetAsync(endpoint);
+        var response = await _client.GetAsync(endpoint, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -31,6 +30,7 @@ public class UnauthorizedAccessTests
     [Fact]
     public async Task GraphQL_Mutation_WithoutToken_ReturnsUnauthorized()
     {
+        var ct = TestContext.Current.CancellationToken;
         var mutation = """
             {
               "query": "mutation($input: CreateProductRequestInput!) { createProduct(input: $input) { id name } }",
@@ -44,7 +44,7 @@ public class UnauthorizedAccessTests
             """;
 
         using var content = new StringContent(mutation, Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync("/graphql", content);
+        var response = await _client.PostAsync("/graphql", content, ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }

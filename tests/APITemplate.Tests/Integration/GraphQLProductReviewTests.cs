@@ -6,7 +6,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class GraphQLProductReviewTests
 {
     private readonly HttpClient _client;
@@ -22,6 +21,7 @@ public class GraphQLProductReviewTests
     [Fact]
     public async Task GraphQL_CreateProductReview_ReturnsNewReview()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenantId: _tenantId);
         var productId = await _graphql.CreateProductAsync("Review Target Product", 19.99m);
 
@@ -51,7 +51,7 @@ public class GraphQLProductReviewTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default, ct);
         result!.Data.CreateProductReview.UserId.ShouldBe(userId);
         result.Data.CreateProductReview.Rating.ShouldBe(4);
         result.Data.CreateProductReview.ProductId.ShouldBe(productId);
@@ -60,6 +60,7 @@ public class GraphQLProductReviewTests
     [Fact]
     public async Task GraphQL_GetReviews_ReturnsEmptyOrPopulatedList()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var query = new { query = "{ reviews { items { id userId rating } totalCount pageNumber pageSize } }" };
@@ -68,7 +69,7 @@ public class GraphQLProductReviewTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default, ct);
         result!.Data.Reviews.Items.Count.ShouldBeGreaterThanOrEqualTo(0);
         result.Data.Reviews.PageNumber.ShouldBeGreaterThan(0);
     }
@@ -76,6 +77,7 @@ public class GraphQLProductReviewTests
     [Fact]
     public async Task GraphQL_GetReviewsByProductId_ReturnsReviewsForProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
         var productId = await _graphql.CreateProductAsync("Product With Reviews", 29.99m);
 
@@ -101,13 +103,14 @@ public class GraphQLProductReviewTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsByProductIdData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsByProductIdData>>(GraphQLJsonOptions.Default, ct);
         result!.Data.ReviewsByProductId.Items.Count.ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
     public async Task GraphQL_GetReviews_WithFilterSortAndPaging_ReturnsExpectedOrder()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
         var productId = await _graphql.CreateProductAsync($"SortTarget-{Guid.NewGuid():N}", 15m);
 
@@ -142,7 +145,7 @@ public class GraphQLProductReviewTests
         var response = await _graphql.PostAsync(query);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default);
+        var result = await response.Content.ReadFromJsonAsync<GraphQLResponse<ReviewsData>>(GraphQLJsonOptions.Default, ct);
         var items = result!.Data.Reviews.Items;
 
         items.Count.ShouldBe(2);
@@ -155,6 +158,7 @@ public class GraphQLProductReviewTests
     [Fact]
     public async Task GraphQL_DeleteProductReview_ReturnsTrue()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
         var productId = await _graphql.CreateProductAsync("Product To Review Then Delete Review", 9.99m);
 
@@ -171,7 +175,7 @@ public class GraphQLProductReviewTests
         };
 
         var createResponse = await _graphql.PostAsync(createMutation);
-        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default);
+        var createResult = await createResponse.Content.ReadFromJsonAsync<GraphQLResponse<CreateProductReviewData>>(GraphQLJsonOptions.Default, ct);
         var reviewId = createResult!.Data.CreateProductReview.Id;
 
         var deleteMutation = new
@@ -183,7 +187,7 @@ public class GraphQLProductReviewTests
 
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductReviewData>>(GraphQLJsonOptions.Default);
+        var deleteResult = await deleteResponse.Content.ReadFromJsonAsync<GraphQLResponse<DeleteProductReviewData>>(GraphQLJsonOptions.Default, ct);
         deleteResult!.Data.DeleteProductReview.ShouldBeTrue();
     }
 }

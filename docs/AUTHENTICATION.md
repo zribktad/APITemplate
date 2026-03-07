@@ -2,11 +2,12 @@
 
 ## Overview
 
-Project uses **Keycloak** as identity provider with hybrid **BFF (Backend-for-Frontend)** pattern:
+Project uses **Keycloak** as identity provider with hybrid authentication:
 
-- **JWT Bearer** - direct API access (microservices, mobile apps, Postman)
-- **OIDC + Cookie** - browser-based login via BFF endpoints
-- **YARP Reverse Proxy** - automatically forwards access tokens from cookie sessions
+- **JWT Bearer** — direct API access (microservices, mobile apps, Postman, curl)
+- **OIDC + Cookie (BFF)** — browser-based login for SPA; tokens never exposed to JavaScript
+- **Scalar OAuth2** — interactive OAuth2 Authorization Code flow in Scalar UI (development)
+- **Client Credentials** — machine-to-machine (service accounts, background jobs)
 
 ## Architecture
 
@@ -14,49 +15,73 @@ Project uses **Keycloak** as identity provider with hybrid **BFF (Backend-for-Fr
 graph TB
     subgraph Clients
         SPA[Browser / SPA]
-        API_CLIENT[API Client<br/>Postman, microservice]
+        API_CLIENT[API Client<br/>Postman, microservice, mobile]
+        SCALAR[Scalar UI<br/>dev tool]
     end
 
-    subgraph API_GATEWAY[API Gateway]
-        BFF[BFF Controller<br/>login / logout / user]
-        YARP[YARP Proxy<br/>/bff/proxy/**]
-        JWT_VAL[JWT Validation]
+    subgraph APP[ASP.NET Core API]
+        BFF[BffController<br/>/api/v1/bff/login<br/>/api/v1/bff/logout<br/>/api/v1/bff/user<br/>/api/v1/bff/csrf]
+        JWT_VAL[JwtBearer Middleware<br/>validates Bearer token]
+        COOKIE_VAL[Cookie Middleware<br/>looks up session in Valkey]
+        CSRF[CsrfValidationMiddleware<br/>X-CSRF: 1 required]
+        TENANT[TenantClaimValidator<br/>validates tenant_id claim]
+        CLAIM[KeycloakClaimMapper<br/>maps Keycloak → .NET claims]
+        AUTHZ[Authorization Middleware<br/>Fallback: Bearer OR Cookie]
     end
 
-    subgraph KEYCLOAK[Keycloak]
+    subgraph SESSION[Valkey / Redis]
+        STORE[ValkeyTicketStore<br/>bff:ticket:GUID → AuthenticationTicket]
+        DP[DataProtection Keys<br/>DataProtection:Keys]
+    end
+
+    subgraph KEYCLOAK[Keycloak :8180]
         REALM[Realm: api-template<br/>Client: api-template]
     end
 
-    SPA -->|Cookie .APITemplate.Auth| BFF
-    SPA -->|Cookie .APITemplate.Auth| YARP
+    SPA -->|Cookie .APITemplate.Auth| COOKIE_VAL
+    SPA -->|POST/PUT/DELETE + X-CSRF: 1| CSRF
     API_CLIENT -->|Authorization: Bearer token| JWT_VAL
+    SCALAR -->|OAuth2 Authorization Code| REALM
     BFF -->|OIDC Code Flow| REALM
-    JWT_VAL -->|Token Validation| REALM
-    YARP -->|Forwards with Bearer token| JWT_VAL
+    JWT_VAL --> TENANT --> CLAIM --> AUTHZ
+    COOKIE_VAL --> STORE
+    COOKIE_VAL --> CSRF --> AUTHZ
 ```
+
+---
+
+## Authentication Methods
+
+| Method | Client | Token visible to JS? |
+|--------|--------|----------------------|
+| **Scalar OAuth2** | Scalar UI (dev tool) | Yes (in Scalar memory only) |
+| **JWT Bearer** | Mobile apps, Postman, curl | Yes (client manages it) |
+| **Client Credentials** | Microservices, background jobs | N/A (machine-to-machine) |
+| **BFF Cookie** | SPA frontend (browser) | **No** — httpOnly cookie, tokens in Valkey |
+
+---
 
 ## Quick Start
 
 ### 1. Start Infrastructure
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-Services:
-| Service       | Port  | Description              |
-|---------------|-------|--------------------------|
-| PostgreSQL    | 5432  | Application database     |
-| MongoDB       | 27017 | Product data storage     |
-| Keycloak      | 8180  | Identity provider        |
-| Keycloak DB   | (internal) | Keycloak PostgreSQL   |
+| Service     | Port  | Description              |
+|-------------|-------|--------------------------|
+| PostgreSQL  | 5432  | Application database     |
+| MongoDB     | 27017 | Product data storage     |
+| Keycloak    | 8180  | Identity provider        |
+| Valkey      | 6379  | Session store + cache    |
 
 ### 2. Default Credentials
 
-| Service   | Username | Password |
-|-----------|----------|----------|
-| Keycloak Admin Console | admin | admin |
-| Application User       | admin | Admin123 |
+| Service                | Username | Password  |
+|------------------------|----------|-----------|
+| Keycloak Admin Console | admin    | admin     |
+| Application User       | admin    | Admin123  |
 
 Default user has role **PlatformAdmin** and tenant `00000000-0000-0000-0000-000000000001`.
 
@@ -66,156 +91,255 @@ Default user has role **PlatformAdmin** and tenant `00000000-0000-0000-0000-0000
 http://localhost:8180/admin
 ```
 
-## Authentication Methods
-
-The API supports 4 authentication methods. Each serves a different client type:
-
-| Method | Client | How it works | Token visible to JS? |
-|--------|--------|-------------|---------------------|
-| **Scalar OAuth2** | Scalar UI (dev tool) | OAuth2 Authorization Code flow via public Keycloak client | Yes (in Scalar memory) |
-| **JWT Bearer** | Mobile apps, Postman, curl | Client obtains token from Keycloak, sends in `Authorization` header | Yes (client manages it) |
-| **Client Credentials** | Microservices, background jobs | Service authenticates with client_id + secret, no user involved | N/A (machine-to-machine) |
-| **BFF Cookie** | SPA frontend (browser) | Backend handles login, stores token in httpOnly cookie | No (secure) |
-| **BFF + YARP Proxy** | SPA frontend calling API | YARP extracts token from cookie, adds Bearer header, forwards to API | No (secure) |
-
-### Where is each method configured?
-
-| Method | Configuration files | Key code |
-|--------|-------------------|----------|
-| **Scalar OAuth2** | `appsettings.json` → `Keycloak` section, realm JSON → client `api-template-scalar` | `Api/OpenApi/BearerSecuritySchemeDocumentTransformer.cs` — registers OAuth2 flow in OpenAPI spec using `IOptions<KeycloakOptions>` |
-| **JWT Bearer** | `appsettings.Development.json` → `Keycloak` section (realm, auth-server-url, resource, credentials.secret) | `Extensions/AuthenticationServiceCollectionExtensions.cs:90-105` — `.AddJwtBearer()` with Authority, Audience, token validation |
-| **Client Credentials** | realm JSON → `api-template` client: `serviceAccountsEnabled: true` | Same JWT Bearer validation — token is issued by Keycloak, API doesn't distinguish grant type |
-| **BFF Cookie** | `appsettings.json` → `Bff` section (CookieName, SessionTimeoutMinutes, Scopes, PostLogoutRedirectUri) | `Extensions/AuthenticationServiceCollectionExtensions.cs:106-138` — `.AddCookie()` + `.AddOpenIdConnect()`, `Api/Controllers/V1/BffController.cs` — login/logout/user endpoints. Fallback auth policy accepts both Bearer and Cookie schemes — SPA calls API endpoints directly with session cookie |
-
-**Registration order in `Program.cs`:**
-```
-AddAuthenticationOptions()          → binds IOptions<KeycloakOptions>, IOptions<BffOptions>, CORS
-AddKeycloakBffAuthentication()      → registers JWT Bearer + Cookie + OIDC schemes, authorization policies
-```
-
-**Keycloak realm** is defined in `infrastructure/keycloak/realms/api-template-realm.json` and auto-imported on `docker-compose up`. It configures clients, roles, protocol mappers, users, password policy, and brute force protection.
-
-### When to use which?
-
-| Scenario | Method | Why |
-|----------|--------|-----|
-| Testing API during development | **Scalar OAuth2** | Visual UI, click Authorize, test endpoints |
-| Quick token test from terminal | **JWT Bearer** (Client Credentials) | One curl command to get token |
-| Mobile app (iOS/Android) | **JWT Bearer** (Authorization Code + PKCE) | PKCE enforced (`S256`), standard OAuth2 mobile flow |
-| Service-to-service communication | **Client Credentials** | No user involved, machine-to-machine, `serviceAccountsEnabled: true` |
-| SPA frontend — login/logout/user info | **BFF Cookie** | Secure, no token exposure to JavaScript |
-| SPA frontend — calling API endpoints | **BFF Cookie** | Session cookie accepted directly by API (fallback policy includes Cookie scheme) |
-
-### Keycloak Standard Endpoints
-
-Keycloak automatically provides these OpenID Connect endpoints for each realm:
-
-| Endpoint | URL | Purpose |
-|----------|-----|---------|
-| Discovery | `/realms/{realm}/.well-known/openid-configuration` | Lists all available endpoints and configuration |
-| Token | `/realms/{realm}/protocol/openid-connect/token` | Exchange credentials/code for tokens |
-| Authorization | `/realms/{realm}/protocol/openid-connect/auth` | Login page (browser redirect) |
-| Logout | `/realms/{realm}/protocol/openid-connect/logout` | End Keycloak session |
-| UserInfo | `/realms/{realm}/protocol/openid-connect/userinfo` | Get user info from token |
-
-These endpoints are public by design (like Google or GitHub login pages). Security comes from credentials, HTTPS in production, and brute force protection — not from hiding the URLs.
-
-When the API sets `options.Authority`, ASP.NET downloads the Discovery endpoint and auto-discovers everything else.
-
 ---
 
-## Testing Each Method
+## Flow 1 — JWT Bearer (API clients, mobile apps)
 
-### 1. Scalar OAuth2
+```
+Client (Postman, mobile app, microservice)
+│
+│  Step 1: Get token from Keycloak
+│  POST http://localhost:8180/realms/api-template/protocol/openid-connect/token
+│  grant_type=authorization_code | client_credentials | refresh_token
+│
+│  Step 2: Call API with token
+│  GET /api/v1/products
+│  Authorization: Bearer <access_token>
+│
+▼
+[ JwtBearer Middleware ]
+  - Downloads JWKS from Keycloak discovery endpoint
+  - Validates token signature, issuer, audience, lifetime
+▼
+[ TenantClaimValidator.OnTokenValidated ]
+  - KeycloakClaimMapper: preferred_username → ClaimTypes.Name
+  - KeycloakClaimMapper: realm_access.roles[] → ClaimTypes.Role[]
+  - Rejects token without tenant_id claim (unless service account)
+▼
+[ Authorization Middleware ]
+  - Fallback policy: requires authenticated user (Bearer OR Cookie)
+  - PlatformAdminOnly: requires role "PlatformAdmin"
+▼
+Controller Action
+```
 
-1. Open `http://localhost:5174/scalar`
-2. Click **Authorize**
-3. Keycloak login page opens → enter `admin` / `Admin123`
-4. Scalar receives token → all requests include it automatically
-5. Try `GET /api/v1/products`
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant KC as Keycloak
+    participant API as ASP.NET Core API
 
-Uses Keycloak client `api-template-scalar` (public, no secret needed).
+    C->>KC: POST /token<br/>(grant_type=authorization_code | client_credentials | refresh_token)
+    KC-->>C: access_token
+    C->>API: GET /api/v1/products<br/>Authorization: Bearer &lt;token&gt;
+    API->>API: JwtBearer Middleware<br/>validates signature, issuer, audience, lifetime
+    API->>API: TenantClaimValidator.OnTokenValidated<br/>maps claims, validates tenant_id
+    API->>API: Authorization Middleware<br/>Fallback: Bearer OR Cookie
+    API-->>C: 200 OK
+```
 
-### 2. JWT Bearer via curl
-
+**Get token via curl:**
 ```bash
-# Get token from Keycloak (client credentials — no user context)
 TOKEN=$(curl -s -X POST "http://localhost:8180/realms/api-template/protocol/openid-connect/token" \
   -d "grant_type=client_credentials" \
   -d "client_id=api-template" \
   -d "client_secret=dev-client-secret" \
   | jq -r '.access_token')
 
-# Call API with token
 curl -H "Authorization: Bearer $TOKEN" http://localhost:5174/api/v1/products
 ```
-
-> **Note:** Client Credentials tokens have no user context (`sub`). For user-scoped tokens, use the Scalar OAuth2 flow or BFF login.
 
 > **Tip:** Paste the token into [jwt.io](https://jwt.io) to inspect claims (roles, tenant_id, etc.)
 
-### 3. BFF Cookie (browser)
+---
 
-1. Open `http://localhost:5174/api/v1/bff/login?returnUrl=/api/v1/bff/user`
-2. Keycloak login page → enter `admin` / `Admin123`
-3. After login, you see JSON with user info
-4. Cookie `.APITemplate.Auth` is now stored in browser
-5. Visit `http://localhost:5174/api/v1/bff/user` — works without re-login
-6. Logout: `http://localhost:5174/api/v1/bff/logout`
+## Flow 2 — BFF Cookie (SPA / browser)
 
-### 4. Client Credentials (service-to-service)
+### 2a. Login
 
-```bash
-# Get token without any user (machine-to-machine)
-TOKEN=$(curl -s -X POST "http://localhost:8180/realms/api-template/protocol/openid-connect/token" \
-  -d "grant_type=client_credentials" \
-  -d "client_id=api-template" \
-  -d "client_secret=dev-client-secret" \
-  | jq -r '.access_token')
+```mermaid
+sequenceDiagram
+    participant SPA as Browser / SPA
+    participant BFF as BffController
+    participant OIDC as OIDC Middleware (BffOidc)
+    participant KC as Keycloak
+    participant VK as Valkey
 
-# Call API with service account token
-curl -H "Authorization: Bearer $TOKEN" http://localhost:5174/api/v1/products
+    SPA->>BFF: GET /api/v1/bff/login?returnUrl=/dashboard
+    BFF-->>SPA: 302 → Keycloak login page (Challenge BffOidc)
+    SPA->>KC: User enters credentials
+    KC-->>OIDC: Authorization code → callback URL
+    OIDC->>KC: Exchange code for tokens
+    KC-->>OIDC: access_token + refresh_token + id_token
+    OIDC->>OIDC: TenantClaimValidator.OnTokenValidated<br/>maps claims, validates tenant_id
+    OIDC->>VK: StoreAsync — bff:ticket:&lt;GUID&gt;<br/>TTL = SessionTimeoutMinutes (60 min)
+    OIDC-->>SPA: Set-Cookie: .APITemplate.Auth=&lt;GUID&gt;<br/>HttpOnly, SameSite=Lax, Secure<br/>302 → /dashboard
 ```
 
-> **Note:** Client Credentials token has no `sub` (user) — it represents the service itself. The token will contain the client's service account roles. Since service accounts have no `tenant_id`, tenant-scoped endpoints will return empty results (EF global filter uses `HasTenant = false`). Service accounts can access non-tenant endpoints (health, admin, etc.).
+### 2b. Authenticated Request
 
-### 5. BFF + YARP Proxy (browser, after BFF login)
+```mermaid
+sequenceDiagram
+    participant SPA as Browser / SPA
+    participant CM as Cookie Middleware
+    participant VK as Valkey
+    participant CSR as CookieSessionRefresher
+    participant KC as Keycloak
+    participant CSRF as CsrfValidationMiddleware
+    participant AUTHZ as Authorization Middleware
 
-After logging in via BFF (step 3 above):
+    SPA->>CM: POST /api/v1/products<br/>Cookie: .APITemplate.Auth=&lt;GUID&gt;<br/>X-CSRF: 1
+    CM->>VK: RetrieveAsync(&lt;GUID&gt;)
+    VK-->>CM: AuthenticationTicket → ClaimsPrincipal
+    CM->>CSR: OnValidatePrincipal
+    alt Token expires within TokenRefreshThresholdMinutes (2 min)
+        CSR->>KC: POST /token (grant_type=refresh_token)
+        KC-->>CSR: new access_token + refresh_token
+        CSR->>VK: Update session (ShouldRenew = true)
+    else Refresh token missing or failed
+        CSR-->>SPA: 401 Unauthorized (RejectPrincipal)
+    end
+    CSR->>CSRF: Validate X-CSRF: 1 header<br/>(GET/HEAD/OPTIONS exempt; JWT Bearer exempt)
+    alt Missing X-CSRF header
+        CSRF-->>SPA: 403 Forbidden
+    end
+    CSRF->>AUTHZ: Bearer OR Cookie authenticated
+    AUTHZ-->>SPA: Controller Action → 200 OK
+```
+
+### 2c. Logout
+
+```mermaid
+sequenceDiagram
+    participant SPA as Browser / SPA
+    participant BFF as BffController
+    participant VK as Valkey
+    participant KC as Keycloak
+
+    SPA->>BFF: GET /api/v1/bff/logout<br/>Cookie: .APITemplate.Auth=&lt;GUID&gt;
+    BFF->>VK: RemoveAsync(&lt;GUID&gt;) — session deleted
+    BFF-->>SPA: Clear cookie .APITemplate.Auth
+    BFF-->>SPA: 302 → Keycloak end_session_endpoint
+    SPA->>KC: End session (SSO invalidated)
+    KC-->>SPA: 302 → PostLogoutRedirectUri (/)
+```
+
+### 2d. CSRF endpoint
+
+SPA should fetch this before making any non-GET request to learn the required header:
 
 ```
-http://localhost:5174/bff/proxy/api/v1/products
+GET /api/v1/bff/csrf   (AllowAnonymous)
+
+Response: { "headerName": "X-CSRF", "headerValue": "1" }
 ```
 
-YARP strips `/bff/proxy`, extracts token from cookie, adds `Authorization: Bearer` header, and forwards to the API. The response is returned directly to the browser.
+Then include `X-CSRF: 1` on every POST / PUT / PATCH / DELETE request.
+
+---
+
+## Flow 3 — Scalar OAuth2 (development UI)
+
+```mermaid
+sequenceDiagram
+    participant DEV as Developer
+    participant SC as Scalar UI
+    participant KC as Keycloak
+    participant API as ASP.NET Core API
+
+    DEV->>SC: Opens /scalar/v1 → clicks Authorize
+    Note over SC: BearerSecuritySchemeDocumentTransformer<br/>registers OAuth2 Authorization Code + PKCE (S256)
+    SC->>KC: Redirect → Keycloak login page
+    DEV->>KC: Enters admin / Admin123
+    KC-->>SC: Authorization code → Scalar callback
+    SC->>KC: Exchange code → access_token (PKCE S256)
+    KC-->>SC: access_token
+    SC->>API: All requests with Authorization: Bearer &lt;token&gt;
+```
+
+> Uses confidential client `api-template` with PKCE (S256). No separate public client needed.
+
+---
+
+## Flow 4 — Client Credentials (machine-to-machine)
+
+```mermaid
+sequenceDiagram
+    participant SVC as Microservice / Background Job
+    participant KC as Keycloak
+    participant API as ASP.NET Core API
+
+    SVC->>KC: POST /token<br/>grant_type=client_credentials<br/>client_id=api-template
+    KC-->>SVC: access_token (service account)<br/>preferred_username = "service-account-api-template"
+    SVC->>API: Request with Authorization: Bearer &lt;token&gt;
+    API->>API: TenantClaimValidator<br/>IsServiceAccount() → true<br/>tenant_id check SKIPPED
+    Note over API: EF global filter: HasTenant = false<br/>tenant-scoped entities return empty<br/>Non-tenant endpoints work normally
+    API-->>SVC: Response
+```
+
+---
+
+## Where Tokens Are Stored
+
+```mermaid
+graph LR
+    Browser["Browser<br/>cookie = GUID (HttpOnly)"] -->|lookup| Ticket
+
+    subgraph Valkey
+        Ticket["bff:ticket:&lt;GUID&gt;<br/>├── access_token<br/>├── refresh_token<br/>├── id_token<br/>├── expires_at<br/>└── ClaimsPrincipal"]
+        DP["DataProtection:Keys<br/>└── ASP.NET Data Protection key ring"]
+    end
+```
+
+**Security principle:** Tokens never leave the server — the browser only holds an opaque GUID.
+
+---
+
+## Token Claims
+
+JWT tokens must contain these claims:
+
+| Claim                | Description                    | Required                              |
+|----------------------|--------------------------------|---------------------------------------|
+| `sub`                | Subject (user ID)              | Yes                                   |
+| `preferred_username` | Username                       | Yes                                   |
+| `email`              | User email                     | Yes                                   |
+| `tenant_id`          | Tenant GUID (custom claim)     | Yes (user tokens) / No (service acct) |
+| `realm_access.roles` | Keycloak realm roles (JSON)    | No                                    |
+| `aud`                | Must include `api-template`    | Yes                                   |
+| `iss`                | Keycloak realm issuer URL      | Yes                                   |
+
+**Claim mapping by `KeycloakClaimMapper`:**
+
+| Keycloak claim         | .NET ClaimType         |
+|------------------------|------------------------|
+| `preferred_username`   | `ClaimTypes.Name`      |
+| `realm_access.roles[]` | `ClaimTypes.Role`      |
+| `tenant_id`            | `CustomClaimTypes.TenantId` (`"tenant_id"`) |
+
+---
+
+## Authorization Policies
+
+| Policy              | Requirement                          | Used on               |
+|---------------------|--------------------------------------|-----------------------|
+| Fallback (default)  | Authenticated via Bearer OR Cookie   | All endpoints         |
+| `PlatformAdminOnly` | Role: `PlatformAdmin`                | Admin-only endpoints  |
 
 ---
 
 ## BFF Endpoints
 
-All BFF endpoints are under `/api/v1/bff/`:
+All under `/api/v1/bff/`:
 
-### `GET /api/v1/bff/login`
+| Endpoint               | Auth required | Description                                      |
+|------------------------|---------------|--------------------------------------------------|
+| `GET /bff/login`       | No            | Initiates OIDC login, optional `?returnUrl=`     |
+| `GET /bff/logout`      | Cookie        | Clears session in Valkey, signs out of Keycloak  |
+| `GET /bff/user`        | Cookie        | Returns current user claims as JSON              |
+| `GET /bff/csrf`        | No            | Returns CSRF header name/value contract          |
 
-Initiates OIDC login flow. Anonymous access.
-
-| Parameter   | Type   | Required | Description                        |
-|-------------|--------|----------|------------------------------------|
-| `returnUrl` | string | No       | Redirect URL after login (local only) |
-
-**Response:** HTTP 302 redirect to Keycloak login page.
-
-### `GET /api/v1/bff/logout`
-
-Terminates session and revokes tokens. Requires authentication (Cookie scheme).
-
-**Response:** HTTP 302 redirect to `PostLogoutRedirectUri` (default: `/`).
-
-### `GET /api/v1/bff/user`
-
-Returns current authenticated user info. Requires authentication (Cookie scheme).
-
-**Response:**
+**`GET /bff/user` response:**
 ```json
 {
   "userId": "unique-user-id",
@@ -226,94 +350,79 @@ Returns current authenticated user info. Requires authentication (Cookie scheme)
 }
 ```
 
-**Without cookie:** Returns HTTP 401 (not a redirect). SPA should handle 401 and redirect to `/bff/login`.
+Returns `401` (not redirect) when unauthenticated — SPA should redirect to `/api/v1/bff/login`.
 
-## YARP Reverse Proxy (BFF Proxy)
+---
 
-Requests to `/bff/proxy/**` are proxied with automatic token injection:
+## Session & Token Lifecycle
 
-```
-GET /bff/proxy/api/v1/products
-  → BffProxy policy authenticates via Cookie scheme
-  → strips /bff/proxy prefix
-  → extracts access_token from cookie session
-  → adds Authorization: Bearer <token> header
-  → forwards to internal API as GET /api/v1/products
-```
+| Setting                      | Default | Config key                               |
+|------------------------------|---------|------------------------------------------|
+| Session timeout              | 60 min  | `Bff:SessionTimeoutMinutes`              |
+| Sliding expiration           | enabled | `CookieAuthenticationOptions`            |
+| Token refresh threshold      | 2 min   | `Bff:TokenRefreshThresholdMinutes`       |
+| Scopes requested from OIDC   | openid, profile, email, offline_access | `Bff:Scopes` |
 
-This allows SPAs to call the API without handling tokens directly.
+**Token refresh trigger:** On every cookie-authenticated request, `CookieSessionRefresher` checks if the access token expires within `TokenRefreshThresholdMinutes`. If so, it silently calls Keycloak `/token` with `grant_type=refresh_token` and updates the session in Valkey.
 
-## Token Requirements
-
-JWT tokens must contain these claims:
-
-| Claim                | Description                | Required |
-|----------------------|----------------------------|----------|
-| `sub`                | Subject (user ID)          | Yes      |
-| `preferred_username` | Username                   | Yes      |
-| `email`              | User email                 | Yes      |
-| `tenant_id`          | Tenant GUID (custom claim) | Yes (user tokens) / No (Client Credentials) |
-| `roles`              | User roles                 | No       |
-| `aud`                | Must include `api-template`| Yes      |
-| `iss`                | Keycloak realm issuer URL  | Yes      |
-
-**Tenant validation:** User tokens **must** include `tenant_id` — tokens without it are rejected with 401. Client Credentials (service account) tokens are exempt because they represent a service, not a user. Service accounts are identified by `preferred_username` starting with `service-account-`. Since service accounts have no tenant, the EF global filter returns empty results for tenant-scoped entities (`HasTenant = false`).
-
-**Claim Mapping:** `KeycloakClaimMapper` maps Keycloak-specific claims to standard .NET ClaimTypes:
-- `preferred_username` → `ClaimTypes.Name`
-- `realm_access.roles` (nested JSON) → individual `ClaimTypes.Role` claims
-
-## Authorization Policies
-
-| Policy            | Requirement         |
-|-------------------|---------------------|
-| Default           | Authenticated user  |
-| `PlatformAdminOnly` | Role: PlatformAdmin |
+---
 
 ## Keycloak Realm Configuration
 
-Realm is auto-imported on startup from `infrastructure/keycloak/realms/api-template-realm.json`.
+Realm auto-imported on `docker compose up` from `infrastructure/keycloak/realms/api-template-realm.json`.
 
 ### Realm: `api-template`
 
 - Self-registration: Disabled
-- Brute force protection: Enabled (5 attempts → lockout 1-15 min, reset after 1h)
+- Brute force protection: 5 attempts → lockout 1–15 min, reset after 1h
 - Email login: Allowed
 - SSL: None (development)
 - Remember Me: Enabled (SSO session up to 15 days)
-- Password policy: min 8 chars, 1 uppercase, 1 digit, expiry after 365 days
-- Refresh token rotation: Enabled (old refresh token revoked on use, no reuse allowed)
-- Session timeouts:
-  - Without Remember Me: 30 min idle / 10 hours max
-  - With Remember Me: 7 days idle / 15 days max
+- Password policy: min 8 chars, 1 uppercase, 1 digit, expires after 365 days
+- Refresh token rotation: Enabled (old refresh token revoked on each use)
 
 ### Roles
 
-| Role           | Description             |
-|----------------|-------------------------|
-| PlatformAdmin  | Full platform access    |
-| User     | Regular tenant user     |
+| Role            | Description            |
+|-----------------|------------------------|
+| `PlatformAdmin` | Full platform access   |
+| `User`          | Regular tenant user    |
 
 ### Client: `api-template`
 
-- Type: Confidential
-- Secret: `dev-client-secret` (dev only)
-- Standard Flow: Enabled (Authorization Code + PKCE)
-- Service Accounts: Enabled (Client Credentials grant)
-- Direct Access Grants: Disabled (password grant is insecure and removed from OAuth 2.1)
-- PKCE: Required (`S256`)
+| Setting                  | Value                                      |
+|--------------------------|--------------------------------------------|
+| Type                     | Confidential                               |
+| Secret                   | `dev-client-secret` (dev only)             |
+| Standard Flow            | Enabled (Authorization Code + PKCE S256)   |
+| Service Accounts         | Enabled (Client Credentials grant)         |
+| Direct Access Grants     | Disabled (password grant removed in OAuth 2.1) |
+| PKCE                     | Required (`S256`)                          |
+| Redirect URIs            | `http://localhost:5174/*`, `http://localhost:8080/*` |
 
-> **OAuth 2.1 compliance:** Both clients enforce PKCE (`pkce.code.challenge.method: S256`). All Authorization Code flows (Scalar, BFF, mobile) must include `code_challenge` and `code_verifier`.
-- Redirect URIs: `http://localhost:5174/*`, `http://localhost:8080/*`
-- Web Origins: `http://localhost:5174`, `http://localhost:8080`
+> **OAuth 2.1 compliance:** All Authorization Code flows (BFF, Scalar, mobile) enforce PKCE (`code_challenge_method=S256`).
 
 ### Custom Protocol Mappers
 
-| Mapper          | Type              | Source Attribute | Token Claim |
-|-----------------|-------------------|------------------|-------------|
-| tenant_id       | User Attribute    | `tenant_id`      | `tenant_id` |
-| audience-mapper | Audience Mapper   | -                | `aud`       |
-| realm-roles     | Realm Role Mapper | realm roles      | `realm_access.roles` |
+| Mapper         | Type              | Source attribute | JWT claim             |
+|----------------|-------------------|------------------|-----------------------|
+| `tenant_id`    | User Attribute    | `tenant_id`      | `tenant_id`           |
+| audience-mapper| Audience Mapper   | —                | `aud`                 |
+| realm-roles    | Realm Role Mapper | realm roles      | `realm_access.roles`  |
+
+### Standard Keycloak Endpoints
+
+| Endpoint      | URL                                                               |
+|---------------|-------------------------------------------------------------------|
+| Discovery     | `/realms/{realm}/.well-known/openid-configuration`                |
+| Token         | `/realms/{realm}/protocol/openid-connect/token`                   |
+| Authorization | `/realms/{realm}/protocol/openid-connect/auth`                    |
+| Logout        | `/realms/{realm}/protocol/openid-connect/logout`                  |
+| UserInfo      | `/realms/{realm}/protocol/openid-connect/userinfo`                |
+
+When the API sets `options.Authority`, ASP.NET auto-discovers all endpoints via the Discovery URL.
+
+---
 
 ## Configuration
 
@@ -333,7 +442,7 @@ Realm is auto-imported on startup from `infrastructure/keycloak/realms/api-templ
 }
 ```
 
-### BFF Options (appsettings.json)
+### appsettings.json — BFF section
 
 ```json
 {
@@ -341,30 +450,32 @@ Realm is auto-imported on startup from `infrastructure/keycloak/realms/api-templ
     "CookieName": ".APITemplate.Auth",
     "PostLogoutRedirectUri": "/",
     "SessionTimeoutMinutes": 60,
-    "Scopes": ["openid", "profile", "email", "offline_access"]
+    "Scopes": ["openid", "profile", "email", "offline_access"],
+    "TokenRefreshThresholdMinutes": 2
   }
 }
 ```
 
 ### Production Environment Variables
 
-| Variable                          | Description                    |
-|-----------------------------------|--------------------------------|
-| `KC_HOSTNAME`                     | Keycloak external hostname     |
-| `KC_REALM`                        | Keycloak realm name            |
-| `KC_CLIENT_ID`                    | Client ID                      |
-| `KC_CLIENT_SECRET`                | Client secret                  |
-| `KC_DB_USERNAME` / `KC_DB_PASSWORD` | Keycloak database credentials |
-| `APITEMPLATE_REDACTION_HMAC_KEY`  | HMAC key for log redaction     |
+| Variable                           | Description                       |
+|------------------------------------|-----------------------------------|
+| `KC_HOSTNAME`                      | Keycloak external hostname        |
+| `Keycloak__realm`                  | Keycloak realm name               |
+| `Keycloak__resource`               | Client ID                         |
+| `Keycloak__credentials__secret`    | Client secret                     |
+| `Valkey__ConnectionString`         | Valkey/Redis connection string    |
+
+---
 
 ## Testing
 
 ### Integration Tests
 
-Tests use a mock JWT authentication setup that bypasses Keycloak:
+Tests use mock JWT authentication that bypasses Keycloak entirely:
 
 ```csharp
-// Authenticate test client with PlatformAdmin role
+// Authenticate with PlatformAdmin role
 IntegrationAuthHelper.Authenticate(client, role: UserRole.PlatformAdmin);
 
 // Authenticate with specific tenant
@@ -373,28 +484,34 @@ IntegrationAuthHelper.Authenticate(client,
     role: UserRole.User);
 ```
 
-Test tokens are signed with RSA-256 using a test key pair and contain all required claims including `tenant_id`.
+Test tokens are signed with RSA-256 using an in-memory test key pair and include all required claims (`tenant_id`, roles, etc.).
 
-### Manual Testing with Swagger/Scalar
+**BFF/CSRF tests** use `BffSecurityWebApplicationFactory` with `FakeCookieAuthStartupFilter`:
+- Set request header `X-Test-Cookie-Auth: 1` to simulate a cookie-authenticated session
+- Non-GET requests without `X-CSRF: 1` return HTTP 403
 
-1. Open API docs at `http://localhost:8080/scalar/v1`
-2. Click "Authorize" and enter Bearer token
-3. Token flow is documented in OpenAPI spec via `BearerSecuritySchemeDocumentTransformer`
+---
 
 ## Key Source Files
 
 | File | Description |
 |------|-------------|
-| `Extensions/AuthenticationServiceCollectionExtensions.cs` | Authentication setup (JWT + OIDC + Cookie) |
-| `Extensions/ServiceCollectionExtensions.cs` | YARP reverse proxy configuration |
+| `Extensions/AuthenticationServiceCollectionExtensions.cs` | All auth registration: JWT Bearer + Cookie + OIDC + policies |
 | `Extensions/ApplicationBuilderExtensions.cs` | Middleware pipeline order |
-| `Api/Controllers/V1/BffController.cs` | BFF endpoints (login/logout/user) |
+| `Api/Controllers/V1/BffController.cs` | BFF endpoints: login / logout / user / csrf |
+| `Api/Middleware/CsrfValidationMiddleware.cs` | CSRF header enforcement for cookie-authenticated requests |
+| `Api/OpenApi/BearerSecuritySchemeDocumentTransformer.cs` | Registers OAuth2 flow in Scalar/OpenAPI spec |
 | `Application/Common/Options/BffOptions.cs` | BFF configuration model |
-| `Application/Common/Security/BffAuthenticationSchemes.cs` | Auth scheme constants |
-| `Infrastructure/Security/BffTokenTransformProvider.cs` | YARP token injection |
-| `Infrastructure/Security/TenantClaimValidator.cs` | Tenant claim validation (required for user tokens, skipped for service accounts) + logging |
-| `Infrastructure/Security/KeycloakClaimMapper.cs` | Keycloak → .NET claim type mapping |
-| `Infrastructure/Security/KeycloakUrlHelper.cs` | Keycloak URL construction |
-| `Application/Common/Options/KeycloakOptions.cs` | Strongly-typed Keycloak configuration |
-| `Infrastructure/Health/KeycloakHealthCheck.cs` | Keycloak health check |
-| `infrastructure/keycloak/realms/api-template-realm.json` | Keycloak realm import |
+| `Application/Common/Options/KeycloakOptions.cs` | Keycloak configuration model |
+| `Application/Common/Security/BffAuthenticationSchemes.cs` | Auth scheme name constants |
+| `Application/Common/Security/AuthorizationPolicies.cs` | Policy name constants |
+| `Application/Common/Security/CustomClaimTypes.cs` | Custom claim type constants (`tenant_id`) |
+| `Infrastructure/Security/ValkeyTicketStore.cs` | Server-side session store (Valkey); cookie holds only GUID |
+| `Infrastructure/Security/CookieSessionRefresher.cs` | Silent token refresh on cookie validation |
+| `Infrastructure/Security/TenantClaimValidator.cs` | Validates tenant_id claim; maps Keycloak claims |
+| `Infrastructure/Security/KeycloakClaimMapper.cs` | Maps preferred_username + realm roles to .NET claim types |
+| `Infrastructure/Security/KeycloakUrlHelper.cs` | Builds Keycloak authority URL |
+| `Infrastructure/Health/KeycloakHealthCheck.cs` | Keycloak health check endpoint |
+| `infrastructure/keycloak/realms/api-template-realm.json` | Keycloak realm auto-import |
+
+

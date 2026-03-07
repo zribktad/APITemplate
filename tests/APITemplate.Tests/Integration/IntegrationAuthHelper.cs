@@ -77,7 +77,8 @@ internal static class IntegrationAuthHelper
         string email,
         string password,
         bool userIsActive = true,
-        bool tenantIsActive = true)
+        bool tenantIsActive = true,
+        CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -107,7 +108,7 @@ internal static class IntegrationAuthHelper
 
         dbContext.Tenants.Add(tenant);
         dbContext.Users.Add(user);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(ct);
 
         return (tenant, user);
     }

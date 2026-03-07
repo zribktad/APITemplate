@@ -33,14 +33,15 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task AddAsync_PersistsProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         var product = CreateProduct("Test Product", 10m);
 
-        var result = await _sut.AddAsync(product);
+        var result = await _sut.AddAsync(product, ct);
 
         result.ShouldNotBeNull();
         result.Id.ShouldBe(product.Id);
 
-        var persisted = await _dbContext.Products.FindAsync(product.Id);
+        var persisted = await _dbContext.Products.FindAsync([product.Id], ct);
         persisted.ShouldNotBeNull();
         persisted!.Name.ShouldBe("Test Product");
     }
@@ -48,11 +49,12 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task GetByIdAsync_WhenExists_ReturnsProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         var product = CreateProduct("Existing", 5m);
         _dbContext.Products.Add(product);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
 
-        var result = await _sut.GetByIdAsync(product.Id);
+        var result = await _sut.GetByIdAsync(product.Id, ct);
 
         result.ShouldNotBeNull();
         result!.Name.ShouldBe("Existing");
@@ -61,7 +63,7 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task GetByIdAsync_WhenNotExists_ReturnsNull()
     {
-        var result = await _sut.GetByIdAsync(Guid.NewGuid());
+        var result = await _sut.GetByIdAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         result.ShouldBeNull();
     }
@@ -69,16 +71,17 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task UpdateAsync_ModifiesProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         var product = CreateProduct("Original", 10m);
         _dbContext.Products.Add(product);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
         _dbContext.Entry(product).State = EntityState.Detached;
 
         product.Name = "Updated";
         product.Price = 25m;
-        await _sut.UpdateAsync(product);
+        await _sut.UpdateAsync(product, ct);
 
-        var updated = await _dbContext.Products.FindAsync(product.Id);
+        var updated = await _dbContext.Products.FindAsync([product.Id], ct);
         updated!.Name.ShouldBe("Updated");
         updated.Price.ShouldBe(25m);
     }
@@ -86,14 +89,15 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task DeleteAsync_WhenExists_RemovesProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         var product = CreateProduct("ToDelete", 10m);
         _dbContext.Products.Add(product);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync(ct);
 
-        await _sut.DeleteAsync(product.Id);
-        await _dbContext.SaveChangesAsync();
+        await _sut.DeleteAsync(product.Id, ct);
+        await _dbContext.SaveChangesAsync(ct);
 
-        var deleted = await _dbContext.Products.FindAsync(product.Id);
+        var deleted = await _dbContext.Products.FindAsync([product.Id], ct);
         deleted.ShouldNotBeNull();
         deleted!.IsDeleted.ShouldBeTrue();
     }
@@ -101,7 +105,7 @@ public class ProductRepositoryTests : IDisposable
     [Fact]
     public async Task DeleteAsync_WhenNotExists_ThrowsNotFoundException()
     {
-        var act = () => _sut.DeleteAsync(Guid.NewGuid());
+        var act = () => _sut.DeleteAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
     }

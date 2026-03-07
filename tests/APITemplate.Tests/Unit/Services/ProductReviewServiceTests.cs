@@ -41,6 +41,7 @@ public class ProductReviewServiceTests
     [Fact]
     public async Task GetAllAsync_ReturnsAllReviews()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         var responses = new List<ProductReviewResponse>
         {
@@ -52,7 +53,7 @@ public class ProductReviewServiceTests
             .Setup(q => q.GetPagedAsync(It.IsAny<ProductReviewFilter>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PagedResponse<ProductReviewResponse>(responses, 2, 1, 10));
 
-        var result = await _sut.GetAllAsync(new ProductReviewFilter());
+        var result = await _sut.GetAllAsync(new ProductReviewFilter(), ct);
 
         result.Items.Count().ShouldBe(2);
         result.TotalCount.ShouldBe(2);
@@ -63,6 +64,7 @@ public class ProductReviewServiceTests
     [InlineData(false)]
     public async Task GetByIdAsync_ReturnsExpectedResult(bool reviewExists)
     {
+        var ct = TestContext.Current.CancellationToken;
         var reviewId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         ProductReviewResponse? response = null;
@@ -81,7 +83,7 @@ public class ProductReviewServiceTests
             .Setup(q => q.GetByIdAsync(reviewId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
-        var result = await _sut.GetByIdAsync(reviewId);
+        var result = await _sut.GetByIdAsync(reviewId, ct);
 
         if (reviewExists)
         {
@@ -98,6 +100,7 @@ public class ProductReviewServiceTests
     [Fact]
     public async Task GetByProductIdAsync_ReturnsReviewsForProduct()
     {
+        var ct = TestContext.Current.CancellationToken;
         var productId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var responses = new List<ProductReviewResponse>
@@ -109,7 +112,7 @@ public class ProductReviewServiceTests
             .Setup(q => q.GetByProductIdAsync(productId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(responses);
 
-        var result = await _sut.GetByProductIdAsync(productId);
+        var result = await _sut.GetByProductIdAsync(productId, ct);
 
         result.Count.ShouldBe(1);
         result[0].ProductId.ShouldBe(productId);
@@ -129,7 +132,7 @@ public class ProductReviewServiceTests
             .Setup(r => r.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductReview rv, CancellationToken _) => rv);
 
-        var result = await _sut.CreateAsync(request);
+        var result = await _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         result.UserId.ShouldBe(_currentUserId);
         result.Rating.ShouldBe(5);
@@ -148,7 +151,7 @@ public class ProductReviewServiceTests
 
         var request = new CreateProductReviewRequest(Guid.NewGuid(), null, 3);
 
-        var act = () => _sut.CreateAsync(request);
+        var act = () => _sut.CreateAsync(request, TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -163,7 +166,7 @@ public class ProductReviewServiceTests
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(review);
 
-        await _sut.DeleteAsync(id);
+        await _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
         _reviewRepoMock.Verify(r => r.DeleteAsync(id, It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
@@ -179,7 +182,7 @@ public class ProductReviewServiceTests
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(review);
 
-        var act = () => _sut.DeleteAsync(id);
+        var act = () => _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<ForbiddenException>(act);
         _reviewRepoMock.Verify(r => r.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>(), It.IsAny<string?>()), Times.Never);
@@ -194,7 +197,7 @@ public class ProductReviewServiceTests
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductReview?)null);
 
-        var act = () => _sut.DeleteAsync(id);
+        var act = () => _sut.DeleteAsync(id, TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<NotFoundException>(act);
     }

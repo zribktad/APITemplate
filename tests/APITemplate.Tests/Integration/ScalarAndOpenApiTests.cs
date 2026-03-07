@@ -7,7 +7,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class ScalarAndOpenApiTests
 {
     private readonly HttpClient _client;
@@ -20,11 +19,12 @@ public class ScalarAndOpenApiTests
     [Fact]
     public async Task OpenApi_Endpoint_ReturnsJsonDocument()
     {
-        var response = await _client.GetAsync("/openapi/v1.json");
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.GetAsync("/openapi/v1.json", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(ct);
         content.ShouldContain("openapi");
         content.ShouldContain("paths");
         content.ShouldContain("ApiProblemDetails");
@@ -34,10 +34,11 @@ public class ScalarAndOpenApiTests
     [Fact]
     public async Task OpenApi_ContainsGlobalErrorResponsesForRestEndpoints()
     {
-        var response = await _client.GetAsync("/openapi/v1.json");
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.GetAsync("/openapi/v1.json", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(content);
 
         var paths = doc.RootElement.GetProperty("paths");
@@ -60,10 +61,11 @@ public class ScalarAndOpenApiTests
     [Fact]
     public async Task OpenApi_ContainsOAuth2SecurityScheme()
     {
-        var response = await _client.GetAsync("/openapi/v1.json");
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.GetAsync("/openapi/v1.json", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(content);
 
         var components = doc.RootElement.GetProperty("components");
@@ -75,22 +77,25 @@ public class ScalarAndOpenApiTests
     [Fact]
     public async Task Scalar_Endpoint_ReturnsHtml()
     {
-        var response = await _client.GetAsync("/scalar/v1");
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.GetAsync("/scalar/v1", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(ct);
         content.ShouldContain("scalar");
     }
 
     [Fact]
     public async Task GraphQL_Endpoint_IsAccessible()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client);
 
         var response = await _client.PostAsJsonAsync(
             "/graphql",
-            new { query = "{ __typename }" });
+            new { query = "{ __typename }" },
+            ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }

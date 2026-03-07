@@ -7,7 +7,6 @@ using Xunit;
 
 namespace APITemplate.Tests.Integration;
 
-[Collection("Integration")]
 public class ProductReviewsControllerTests
 {
     private readonly HttpClient _client;
@@ -21,57 +20,61 @@ public class ProductReviewsControllerTests
     [Fact]
     public async Task FullReviewFlow_CreateAndQuery()
     {
+        var ct = TestContext.Current.CancellationToken;
         var userId = IntegrationAuthHelper.AuthenticateAndGetUserId(_client, tenantId: _tenantId);
 
         // 1. Create a product
         var productResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
-            new { Name = "Reviewed Product", Price = 49.99 });
+            new { Name = "Reviewed Product", Price = 49.99 },
+            ct);
 
         productResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         var productId = product.GetProperty("id").GetString()!;
 
         // 2. Create a review for the product
         var createReviewResponse = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, Comment = "Great product!", Rating = 5 });
+            new { ProductId = productId, Comment = "Great product!", Rating = 5 },
+            ct);
 
         createReviewResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var created = await createReviewResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var created = await createReviewResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         var reviewId = created.GetProperty("id").GetString()!;
         created.GetProperty("userId").GetGuid().ShouldBe(userId);
         created.GetProperty("rating").GetInt32().ShouldBe(5);
         created.GetProperty("productId").GetString().ShouldBe(productId);
 
         // 3. Get review by id
-        var getByIdResponse = await _client.GetAsync($"/api/v1/productreviews/{reviewId}");
+        var getByIdResponse = await _client.GetAsync($"/api/v1/productreviews/{reviewId}", ct);
         getByIdResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         fetched.GetProperty("userId").GetGuid().ShouldBe(userId);
 
         // 4. Get reviews by productId
-        var byProductResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}");
+        var byProductResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         byProductResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var reviews = await byProductResponse.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive);
+        var reviews = await byProductResponse.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive, ct);
         reviews.ShouldNotBeNull();
         reviews!.Length.ShouldBeGreaterThanOrEqualTo(1);
 
         // 5. Delete the review
-        var deleteResponse = await _client.DeleteAsync($"/api/v1/productreviews/{reviewId}");
+        var deleteResponse = await _client.DeleteAsync($"/api/v1/productreviews/{reviewId}", ct);
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         // 6. Verify deletion
-        var getDeletedResponse = await _client.GetAsync($"/api/v1/productreviews/{reviewId}");
+        var getDeletedResponse = await _client.GetAsync($"/api/v1/productreviews/{reviewId}", ct);
         getDeletedResponse.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task GetById_NonExistentReview_ReturnsNotFound()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
-        var response = await _client.GetAsync($"/api/v1/productreviews/{Guid.NewGuid()}");
+        var response = await _client.GetAsync($"/api/v1/productreviews/{Guid.NewGuid()}", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
@@ -79,16 +82,18 @@ public class ProductReviewsControllerTests
     [Fact]
     public async Task Create_WithNonExistentProduct_ReturnsNotFound()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var response = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = Guid.NewGuid(), Rating = 3 });
+            new { ProductId = Guid.NewGuid(), Rating = 3 },
+            ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         problem.GetProperty("status").GetInt32().ShouldBe((int)HttpStatusCode.NotFound);
         problem.GetProperty("title").GetString().ShouldBe("Not Found");
         var detail = problem.GetProperty("detail").GetString();
@@ -103,19 +108,21 @@ public class ProductReviewsControllerTests
     [Fact]
     public async Task GetByProductId_ReturnsEmptyForProductWithNoReviews()
     {
+        var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client, tenantId: _tenantId);
 
         var productResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
-            new { Name = "No Review Product", Price = 9.99 });
+            new { Name = "No Review Product", Price = 9.99 },
+            ct);
 
-        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         var productId = product.GetProperty("id").GetString()!;
 
-        var response = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}");
+        var response = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var reviews = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive);
+        var reviews = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive, ct);
         reviews.ShouldNotBeNull();
         reviews!.ShouldBeEmpty();
     }

@@ -42,6 +42,10 @@ public sealed class BffController : ControllerBase
             BffAuthenticationSchemes.Oidc);
     }
 
+    [HttpGet("csrf")]
+    [AllowAnonymous]
+    public IActionResult GetCsrf() => Ok(new { headerName = CsrfConstants.HeaderName, headerValue = CsrfConstants.HeaderValue });
+
     [HttpGet("user")]
     public IActionResult GetUser()
     {

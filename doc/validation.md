@@ -1,6 +1,10 @@
-# How to Add Input Validation (FluentValidation)
+# How to Add Input Validation
 
-This guide explains how to add validation rules using **FluentValidation 11** — the validation library used throughout this project. Validation is triggered automatically for all controller inputs before the action method runs.
+This project uses a hybrid validation approach:
+
+- `DataAnnotationsValidator<T>` for simple per-field rules declared directly on DTOs
+- `FluentValidation` for cross-field, conditional, composed, and reusable rules
+- `FluentValidationActionFilter` to execute registered validators automatically before controller actions
 
 ---
 
@@ -8,93 +12,98 @@ This guide explains how to add validation rules using **FluentValidation 11** �
 
 The validation pipeline is:
 
-```
+```text
 HTTP Request body/query
-  → FluentValidation (auto-validation via FluentValidation.AspNetCore)
-  → If invalid: 400 Bad Request with structured error JSON
-  → If valid: controller action method runs
+  → Model binding
+  → FluentValidationActionFilter
+      → resolves IValidator<T> from DI
+      → runs DataAnnotationsValidator<T> and any extra FluentValidation rules
+  → If invalid: 400 Bad Request with ValidationProblemDetails
+  → If valid: controller action runs
 ```
 
-Registration is done once in `ServiceCollectionExtensions.AddApplicationServices()`:
+Registration is done in DI and MVC setup:
 
 ```csharp
+services.AddControllers(options =>
+{
+    options.Filters.Add<FluentValidationActionFilter>();
+});
+
 services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
-services.AddFluentValidationAutoValidation();
 ```
 
-Every `AbstractValidator<T>` in the assembly is discovered and registered automatically — no explicit registration per validator is needed.
+There is no per-validator registration and no `AddFluentValidationAutoValidation()` middleware in the current implementation.
 
 ---
 
-## Step 1 – Create a Simple Validator
+## Rule of Thumb
 
-Place validators in `src/APITemplate/Application/Features/<Feature>/Validation/`. Name them `<RequestTypeName>Validator.cs`.
+Use:
 
-**`src/APITemplate/Application/Features/<Feature>/Validation/CreateOrderRequestValidator.cs`**
+- Data Annotations for required fields, length, ranges, email format, and other single-field rules
+- `DataAnnotationsValidator<T>` as the validator base when a request is mostly attribute-driven
+- FluentValidation rules only for logic that cannot be expressed cleanly with attributes
+
+This keeps DTO contracts explicit while still allowing richer validation where needed.
+
+---
+
+## Step 1 - Add Data Annotations to the DTO
+
+For simple rules, put validation directly on the request DTO.
 
 ```csharp
+using System.ComponentModel.DataAnnotations;
+using APITemplate.Application.Common.Validation;
+
+public sealed record CreateProductRequest(
+    [property: NotEmpty(ErrorMessage = "Product name is required.")]
+    [property: MaxLength(200, ErrorMessage = "Product name must not exceed 200 characters.")]
+    string Name,
+    string? Description,
+    [property: Range(0.01, double.MaxValue, ErrorMessage = "Price must be greater than zero.")]
+    decimal Price,
+    Guid? CategoryId = null) : IProductRequest;
+```
+
+The custom `NotEmptyAttribute` is available in `Application/Common/Validation/NotEmptyAttribute.cs` for strings and collections where plain `[Required]` is not enough.
+
+---
+
+## Step 2 - Bridge Attributes Through a Validator
+
+Create a validator that inherits from `DataAnnotationsValidator<T>`.
+
+```csharp
+using APITemplate.Application.Common.Validation;
+
+namespace APITemplate.Application.Features.ProductReview.Validation;
+
+public sealed class CreateProductReviewRequestValidator
+    : DataAnnotationsValidator<CreateProductReviewRequest>;
+```
+
+This base class:
+
+- runs `Validator.TryValidateObject(...)`
+- validates constructor parameter attributes for record DTOs
+- converts attribute failures into FluentValidation failures
+
+Use this pattern when the request only needs attribute-based validation.
+
+---
+
+## Step 3 - Add Cross-Field or Conditional Rules
+
+When validation depends on multiple fields, extend `DataAnnotationsValidator<T>` and add FluentValidation rules.
+
+```csharp
+using APITemplate.Application.Common.Validation;
 using FluentValidation;
 
-namespace APITemplate.Application.Validators;
-
-public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderRequest>
-{
-    public CreateOrderRequestValidator()
-    {
-        RuleFor(x => x.CustomerId)
-            .NotEmpty().WithMessage("CustomerId is required.");
-
-        RuleFor(x => x.TotalAmount)
-            .GreaterThan(0).WithMessage("TotalAmount must be greater than zero.")
-            .LessThanOrEqualTo(1_000_000).WithMessage("TotalAmount must not exceed 1,000,000.");
-
-        RuleFor(x => x.DeliveryAddress)
-            .NotEmpty().WithMessage("DeliveryAddress is required.")
-            .MaximumLength(500).WithMessage("DeliveryAddress must not exceed 500 characters.");
-    }
-}
-```
-
----
-
-## Step 2 – Cross-Field (Conditional) Rules
-
-Use `.When()` to apply rules only under certain conditions. Use the validator against multiple fields with `.Must()` for cross-field comparisons:
-
-```csharp
-public sealed class CreateShipmentRequestValidator : AbstractValidator<CreateShipmentRequest>
-{
-    public CreateShipmentRequestValidator()
-    {
-        // Rule only applies when the order exceeds a threshold
-        RuleFor(x => x.InsuranceValue)
-            .GreaterThan(0).WithMessage("Insurance value required for high-value shipments.")
-            .When(x => x.OrderValue > 5000);
-
-        // Cross-field date range validation
-        RuleFor(x => x.DeliveryDeadline)
-            .GreaterThan(x => x.PickupDate).WithMessage("DeliveryDeadline must be after PickupDate.")
-            .When(x => x.PickupDate != default);
-
-        // Cross-field rule from the project: description required for expensive products
-        // See ProductRequestValidatorBase.cs for the real example:
-        // RuleFor(x => x.Description)
-        //     .NotEmpty().WithMessage("Description required for products priced above 1000.")
-        //     .When(x => x.Price > 1000);
-    }
-}
-```
-
----
-
-## Step 3 – Shared Base Validator
-
-When multiple request types share the same fields and rules, extract a base validator:
-
-```csharp
-// Application/Features/<Feature>/Validation/ProductRequestValidatorBase.cs (existing pattern)
-public abstract class ProductRequestValidatorBase<T> : AbstractValidator<T>
-    where T : IProductRequest
+public abstract class ProductRequestValidatorBase<T> : DataAnnotationsValidator<T>
+    where T : class, IProductRequest
 {
     protected ProductRequestValidatorBase()
     {
@@ -103,42 +112,38 @@ public abstract class ProductRequestValidatorBase<T> : AbstractValidator<T>
             .When(x => x.Price > 1000);
     }
 }
+```
 
-// CreateProductRequestValidator delegates entirely to the base:
+Then reuse it:
+
+```csharp
 public sealed class CreateProductRequestValidator
     : ProductRequestValidatorBase<CreateProductRequest>;
 
-// UpdateProductRequestValidator does the same:
 public sealed class UpdateProductRequestValidator
     : ProductRequestValidatorBase<UpdateProductRequest>;
 ```
 
 ---
 
-## Step 4 – Including Another Validator
+## Step 4 - Compose Shared Validators
 
-Use `Include()` to compose validators without inheritance. This is useful for shared pagination/filter rules:
+For filters and reusable request parts, compose validators with `Include(...)`.
 
 ```csharp
-// Application/Features/<Feature>/Validation/PaginationFilterValidator.cs (existing)
-public sealed class PaginationFilterValidator : AbstractValidator<PaginationFilter>
-{
-    public PaginationFilterValidator()
-    {
-        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
-    }
-}
+using FluentValidation;
 
-// ProductFilterValidator.cs includes the base pagination rules:
 public sealed class ProductFilterValidator : AbstractValidator<ProductFilter>
 {
     public ProductFilterValidator()
     {
-        Include(new PaginationFilterValidator());   // ← compose
+        Include(new PaginationFilterValidator());
+        Include(new DateRangeFilterValidator<ProductFilter>());
+        Include(new SortableFilterValidator<ProductFilter>(ProductSortFields.Map.AllowedNames));
 
         RuleFor(x => x.MinPrice)
-            .GreaterThanOrEqualTo(0).When(x => x.MinPrice.HasValue);
+            .GreaterThanOrEqualTo(0)
+            .When(x => x.MinPrice.HasValue);
 
         RuleFor(x => x.MaxPrice)
             .GreaterThanOrEqualTo(x => x.MinPrice!.Value)
@@ -147,115 +152,105 @@ public sealed class ProductFilterValidator : AbstractValidator<ProductFilter>
 }
 ```
 
----
-
-## Step 5 – Collection Item Validation
-
-To validate each element in a list, use `RuleForEach`:
-
-```csharp
-public sealed class CreateBulkOrderRequestValidator : AbstractValidator<CreateBulkOrderRequest>
-{
-    public CreateBulkOrderRequestValidator()
-    {
-        RuleFor(x => x.Items)
-            .NotEmpty().WithMessage("At least one order item is required.");
-
-        RuleForEach(x => x.Items).ChildRules(item =>
-        {
-            item.RuleFor(i => i.Sku).NotEmpty();
-            item.RuleFor(i => i.Quantity).GreaterThan(0);
-            item.RuleFor(i => i.UnitPrice).GreaterThan(0);
-        });
-    }
-}
-```
+Existing reusable validators live under `Application/Common/Validation/`.
 
 ---
 
-## Step 6 – Async Validation Rules
+## Step 5 - Async Validation
 
-For rules that need a database lookup, use `MustAsync`:
+When a rule needs I/O, inject a dependency and use `MustAsync`.
 
 ```csharp
+using FluentValidation;
+
 public sealed class CreateOrderRequestValidator : AbstractValidator<CreateOrderRequest>
 {
-    public CreateOrderRequestValidator(ICustomerRepository customerRepo)
+    public CreateOrderRequestValidator(ICustomerRepository customerRepository)
     {
         RuleFor(x => x.CustomerId)
-            .NotEmpty()
-            .MustAsync(async (id, ct) =>
-                await customerRepo.ExistsAsync(id, ct))
+            .MustAsync(async (id, ct) => await customerRepository.ExistsAsync(id, ct))
             .WithMessage("Customer does not exist.");
     }
 }
 ```
 
-> **Note:** Async validators require the injected dependency to be registered as a scoped or transient service (matching the validator lifetime).
+Use this sparingly. Business invariants that depend on broader domain state often belong in the service layer instead.
 
 ---
 
-## How Validation Errors Are Returned
+## Service-Level Validation
 
-When any rule fails, FluentValidation returns HTTP **400 Bad Request** with this structure:
+For business rule violations discovered after request validation, throw the domain `ValidationException`.
+
+```csharp
+public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct)
+{
+    var existing = await _repository.GetByNameAsync(request.Name, ct);
+    if (existing is not null)
+        throw new ValidationException("A product with the same name already exists.");
+
+    // continue
+}
+```
+
+`ApiExceptionHandler` converts this into HTTP `400`.
+
+---
+
+## Validation Error Response
+
+Validation failures return HTTP `400 Bad Request` as `ValidationProblemDetails`.
 
 ```json
 {
   "errors": {
-    "TotalAmount": [
-      "TotalAmount must be greater than zero."
+    "Price": [
+      "Price must be greater than zero."
     ],
-    "DeliveryAddress": [
-      "DeliveryAddress is required."
+    "Description": [
+      "Description is required for products priced above 1000."
     ]
   },
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
   "title": "One or more validation errors occurred.",
   "status": 400
 }
 ```
 
-The `ApiExceptionHandler` handles domain-level `ValidationException` (thrown manually in service code) and returns HTTP 400 as well.
-
 ---
 
-## Manually Throwing a Validation Error in Service Code
+## Testing Guidance
 
-For business rule violations discovered after initial input validation (e.g., duplicate SKU in the database), throw `ValidationException`:
+Use two patterns depending on where the rule lives:
 
-```csharp
-// Domain/Exceptions/ValidationException.cs
-public async Task<OrderResponse> CreateAsync(CreateOrderRequest request, CancellationToken ct)
-{
-    var existing = await _repo.GetBySkuAsync(request.Sku, ct);
-    if (existing is not null)
-        throw new ValidationException($"An order for SKU '{request.Sku}' already exists.");
+- Attribute-driven validators: instantiate the validator and call `Validate(...)`
+- Pure FluentValidation rules: use `FluentValidation.TestHelper`
 
-    // ... proceed with creation
-}
-```
+The existing tests under `tests/APITemplate.Tests/Unit/Validators/` show both styles.
 
 ---
 
 ## Checklist
 
+- [ ] Add Data Annotation attributes to the DTO for simple field rules
 - [ ] Create `<RequestType>Validator.cs` in `Application/Features/<Feature>/Validation/`
-- [ ] Inherit from `AbstractValidator<YourRequestType>`
-- [ ] Add `RuleFor` calls for each property
-- [ ] For shared rules, create a base validator or use `Include()`
-- [ ] No registration needed — validators are discovered automatically from the assembly
+- [ ] Inherit from `DataAnnotationsValidator<T>` when attributes should be enforced
+- [ ] Add FluentValidation rules only for cross-field, conditional, or composed logic
+- [ ] Reuse `PaginationFilterValidator`, `DateRangeFilterValidator<T>`, and `SortableFilterValidator<T>` where applicable
+- [ ] Rely on assembly scanning; no per-validator DI registration is needed
 
 ---
 
-## Key Files Reference
+## Key Files
 
 | File | Purpose |
 |------|---------|
-| `Application/Features/<Feature>/Validation/` | All validator classes |
-| `Application/Features/<Feature>/Validation/ProductRequestValidatorBase.cs` | Base validator example |
-| `Application/Features/<Feature>/Validation/ProductFilterValidator.cs` | `Include()` composition example |
-| `Application/Features/<Feature>/Validation/CreateProductReviewRequestValidator.cs` | Typical standalone validator |
-| `Domain/Exceptions/ValidationException.cs` | Domain-level validation exception |
-| `Api/ExceptionHandling/ApiExceptionHandler.cs` | Catches `ValidationException` → 400 |
-| `Extensions/ServiceCollectionExtensions.cs` | `AddValidatorsFromAssemblyContaining` + `AddFluentValidationAutoValidation` |
-
+| `Application/Common/Validation/DataAnnotationsValidator.cs` | Bridges Data Annotations into FluentValidation |
+| `Application/Common/Validation/NotEmptyAttribute.cs` | Custom attribute for non-empty string/collection checks |
+| `Application/Common/Validation/PaginationFilterValidator.cs` | Shared pagination validation |
+| `Application/Common/Validation/DateRangeFilterValidator.cs` | Shared date-range validation |
+| `Application/Common/Validation/SortableFilterValidator.cs` | Shared sort parameter validation |
+| `Api/Filters/FluentValidationActionFilter.cs` | Runs validators for controller action arguments |
+| `Application/Features/Product/Validation/ProductRequestValidatorBase.cs` | Hybrid validator example |
+| `Application/Features/ProductReview/Validation/CreateProductReviewRequestValidator.cs` | Attribute-only validator example |
+| `Domain/Exceptions/ValidationException.cs` | Service-layer validation error |
+| `Api/ExceptionHandling/ApiExceptionHandler.cs` | Converts validation exceptions to HTTP 400 |

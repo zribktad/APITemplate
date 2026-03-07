@@ -26,12 +26,14 @@ public sealed class PostgresDataIntegrityTests
     [Fact]
     public async Task XminConcurrency_ConcurrentUpdate_ThrowsDbUpdateConcurrencyException()
     {
+        var ct = TestContext.Current.CancellationToken;
         var username = $"xmin-test-{Guid.NewGuid():N}";
         var (_, user) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             username,
             $"{username}@example.com",
-            "secret-pass");
+            "secret-pass",
+            ct: ct);
 
         await using var scope1 = _factory.Services.CreateAsyncScope();
         await using var scope2 = _factory.Services.CreateAsyncScope();
@@ -41,22 +43,23 @@ public sealed class PostgresDataIntegrityTests
 
         var entity1 = await db1.Users
             .IgnoreQueryFilters()
-            .SingleAsync(u => u.Id == user.Id);
+            .SingleAsync(u => u.Id == user.Id, ct);
 
         var entity2 = await db2.Users
             .IgnoreQueryFilters()
-            .SingleAsync(u => u.Id == user.Id);
+            .SingleAsync(u => u.Id == user.Id, ct);
 
         entity1.Email = $"{username}.first@example.com";
-        await db1.SaveChangesAsync();
+        await db1.SaveChangesAsync(ct);
 
         entity2.Email = $"{username}.second@example.com";
-        await Should.ThrowAsync<DbUpdateConcurrencyException>(db2.SaveChangesAsync());
+        await Should.ThrowAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync(ct));
     }
 
     [Fact]
     public async Task CategoryStats_ReturnsTenantScopedAndSoftDeleteScopedValues()
     {
+        var ct = TestContext.Current.CancellationToken;
         var usernameA = $"tenant-a-{Guid.NewGuid():N}";
         var usernameB = $"tenant-b-{Guid.NewGuid():N}";
 
@@ -64,13 +67,15 @@ public sealed class PostgresDataIntegrityTests
             _factory.Services,
             usernameA,
             $"{usernameA}@example.com",
-            "pass-a");
+            "pass-a",
+            ct: ct);
 
         var (tenantB, userB) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             usernameB,
             $"{usernameB}@example.com",
-            "pass-b");
+            "pass-b",
+            ct: ct);
 
         Guid categoryAId;
         Guid categoryBId;
@@ -152,7 +157,7 @@ public sealed class PostgresDataIntegrityTests
             db.Categories.AddRange(categoryA, categoryB);
             db.Products.AddRange(productA1, productA2, productB1);
             db.ProductReviews.AddRange(reviewA1, reviewA2, reviewB1);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
 
             // Mark one review and one product as soft-deleted to verify SQL function filtering.
             reviewA2.IsDeleted = true;
@@ -162,7 +167,7 @@ public sealed class PostgresDataIntegrityTests
             productA2.IsDeleted = true;
             productA2.DeletedAtUtc = DateTime.UtcNow;
             productA2.DeletedBy = Guid.NewGuid();
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
 
             categoryAId = categoryA.Id;
             categoryBId = categoryB.Id;
@@ -172,26 +177,26 @@ public sealed class PostgresDataIntegrityTests
 
         IntegrationAuthHelper.Authenticate(_client, tenantId: tenantA.Id, username: usernameA, role: Domain.Enums.UserRole.User);
 
-        var statsResponse = await _client.GetAsync($"/api/v1/categories/{categoryAId}/stats");
+        var statsResponse = await _client.GetAsync($"/api/v1/categories/{categoryAId}/stats", ct);
         statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await statsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var payload = await statsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         payload.GetProperty("categoryId").GetGuid().ShouldBe(categoryAId);
         payload.GetProperty("productCount").GetInt64().ShouldBe(1);
         payload.GetProperty("averagePrice").GetDecimal().ShouldBe(100m);
         payload.GetProperty("totalReviews").GetInt64().ShouldBe(1);
 
         // Tenant A token must not access stats of tenant B category.
-        var forbiddenByIsolation = await _client.GetAsync($"/api/v1/categories/{categoryBId}/stats");
+        var forbiddenByIsolation = await _client.GetAsync($"/api/v1/categories/{categoryBId}/stats", ct);
         forbiddenByIsolation.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         // Ensure soft-deleted review is hidden from tenant-scoped query path.
-        var reviewById = await _client.GetAsync($"/api/v1/productreviews/{reviewToSoftDeleteId}");
+        var reviewById = await _client.GetAsync($"/api/v1/productreviews/{reviewToSoftDeleteId}", ct);
         reviewById.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
-        var reviewsByProduct = await _client.GetAsync($"/api/v1/productreviews/by-product/{productAId}");
+        var reviewsByProduct = await _client.GetAsync($"/api/v1/productreviews/by-product/{productAId}", ct);
         reviewsByProduct.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var reviews = await reviewsByProduct.Content.ReadFromJsonAsync<JsonElement[]>();
+        var reviews = await reviewsByProduct.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: ct);
         reviews.ShouldNotBeNull();
         reviews!.Length.ShouldBe(1);
     }
@@ -199,12 +204,14 @@ public sealed class PostgresDataIntegrityTests
     [Fact]
     public async Task DeleteProduct_WithExistingReviews_SoftDeletesReviews_Cascade()
     {
+        var ct = TestContext.Current.CancellationToken;
         var username = $"cascade-{Guid.NewGuid():N}";
         var (tenant, seededUser) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-cascade");
+            "pass-cascade",
+            ct: ct);
 
         Guid productId;
         Guid review1Id;
@@ -223,7 +230,7 @@ public sealed class PostgresDataIntegrityTests
             };
 
             db.Categories.Add(category);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
             categoryId = category.Id;
         }
 
@@ -236,33 +243,36 @@ public sealed class PostgresDataIntegrityTests
                 Name = $"Product-Cascade-{Guid.NewGuid():N}",
                 Price = 88m,
                 CategoryId = categoryId
-            });
+            },
+            ct);
         createProductResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var createdProduct = await createProductResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var createdProduct = await createProductResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         productId = createdProduct.GetProperty("id").GetGuid();
 
         var createReview1 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, Rating = 5 });
+            new { ProductId = productId, Rating = 5 },
+            ct);
         createReview1.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var createdReview1 = await createReview1.Content.ReadFromJsonAsync<JsonElement>();
+        var createdReview1 = await createReview1.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         review1Id = createdReview1.GetProperty("id").GetGuid();
 
         var createReview2 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = productId, Rating = 4 });
+            new { ProductId = productId, Rating = 4 },
+            ct);
         createReview2.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var createdReview2 = await createReview2.Content.ReadFromJsonAsync<JsonElement>();
+        var createdReview2 = await createReview2.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         review2Id = createdReview2.GetProperty("id").GetGuid();
 
-        var deleteResponse = await _client.DeleteAsync($"/api/v1/products/{productId}");
+        var deleteResponse = await _client.DeleteAsync($"/api/v1/products/{productId}", ct);
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
-        var reviewsResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}");
+        var reviewsResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         reviewsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var visibleReviews = await reviewsResponse.Content.ReadFromJsonAsync<JsonElement[]>();
+        var visibleReviews = await reviewsResponse.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: ct);
         visibleReviews.ShouldNotBeNull();
         visibleReviews.ShouldBeEmpty();
 
@@ -272,7 +282,7 @@ public sealed class PostgresDataIntegrityTests
         var allReviews = await verifyDb.ProductReviews
             .IgnoreQueryFilters()
             .Where(r => r.Id == review1Id || r.Id == review2Id)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         allReviews.Count.ShouldBe(2);
         allReviews.All(r => r.IsDeleted).ShouldBeTrue();
@@ -281,12 +291,14 @@ public sealed class PostgresDataIntegrityTests
     [Fact]
     public async Task CategoryStats_FunctionCallable_ReturnsZeroValuesForEmptyCategory()
     {
+        var ct = TestContext.Current.CancellationToken;
         var username = $"stats-smoke-{Guid.NewGuid():N}";
         var (tenant, _) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-smoke");
+            "pass-smoke",
+            ct: ct);
 
         Guid categoryId;
 
@@ -301,16 +313,16 @@ public sealed class PostgresDataIntegrityTests
             };
 
             db.Categories.Add(category);
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
             categoryId = category.Id;
         }
 
         IntegrationAuthHelper.Authenticate(_client, tenantId: tenant.Id, username: username, role: Domain.Enums.UserRole.User);
 
-        var response = await _client.GetAsync($"/api/v1/categories/{categoryId}/stats");
+        var response = await _client.GetAsync($"/api/v1/categories/{categoryId}/stats", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
         payload.GetProperty("categoryId").GetGuid().ShouldBe(categoryId);
         payload.GetProperty("productCount").GetInt64().ShouldBe(0);
         payload.GetProperty("averagePrice").GetDecimal().ShouldBe(0m);
