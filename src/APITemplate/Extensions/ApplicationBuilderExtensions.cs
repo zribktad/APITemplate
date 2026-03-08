@@ -223,7 +223,7 @@ public static class ApplicationBuilderExtensions
     }
 
     private static string BuildScalarRedirectUri(HttpRequest request)
-        => $"{request.Scheme}://{request.Host}{request.Path}";
+        => $"{request.Scheme}://{request.Host}{request.PathBase}{request.Path}";
 
     public static WebApplication UseHealthChecks(this WebApplication app)
     {

@@ -42,16 +42,21 @@ public sealed class RequestContextMiddleware
             return Task.CompletedTask;
         });
 
-        using (LogContext.PushProperty("CorrelationId", correlationId))
+        try
         {
-            await _next(context);
+            using (LogContext.PushProperty("CorrelationId", correlationId))
+            {
+                await _next(context);
+            }
         }
-
-        var metricsTagsFeature = context.Features.Get<IHttpMetricsTagsFeature>();
-        if (metricsTagsFeature is not null)
+        finally
         {
-            metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.ApiSurface, TelemetryApiSurfaceResolver.Resolve(context.Request.Path)));
-            metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.Authenticated, context.User.Identity?.IsAuthenticated == true));
+            var metricsTagsFeature = context.Features.Get<IHttpMetricsTagsFeature>();
+            if (metricsTagsFeature is not null)
+            {
+                metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.ApiSurface, TelemetryApiSurfaceResolver.Resolve(context.Request.Path)));
+                metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.Authenticated, context.User.Identity?.IsAuthenticated == true));
+            }
         }
     }
 

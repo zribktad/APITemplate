@@ -3,6 +3,18 @@ auth_enabled: false
 server:
   http_listen_port: 3100
 
+pattern_ingester:
+  enabled: true
+
+distributor:
+  otlp_config:
+    default_resource_attributes_as_index_labels:
+      - service.name
+      - service.namespace
+      - service.version
+      - deployment.environment.name
+      - host.name
+
 common:
   path_prefix: /loki
   replication_factor: 1
@@ -43,6 +55,17 @@ limits_config:
     - component
     - workload
     - job
+  otlp_config:
+    resource_attributes:
+      ignore_defaults: false
+      attributes_config:
+        - action: index_label
+          attributes:
+            - service.name
+            - service.namespace
+            - service.version
+            - deployment.environment.name
+            - host.name
 
 analytics:
   reporting_enabled: false
