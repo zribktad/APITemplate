@@ -17,8 +17,8 @@
 
 ## Product Data
 
-- [ ] Add workflow for attaching `ProductData` records to products.
-- [ ] Support one-to-many relationship where a single product can have multiple `ProductData` entries.
+- [x] Add workflow for attaching `ProductData` records to products.
+- [x] Support many-to-many relationship where a single product can have multiple `ProductData` entries.
 
 ## Notifications
 
@@ -49,3 +49,9 @@
 - [ ] Add file upload support for `ProductData`.
 - [ ] Add storage abstraction for local and S3-compatible backends.
 - [ ] Add cleanup workflow for orphaned files.
+
+
+## Soft delete and Data Retention
+- [ ] Hard delete for soft-deleted products after a configurable retention period.
+- [ ] Add workflow for permanently deleting soft-deleted products after retention period.
+- [ ] MassTransit Outbox, Wolverine, CAP, or other reliable messaging for eventual consistency in data deletion across related entities.
