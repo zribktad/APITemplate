@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
+using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ internal static class CookieSessionRefresher
         var tokenResponse = await TryRefreshSessionAsync(context, refreshRequest);
         if (tokenResponse is null)
         {
+            AuthTelemetry.RecordCookieRefreshFailed();
             context.RejectPrincipal();
             return;
         }
@@ -40,6 +42,7 @@ internal static class CookieSessionRefresher
 
         if (!TryGetRefreshToken(context, out var refreshToken))
         {
+            AuthTelemetry.RecordMissingRefreshToken();
             context.RejectPrincipal();
             return false;
         }
@@ -93,12 +96,16 @@ internal static class CookieSessionRefresher
                 refreshRequest);
 
             if (!response.IsSuccessStatusCode)
+            {
+                AuthTelemetry.RecordTokenEndpointRejected();
                 return null;
+            }
 
             return await response.Content.ReadFromJsonAsync<TokenResponse>(context.HttpContext.RequestAborted);
         }
         catch (Exception ex)
         {
+            AuthTelemetry.RecordTokenRefreshException(ex);
             GetLogger(context).LogWarning(ex, "Token refresh failed, rejecting principal.");
             return null;
         }
@@ -173,7 +180,6 @@ internal static class CookieSessionRefresher
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(nameof(CookieSessionRefresher));
     }
-
     private sealed record TokenResponse(
         [property: JsonPropertyName(AuthConstants.CookieTokenNames.AccessToken)] string AccessToken,
         [property: JsonPropertyName(AuthConstants.CookieTokenNames.RefreshToken)] string? RefreshToken,

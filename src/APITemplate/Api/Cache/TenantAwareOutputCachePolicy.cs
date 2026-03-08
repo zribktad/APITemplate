@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using APITemplate.Application.Common.Security;
+using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.OutputCaching;
 
 namespace APITemplate.Api.Cache;
@@ -25,13 +26,20 @@ public sealed class TenantAwareOutputCachePolicy : IOutputCachePolicy
         // Vary cache key by tenant so each tenant has isolated cache entries.
         var tenantId = context.HttpContext.User.FindFirstValue(CustomClaimTypes.TenantId) ?? string.Empty;
         context.CacheVaryByRules.VaryByValues[CustomClaimTypes.TenantId] = tenantId;
+        CacheTelemetry.ConfigureRequest(context);
 
         return ValueTask.CompletedTask;
     }
 
     public ValueTask ServeFromCacheAsync(OutputCacheContext context, CancellationToken cancellationToken)
-        => ValueTask.CompletedTask;
+    {
+        CacheTelemetry.RecordCacheHit(context);
+        return ValueTask.CompletedTask;
+    }
 
     public ValueTask ServeResponseAsync(OutputCacheContext context, CancellationToken cancellationToken)
-        => ValueTask.CompletedTask;
+    {
+        CacheTelemetry.RecordResponseOutcome(context);
+        return ValueTask.CompletedTask;
+    }
 }

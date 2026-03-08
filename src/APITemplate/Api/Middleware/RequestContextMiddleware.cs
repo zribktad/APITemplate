@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using APITemplate.Infrastructure.Observability;
+using Microsoft.AspNetCore.Http.Features;
 using Serilog.Context;
 
 namespace APITemplate.Api.Middleware;
@@ -27,9 +29,10 @@ public sealed class RequestContextMiddleware
     {
         var correlationId = ResolveCorrelationId(context);
         var sw = Stopwatch.StartNew();
+        var traceId = Activity.Current?.TraceId.ToHexString() ?? context.TraceIdentifier;
         context.Items[CorrelationIdItemKey] = correlationId;
         context.Response.Headers[CorrelationIdHeader] = correlationId;
-        context.Response.Headers["X-Trace-Id"] = context.TraceIdentifier;
+        context.Response.Headers["X-Trace-Id"] = traceId;
         context.Response.Headers["X-Elapsed-Ms"] = "0";
 
         // Response headers are finalized here so elapsed time reflects full downstream execution.
@@ -43,6 +46,13 @@ public sealed class RequestContextMiddleware
         {
             await _next(context);
         }
+
+        var metricsTagsFeature = context.Features.Get<IHttpMetricsTagsFeature>();
+        if (metricsTagsFeature is not null)
+        {
+            metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.ApiSurface, TelemetryApiSurfaceResolver.Resolve(context.Request.Path)));
+            metricsTagsFeature.Tags.Add(new(TelemetryTagKeys.Authenticated, context.User.Identity?.IsAuthenticated == true));
+        }
     }
 
     private static string ResolveCorrelationId(HttpContext context)
@@ -53,4 +63,5 @@ public sealed class RequestContextMiddleware
 
         return context.TraceIdentifier;
     }
+
 }

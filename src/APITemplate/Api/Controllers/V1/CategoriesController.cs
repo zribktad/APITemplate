@@ -11,12 +11,14 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
-    private readonly IOutputCacheStore _outputCacheStore;
+    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public CategoriesController(ICategoryService categoryService, IOutputCacheStore outputCacheStore)
+    public CategoriesController(
+        ICategoryService categoryService,
+        IOutputCacheInvalidationService outputCacheInvalidationService)
     {
         _categoryService = categoryService;
-        _outputCacheStore = outputCacheStore;
+        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -39,7 +41,7 @@ public sealed class CategoriesController : ControllerBase
     public async Task<ActionResult<CategoryResponse>> Create(CreateCategoryRequest request, CancellationToken ct)
     {
         var category = await _categoryService.CreateAsync(request, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Categories, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return CreatedAtAction(nameof(GetById), new { id = category.Id, version = "1.0" }, category);
     }
 
@@ -47,7 +49,7 @@ public sealed class CategoriesController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateCategoryRequest request, CancellationToken ct)
     {
         await _categoryService.UpdateAsync(id, request, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Categories, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return NoContent();
     }
 
@@ -55,7 +57,7 @@ public sealed class CategoriesController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _categoryService.DeleteAsync(id, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Categories, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return NoContent();
     }
 

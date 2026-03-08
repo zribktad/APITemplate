@@ -4,6 +4,7 @@ using APITemplate.Api.ExceptionHandling;
 using APITemplate.Api.Filters;
 using APITemplate.Api.OpenApi;
 using APITemplate.Application.Common.Options;
+using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
@@ -55,6 +56,15 @@ public static class ApiServiceCollectionExtensions
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, _) =>
+            {
+                var endpoint = context.HttpContext.GetEndpoint()?.DisplayName ?? TelemetryDefaults.Unknown;
+                ApiMetrics.RecordRateLimitRejection(
+                    CachePolicyNames.RateLimitPolicy,
+                    context.HttpContext.Request.Method,
+                    endpoint);
+                return ValueTask.CompletedTask;
+            };
         });
         services.AddSingleton<IConfigureOptions<RateLimiterOptions>>(sp =>
         {
@@ -123,6 +133,7 @@ public static class ApiServiceCollectionExtensions
         }
 
         services.AddSingleton<TenantAwareOutputCachePolicy>();
+        services.AddScoped<IOutputCacheInvalidationService, OutputCacheInvalidationService>();
 
         var cachingSection = configuration.GetSection("Caching");
         services.AddOutputCache(options =>

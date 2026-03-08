@@ -11,12 +11,14 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class ProductsController : ControllerBase
 {
     private readonly IProductService _productService;
-    private readonly IOutputCacheStore _outputCacheStore;
+    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public ProductsController(IProductService productService, IOutputCacheStore outputCacheStore)
+    public ProductsController(
+        IProductService productService,
+        IOutputCacheInvalidationService outputCacheInvalidationService)
     {
         _productService = productService;
-        _outputCacheStore = outputCacheStore;
+        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -39,7 +41,7 @@ public sealed class ProductsController : ControllerBase
     public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken ct)
     {
         var product = await _productService.CreateAsync(request, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Products, ct);
         return CreatedAtAction(nameof(GetById), new { id = product.Id, version = "1.0" }, product);
     }
 
@@ -47,7 +49,7 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct)
     {
         await _productService.UpdateAsync(id, request, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Products, ct);
         return NoContent();
     }
 
@@ -55,8 +57,9 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _productService.DeleteAsync(id, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Products, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Reviews, ct);
+        await _outputCacheInvalidationService.EvictAsync(
+            [CachePolicyNames.Products, CachePolicyNames.Reviews],
+            ct);
         return NoContent();
     }
 }

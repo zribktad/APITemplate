@@ -11,12 +11,14 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class ProductReviewsController : ControllerBase
 {
     private readonly IProductReviewService _reviewService;
-    private readonly IOutputCacheStore _outputCacheStore;
+    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public ProductReviewsController(IProductReviewService reviewService, IOutputCacheStore outputCacheStore)
+    public ProductReviewsController(
+        IProductReviewService reviewService,
+        IOutputCacheInvalidationService outputCacheInvalidationService)
     {
         _reviewService = reviewService;
-        _outputCacheStore = outputCacheStore;
+        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -47,7 +49,7 @@ public sealed class ProductReviewsController : ControllerBase
     public async Task<ActionResult<ProductReviewResponse>> Create(CreateProductReviewRequest request, CancellationToken ct)
     {
         var review = await _reviewService.CreateAsync(request, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Reviews, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Reviews, ct);
         return CreatedAtAction(nameof(GetById), new { id = review.Id, version = "1.0" }, review);
     }
 
@@ -55,7 +57,7 @@ public sealed class ProductReviewsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _reviewService.DeleteAsync(id, ct);
-        await _outputCacheStore.EvictByTagAsync(CachePolicyNames.Reviews, ct);
+        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Reviews, ct);
         return NoContent();
     }
 }

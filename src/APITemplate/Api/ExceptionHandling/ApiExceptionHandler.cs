@@ -1,4 +1,5 @@
 using APITemplate.Domain.Exceptions;
+using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
     {
         // GraphQL has its own error format and middleware, so let that pipeline handle GraphQL exceptions.
-        if (context.Request.Path.StartsWithSegments("/graphql"))
+        if (context.Request.Path.StartsWithSegments(TelemetryPathPrefixes.GraphQl))
             return false;
 
         var (statusCode, title, detail, errorCode, metadata) = Resolve(exception);
@@ -64,6 +65,13 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 errorCode,
                 context.TraceIdentifier);
         }
+
+        ApiMetrics.RecordHandledException(
+            statusCode,
+            errorCode,
+            exception.GetType().Name);
+
+        ConflictTelemetry.Record(exception, errorCode);
 
         context.Response.StatusCode = statusCode;
         var wasWritten = await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext

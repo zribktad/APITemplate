@@ -2,6 +2,7 @@ using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
 using APITemplate.Domain.Enums;
 using APITemplate.Infrastructure.Health;
+using APITemplate.Infrastructure.Observability;
 using APITemplate.Infrastructure.Security;
 using Keycloak.AuthServices.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -141,11 +142,7 @@ public static class AuthenticationServiceCollectionExtensions
             : CookieSecurePolicy.Always;
         options.ExpireTimeSpan = TimeSpan.FromMinutes(settings.Bff.SessionTimeoutMinutes);
         options.SlidingExpiration = true;
-        options.Events.OnRedirectToLogin = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
-        };
+        options.Events.OnRedirectToLogin = RejectUnauthorizedRedirectAsync;
         options.Events.OnValidatePrincipal = CookieSessionRefresher.OnValidatePrincipal;
     }
 
@@ -198,6 +195,13 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddHttpClient(AuthConstants.HttpClients.KeycloakToken);
         services.AddHealthChecks()
             .AddCheck<KeycloakHealthCheck>("keycloak", tags: ["identity"]);
+    }
+
+    private static Task RejectUnauthorizedRedirectAsync(Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions> context)
+    {
+        AuthTelemetry.RecordUnauthorizedRedirect();
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
     }
 
     private sealed record AuthSettings(

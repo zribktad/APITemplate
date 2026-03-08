@@ -1,4 +1,5 @@
 using APITemplate.Domain.Interfaces;
+using APITemplate.Infrastructure.Observability;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,24 +31,24 @@ public sealed class StoredProcedureExecutor : IStoredProcedureExecutor
         IStoredProcedure<TResult> procedure,
         CancellationToken ct = default)
         where TResult : class
-    {
-        return _dbContext.Set<TResult>()
-            .FromSql(procedure.ToSql())
-            .FirstOrDefaultAsync(ct);
-    }
+        => StoredProcedureTelemetry.TraceQueryFirstAsync(
+            procedure,
+            () => _dbContext.Set<TResult>()
+                .FromSql(procedure.ToSql())
+                .FirstOrDefaultAsync(ct));
 
-    public async Task<IReadOnlyList<TResult>> QueryManyAsync<TResult>(
+    public Task<IReadOnlyList<TResult>> QueryManyAsync<TResult>(
         IStoredProcedure<TResult> procedure,
         CancellationToken ct = default)
         where TResult : class
-    {
-        return await _dbContext.Set<TResult>()
-            .FromSql(procedure.ToSql())
-            .ToListAsync(ct);
-    }
+        => StoredProcedureTelemetry.TraceQueryManyAsync(
+            procedure,
+            async () => await _dbContext.Set<TResult>()
+                .FromSql(procedure.ToSql())
+                .ToListAsync(ct));
 
     public Task<int> ExecuteAsync(FormattableString sql, CancellationToken ct = default)
-    {
-        return _dbContext.Database.ExecuteSqlAsync(sql, ct);
-    }
+        => StoredProcedureTelemetry.TraceExecuteAsync(
+            sql,
+            () => _dbContext.Database.ExecuteSqlAsync(sql, ct));
 }

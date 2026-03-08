@@ -17,6 +17,7 @@
     <PackageVersion Include="HotChocolate.AspNetCore" Version="15.1.12" />
     <PackageVersion Include="HotChocolate.AspNetCore.Authorization" Version="15.1.12" />
     <PackageVersion Include="HotChocolate.Data.EntityFramework" Version="15.1.12" />
+    <PackageVersion Include="HotChocolate.Diagnostics" Version="15.1.12" />
     <PackageVersion Include="Keycloak.AuthServices.Authentication" Version="2.8.0" />
     <PackageVersion Include="Keycloak.AuthServices.Authorization" Version="2.8.0" />
     <PackageVersion Include="Kot.MongoDB.Migrations" Version="3.1.0" />
@@ -38,15 +39,26 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.7.0" />
     <PackageVersion Include="Moq" Version="4.20.72" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageVersion Include="Npgsql.OpenTelemetry" Version="10.0.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.Console" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Process" Version="1.15.0-beta.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.StackExchangeRedis" Version="1.15.0-beta.1" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.13.1" />
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageVersion Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     <PackageVersion Include="Serilog.Expressions" Version="5.0.0" />
     <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageVersion Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="MongoDB.Driver.Core.Extensions.DiagnosticSources" Version="3.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.10.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Microsoft.Extensions.Resilience" Version="10.3.0" />

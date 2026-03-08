@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using APITemplate.Application.Common.Security;
+using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ public static class TenantClaimValidator
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
+            AuthTelemetry.RecordMissingTenantClaim(context.HttpContext, JwtBearerDefaults.AuthenticationScheme);
             context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 
@@ -34,6 +36,7 @@ public static class TenantClaimValidator
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
+            AuthTelemetry.RecordMissingTenantClaim(context.HttpContext, OpenIdConnectDefaults.AuthenticationScheme);
             context.Fail($"Missing required {CustomClaimTypes.TenantId} claim.");
         }
 

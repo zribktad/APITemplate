@@ -2,8 +2,8 @@
 
 ## Observability
 
-- [ ] Add observability stack and instrumentation for metrics, tracing, and alerting.
-- [ ] Add OpenTelemetry for traces, metrics, and correlation across database, HTTP, and cache operations.
+- [x] Add observability stack and instrumentation for metrics, tracing, and alerting.
+- [x] Add OpenTelemetry for traces, metrics, and correlation across database, HTTP, and cache operations.
 
 ## User Workflows
 

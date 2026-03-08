@@ -1,3 +1,4 @@
+using APITemplate.Infrastructure.Observability;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -40,6 +41,7 @@ public sealed class FluentValidationActionFilter : IAsyncActionFilter
             if (result.IsValid)
                 continue;
 
+            ValidationTelemetry.RecordValidationFailure(context, argumentType, result.Errors);
             foreach (var error in result.Errors)
                 context.ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
         }

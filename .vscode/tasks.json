@@ -61,6 +61,69 @@
       "problemMatcher": []
     },
     {
+      "label": "docker: observability up (aspire)",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--profile",
+        "aspire",
+        "up",
+        "-d",
+        "postgres",
+        "mongodb",
+        "keycloak-db",
+        "keycloak",
+        "valkey",
+        "aspire-dashboard"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: observability up (full)",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "up",
+        "-d",
+        "postgres",
+        "mongodb",
+        "keycloak-db",
+        "keycloak",
+        "valkey",
+        "alloy",
+        "prometheus",
+        "loki",
+        "tempo",
+        "grafana"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: observability down",
+      "type": "process",
+      "command": "docker",
+      "args": [
+        "compose",
+        "--profile",
+        "aspire",
+        "stop",
+        "aspire-dashboard",
+        "grafana",
+        "tempo",
+        "loki",
+        "prometheus",
+        "alloy",
+        "valkey",
+        "keycloak",
+        "keycloak-db",
+        "mongodb",
+        "postgres"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "docker: infra down (dev)",
       "type": "process",
       "command": "docker",
@@ -150,6 +213,24 @@
       "label": "prepare: debug https",
       "dependsOn": [
         "docker: infra ensure up (dev)",
+        "build: api"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "prepare: debug aspire",
+      "dependsOn": [
+        "docker: observability up (aspire)",
+        "build: api"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "prepare: debug observability full",
+      "dependsOn": [
+        "docker: observability up (full)",
         "build: api"
       ],
       "dependsOrder": "sequence",

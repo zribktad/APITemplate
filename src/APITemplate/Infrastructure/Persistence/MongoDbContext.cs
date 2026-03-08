@@ -2,6 +2,7 @@ using APITemplate.Domain.Entities;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Extensions.DiagnosticSources;
 
 namespace APITemplate.Infrastructure.Persistence;
 
@@ -13,6 +14,7 @@ public sealed class MongoDbContext
     {
         var clientSettings = MongoClientSettings.FromConnectionString(settings.Value.ConnectionString);
         clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        clientSettings.ClusterConfigurator = cb => cb.Subscribe(new DiagnosticsActivityEventSubscriber());
         var client = new MongoClient(clientSettings);
         _database = client.GetDatabase(settings.Value.DatabaseName);
     }

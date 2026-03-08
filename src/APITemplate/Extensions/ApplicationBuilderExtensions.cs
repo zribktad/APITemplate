@@ -1,6 +1,7 @@
 using APITemplate.Api.Cache;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
+using APITemplate.Infrastructure.Observability;
 using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Security;
 using APITemplate.Api.Middleware;
@@ -23,18 +24,16 @@ public static class ApplicationBuilderExtensions
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>(); // Resolve EF Core context for relational migrations.
         if (dbContext.Database.IsRelational())
-        {
-            await dbContext.Database.MigrateAsync(); // Run pending relational migrations.
-        }
+            await StartupTelemetry.RunRelationalMigrationAsync(() => dbContext.Database.MigrateAsync());
 
         var seeder = scope.ServiceProvider.GetRequiredService<AuthBootstrapSeeder>();
-        await seeder.SeedAsync();
+        await StartupTelemetry.RunAuthBootstrapSeedAsync(() => seeder.SeedAsync());
 
         var mongoContext = scope.ServiceProvider.GetService<MongoDbContext>(); // Mongo context can be missing in tests.
         if (mongoContext is not null)
         {
             var migrator = scope.ServiceProvider.GetRequiredService<IMigrator>(); // Resolve Mongo migrator from DI.
-            await migrator.MigrateAsync(); // Run pending Mongo migrations.
+            await StartupTelemetry.RunMongoMigrationAsync(() => migrator.MigrateAsync());
         }
     }
 
@@ -109,30 +108,31 @@ public static class ApplicationBuilderExtensions
         const int maxRetries = 30;
         const int delayMs = 2000;
 
-        for (var i = 1; i <= maxRetries; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            try
+        await StartupTelemetry.WaitForKeycloakReadinessAsync(
+            maxRetries,
+            async attempt =>
             {
-                var response = await httpClient.GetAsync(discoveryUrl, cancellationToken);
-                if (response.IsSuccessStatusCode)
+                cancellationToken.ThrowIfCancellationRequested();
+                try
                 {
-                    app.Logger.KeycloakReady(keycloak.AuthServerUrl);
-                    return;
+                    var response = await httpClient.GetAsync(discoveryUrl, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        app.Logger.KeycloakReady(keycloak.AuthServerUrl);
+                        return true;
+                    }
                 }
-            }
-            catch (HttpRequestException)
-            {
-                // Keycloak not reachable yet
-            }
+                catch (HttpRequestException)
+                {
+                    // Keycloak not reachable yet
+                }
 
-            app.Logger.KeycloakRetrying(i, maxRetries);
-            await Task.Delay(delayMs, cancellationToken);
-        }
-
-        throw new InvalidOperationException(
-            $"Keycloak at {keycloak.AuthServerUrl} did not become available after {maxRetries} retries.");
+                app.Logger.KeycloakRetrying(attempt, maxRetries);
+                await Task.Delay(delayMs, cancellationToken);
+                return false;
+            },
+            () => new InvalidOperationException(
+                $"Keycloak at {keycloak.AuthServerUrl} did not become available after {maxRetries} retries."));
     }
 
     /// <summary>

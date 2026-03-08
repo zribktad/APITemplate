@@ -1,9 +1,13 @@
+using APITemplate.Api.GraphQL.Instrumentation;
+
 namespace APITemplate.Extensions;
 
 public static class GraphQLServiceCollectionExtensions
 {
     public static IServiceCollection AddGraphQLConfiguration(this IServiceCollection services)
     {
+        services.AddSingleton<GraphQlExecutionMetricsListener>();
+
         services
             .AddGraphQLServer()
             .AddQueryType<Api.GraphQL.Queries.ProductQueries>()
@@ -14,6 +18,8 @@ public static class GraphQLServiceCollectionExtensions
             .AddType<Api.GraphQL.Types.ProductReviewType>()
             .AddDataLoader<Api.GraphQL.DataLoaders.ProductReviewsByProductDataLoader>()
             .AddAuthorization()
+            .AddInstrumentation()
+            .AddDiagnosticEventListener(sp => sp.GetRequiredService<GraphQlExecutionMetricsListener>())
             .ModifyPagingOptions(o =>
             {
                 o.MaxPageSize = 100;

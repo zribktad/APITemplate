@@ -29,6 +29,10 @@ internal static class TestConfigurationHelper
             ["Redaction:HmacKeyEnvironmentVariable"] = "APITEMPLATE_REDACTION_HMAC_KEY",
             ["Redaction:HmacKey"] = testRedactionHmacKey,
             ["Redaction:KeyId"] = "1001",
+            ["Observability:ServiceName"] = "APITemplate.Tests",
+            ["Observability:Exporters:Aspire:Enabled"] = "false",
+            ["Observability:Exporters:Otlp:Enabled"] = "false",
+            ["Observability:Exporters:Console:Enabled"] = "false",
             ["Valkey:ConnectionString"] = ""
         };
     }

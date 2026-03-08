@@ -10,10 +10,12 @@ try
     {
         loggerConfiguration
             .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services);
+            .ReadFrom.Services(services)
+            .AddOpenTelemetrySinks(context.Configuration, context.HostingEnvironment);
     });
 
     builder.Services.AddApiFoundation(builder.Configuration); // Registers exception handling services (AddExceptionHandler + ProblemDetails), activated later in UseApiPipeline.
+    builder.Services.AddObservability(builder.Configuration, builder.Environment); // Register OpenTelemetry tracing/metrics and environment-specific exporters.
     builder.Services.AddAuthenticationOptions(builder.Configuration, builder.Environment);
     builder.Services.AddPersistence(builder.Configuration); // Register EF Core + repositories + relational health checks.
     builder.Services.AddApplicationServices(); // Register application services + validators.

@@ -1,4 +1,58 @@
 services:
+  alloy:
+    image: grafana/alloy:v1.10.2
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+
+  prometheus:
+    image: prom/prometheus:v3.4.2
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./infrastructure/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheusdata:/prometheus
+
+  loki:
+    image: grafana/loki:3.5.5
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./infrastructure/observability/loki/config.yml:/etc/loki/config.yml:ro
+      - lokidata:/loki
+
+  tempo:
+    image: grafana/tempo:2.9.1
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/config.yml"]
+    volumes:
+      - ./infrastructure/observability/tempo/config.yml:/etc/tempo/config.yml:ro
+      - tempodata:/var/tempo
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    volumes:
+      - ./infrastructure/observability/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+
   postgres:
     image: postgres:17.2
     restart: unless-stopped
@@ -93,7 +147,12 @@ services:
       Keycloak__credentials__secret: "${KC_CLIENT_SECRET}"
       Valkey__ConnectionString: "valkey:6379"
       APITEMPLATE_REDACTION_HMAC_KEY: "${REDACTION_HMAC_KEY}"
+      Observability__Otlp__Endpoint: "http://alloy:4317"
+      Observability__Exporters__Otlp__Enabled: "true"
+      Observability__Exporters__Aspire__Enabled: "false"
     depends_on:
+      alloy:
+        condition: service_started
       postgres:
         condition: service_healthy
       mongodb:
@@ -104,6 +163,10 @@ services:
         condition: service_healthy
 
 volumes:
+  prometheusdata:
+  lokidata:
+  tempodata:
+  grafanadata:
   pgdata:
   mongodata:
   keycloak-pgdata:

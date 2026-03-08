@@ -20,6 +20,7 @@ Step-by-step guides for the most common workflows in this project:
 | [Specifications](doc/specifications.md)             | Write reusable EF Core query specifications with Ardalis                    |
 | [Scalar & GraphQL UI](doc/scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground                   |
 | [Testing](doc/testing.md)                           | Write unit tests (services, validators, repositories) and integration tests |
+| [Observability](doc/observability.md)               | Run OpenTelemetry locally with Aspire Dashboard or Grafana LGTM             |
 | [Result Pattern](doc/result-pattern.md)             | Guidelines for introducing selective `Result<T>` flow in phase 2            |
 
 ---

@@ -1,4 +1,77 @@
 services:
+  alloy:
+    image: grafana/alloy:v1.10.2
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "12345:12345"
+    volumes:
+      - ./infrastructure/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+
+  prometheus:
+    image: prom/prometheus:v3.4.2
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-remote-write-receiver
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheusdata:/prometheus
+
+  loki:
+    image: grafana/loki:3.5.5
+    command: ["-config.file=/etc/loki/config.yml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infrastructure/observability/loki/config.yml:/etc/loki/config.yml:ro
+      - lokidata:/loki
+
+  tempo:
+    image: grafana/tempo:2.9.1
+    command: ["-config.file=/etc/tempo/config.yml"]
+    ports:
+      - "3200:3200"
+      - "4319:4317"
+    volumes:
+      - ./infrastructure/observability/tempo/config.yml:/etc/tempo/config.yml:ro
+      - tempodata:/var/tempo
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    volumes:
+      - ./infrastructure/observability/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.5
+    profiles: ["aspire"]
+    ports:
+      - "4317:18889"
+      - "4318:18890"
+      - "18888:18888"
+    environment:
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+      ASPIRE_DASHBOARD_OTLP_HTTP_ENDPOINT_URL: http://0.0.0.0:18890
+
   postgres:
     image: postgres:18.3
     environment:
@@ -94,7 +167,12 @@ services:
       Keycloak__resource: "api-template"
       Keycloak__credentials__secret: "${KC_DEV_CLIENT_SECRET:-dev-client-secret}"
       Valkey__ConnectionString: "valkey:6379"
+      Observability__Otlp__Endpoint: "http://alloy:4317"
+      Observability__Exporters__Otlp__Enabled: "true"
+      Observability__Exporters__Aspire__Enabled: "false"
     depends_on:
+      alloy:
+        condition: service_started
       postgres:
         condition: service_healthy
       mongodb:
@@ -105,6 +183,10 @@ services:
         condition: service_healthy
 
 volumes:
+  prometheusdata:
+  lokidata:
+  tempodata:
+  grafanadata:
   pgdata:
   mongodata:
   keycloak-pgdata:
