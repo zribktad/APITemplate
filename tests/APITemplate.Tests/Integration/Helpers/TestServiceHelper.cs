@@ -102,4 +102,10 @@ internal static class TestServiceHelper
         services.AddSingleton(mock);
         services.AddSingleton(mock.Object);
     }
+
+    internal static void ReplaceProductRepositoryWithInMemory(IServiceCollection services)
+    {
+        services.RemoveAll(typeof(IProductRepository));
+        services.AddScoped<IProductRepository, InMemoryProductRepository>();
+    }
 }

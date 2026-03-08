@@ -610,7 +610,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var repository = new ProductRepository(deleteContext);
+            var repository = new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>());
             var unitOfWork = new UnitOfWork(deleteContext);
 
             await repository.DeleteAsync(product.Id, ct);
@@ -667,7 +667,7 @@ public sealed class PostgresDataIntegrityTests
         await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
             var service = new APITemplate.Application.Features.Product.Services.ProductService(
-                new ProductRepository(deleteContext),
+                new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>()),
                 Mock.Of<IProductQueryService>(),
                 Mock.Of<ICategoryRepository>(),
                 Mock.Of<IProductDataRepository>(),
@@ -711,7 +711,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var transactionContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var productRepository = new ProductRepository(transactionContext);
+            var productRepository = new ProductRepository(transactionContext, _factory.Services.GetRequiredService<IServiceScopeFactory>());
             var failingReviewRepository = new Mock<IProductReviewRepository>();
             failingReviewRepository
                 .Setup(repository => repository.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()))

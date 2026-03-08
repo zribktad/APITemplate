@@ -56,6 +56,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
             TestServiceHelper.MockMongoServices(services);
             TestServiceHelper.RemoveExternalHealthChecks(services);
+            TestServiceHelper.ReplaceProductRepositoryWithInMemory(services);
             TestServiceHelper.ReplaceOutputCacheWithInMemory(services);
             TestServiceHelper.ReplaceDataProtectionWithInMemory(services);
             TestServiceHelper.ReplaceTicketStoreWithInMemory(services);

@@ -122,7 +122,7 @@ public class ProductDataControllerTests
 
         var body = await response.Content.ReadAsStringAsync(ct);
         response.StatusCode.ShouldBe(HttpStatusCode.Created, body);
-        var data = System.Text.Json.JsonSerializer.Deserialize<ProductDataContractResponse>(body, TestJsonOptions.CaseInsensitive);
+        var data = await response.Content.ReadFromJsonAsync<ProductDataContractResponse>(TestJsonOptions.CaseInsensitive, ct);
         data.ShouldNotBeNull();
         data!.Type.ShouldBe(type);
     }

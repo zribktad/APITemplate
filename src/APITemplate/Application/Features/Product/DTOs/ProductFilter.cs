@@ -12,6 +12,6 @@ public sealed record ProductFilter(
     string? SortBy = null,
     string? SortDirection = null,
     int PageNumber = 1,
-    int PageSize = 10,
+    int PageSize = PaginationFilter.DefaultPageSize,
     string? Query = null,
     IReadOnlyCollection<Guid>? CategoryIds = null) : PaginationFilter(PageNumber, PageSize), IDateRangeFilter, ISortableFilter;

@@ -24,7 +24,7 @@ public class ProductQueries
             input?.SortBy,
             input?.SortDirection,
             input?.PageNumber ?? 1,
-            input?.PageSize ?? 20,
+            input?.PageSize ?? PaginationFilter.DefaultPageSize,
             input?.Query,
             input?.CategoryIds);
 

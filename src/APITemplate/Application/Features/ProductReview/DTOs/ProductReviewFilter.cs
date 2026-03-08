@@ -12,4 +12,4 @@ public sealed record ProductReviewFilter(
     string? SortBy = null,
     string? SortDirection = null,
     int PageNumber = 1,
-    int PageSize = 10) : PaginationFilter(PageNumber, PageSize), IDateRangeFilter, ISortableFilter;
+    int PageSize = PaginationFilter.DefaultPageSize) : PaginationFilter(PageNumber, PageSize), IDateRangeFilter, ISortableFilter;

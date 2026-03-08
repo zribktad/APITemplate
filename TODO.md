@@ -27,6 +27,10 @@
 - [ ] Add email notification for password reset workflow.
 - [ ] Add email notification for user role changes.
 
+## Contracts
+
+- [ ] Extract request/response DTOs and shared contract models into a separate NuGet package.
+
 ## Search
 
 - [x] Add full-text search for products and categories.

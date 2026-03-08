@@ -20,7 +20,7 @@ public sealed class CategoryQueries
             input?.SortBy,
             input?.SortDirection,
             input?.PageNumber ?? 1,
-            input?.PageSize ?? 20);
+            input?.PageSize ?? PaginationFilter.DefaultPageSize);
 
         await validator.ValidateAndThrowAppAsync(filter, ct);
 

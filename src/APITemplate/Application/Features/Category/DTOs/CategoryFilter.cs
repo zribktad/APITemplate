@@ -8,4 +8,4 @@ public sealed record CategoryFilter(
     string? SortBy = null,
     string? SortDirection = null,
     int PageNumber = 1,
-    int PageSize = 10) : PaginationFilter(PageNumber, PageSize), ISortableFilter;
+    int PageSize = PaginationFilter.DefaultPageSize) : PaginationFilter(PageNumber, PageSize), ISortableFilter;

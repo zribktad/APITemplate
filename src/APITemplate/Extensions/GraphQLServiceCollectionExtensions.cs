@@ -23,8 +23,8 @@ public static class GraphQLServiceCollectionExtensions
             .AddDiagnosticEventListener(sp => sp.GetRequiredService<GraphQlExecutionMetricsListener>())
             .ModifyPagingOptions(o =>
             {
-                o.MaxPageSize = 100;
-                o.DefaultPageSize = 20;
+                o.MaxPageSize = PaginationFilter.MaxPageSize;
+                o.DefaultPageSize = PaginationFilter.DefaultPageSize;
                 o.IncludeTotalCount = true;
             })
             .AddMaxExecutionDepthRule(5);

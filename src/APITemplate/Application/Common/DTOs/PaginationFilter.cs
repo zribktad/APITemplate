@@ -6,4 +6,8 @@ public record PaginationFilter(
     int PageNumber = 1,
 
     [Range(1, 100, ErrorMessage = "PageSize must be between 1 and 100.")]
-    int PageSize = 10);
+    int PageSize = 20)
+{
+    public const int DefaultPageSize = 20;
+    public const int MaxPageSize = 100;
+}
