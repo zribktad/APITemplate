@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using APITemplate.Domain.Entities;
 using APITemplate.Tests.Integration.Helpers;
 using APITemplate.Domain.Interfaces;
@@ -52,10 +51,10 @@ public class ProductDataControllerTests
         var response = await _client.GetAsync("/api/v1/product-data?type=image", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var items = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive, ct);
+        var items = await response.Content.ReadFromJsonAsync<ProductDataContractResponse[]>(TestJsonOptions.CaseInsensitive, ct);
         items.ShouldNotBeNull();
         items!.Length.ShouldBe(1);
-        items[0].GetProperty("type").GetString().ShouldBe("image");
+        items[0].Type.ShouldBe("image");
     }
 
     [Fact]
@@ -73,9 +72,10 @@ public class ProductDataControllerTests
         var response = await _client.GetAsync($"/api/v1/product-data/{image.Id}", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive, ct);
-        json.GetProperty("title").GetString().ShouldBe("Banner");
-        json.GetProperty("type").GetString().ShouldBe("image");
+        var data = await response.Content.ReadFromJsonAsync<ProductDataContractResponse>(TestJsonOptions.CaseInsensitive, ct);
+        data.ShouldNotBeNull();
+        data!.Title.ShouldBe("Banner");
+        data.Type.ShouldBe("image");
     }
 
     [Fact]
@@ -122,8 +122,9 @@ public class ProductDataControllerTests
 
         var body = await response.Content.ReadAsStringAsync(ct);
         response.StatusCode.ShouldBe(HttpStatusCode.Created, body);
-        var json = JsonSerializer.Deserialize<JsonElement>(body);
-        json.GetProperty("type").GetString().ShouldBe(type);
+        var data = System.Text.Json.JsonSerializer.Deserialize<ProductDataContractResponse>(body, TestJsonOptions.CaseInsensitive);
+        data.ShouldNotBeNull();
+        data!.Type.ShouldBe(type);
     }
 
     [Theory]

@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using APITemplate.Tests.Integration.Helpers;
 using Shouldly;
 using Xunit;
@@ -30,8 +29,9 @@ public class ProductReviewsControllerTests
             ct);
 
         productResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var productId = product.GetProperty("id").GetString()!;
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductResponse>(TestJsonOptions.CaseInsensitive, ct);
+        product.ShouldNotBeNull();
+        var productId = product!.Id;
 
         // 2. Create a review for the product
         var createReviewResponse = await _client.PostAsJsonAsync(
@@ -40,22 +40,24 @@ public class ProductReviewsControllerTests
             ct);
 
         createReviewResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var created = await createReviewResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var reviewId = created.GetProperty("id").GetString()!;
-        created.GetProperty("userId").GetGuid().ShouldBe(userId);
-        created.GetProperty("rating").GetInt32().ShouldBe(5);
-        created.GetProperty("productId").GetString().ShouldBe(productId);
+        var created = await createReviewResponse.Content.ReadFromJsonAsync<ProductReviewResponse>(TestJsonOptions.CaseInsensitive, ct);
+        created.ShouldNotBeNull();
+        var reviewId = created!.Id;
+        created.UserId.ShouldBe(userId);
+        created.Rating.ShouldBe(5);
+        created.ProductId.ShouldBe(productId);
 
         // 3. Get review by id
         var getByIdResponse = await _client.GetAsync($"/api/v1/productreviews/{reviewId}", ct);
         getByIdResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        fetched.GetProperty("userId").GetGuid().ShouldBe(userId);
+        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<ProductReviewResponse>(TestJsonOptions.CaseInsensitive, ct);
+        fetched.ShouldNotBeNull();
+        fetched!.UserId.ShouldBe(userId);
 
         // 4. Get reviews by productId
         var byProductResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         byProductResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var reviews = await byProductResponse.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive, ct);
+        var reviews = await byProductResponse.Content.ReadFromJsonAsync<ProductReviewResponse[]>(TestJsonOptions.CaseInsensitive, ct);
         reviews.ShouldNotBeNull();
         reviews!.Length.ShouldBeGreaterThanOrEqualTo(1);
 
@@ -93,16 +95,16 @@ public class ProductReviewsControllerTests
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
 
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        problem.GetProperty("status").GetInt32().ShouldBe((int)HttpStatusCode.NotFound);
-        problem.GetProperty("title").GetString().ShouldBe("Not Found");
-        var detail = problem.GetProperty("detail").GetString();
-        detail.ShouldNotBeNullOrWhiteSpace();
-        detail.ShouldContain("Product with id");
-        detail.ShouldContain("not found");
-        problem.GetProperty("errorCode").GetString().ShouldBe(ErrorCatalog.Reviews.ProductNotFoundForReview);
-        problem.GetProperty("type").GetString().ShouldBe($"https://api-template.local/errors/{ErrorCatalog.Reviews.ProductNotFoundForReview}");
-        problem.GetProperty("traceId").GetString().ShouldNotBeNullOrWhiteSpace();
+        var problem = await response.Content.ReadFromJsonAsync<ApiErrorResponse>(TestJsonOptions.CaseInsensitive, ct);
+        problem.ShouldNotBeNull();
+        problem!.Status.ShouldBe((int)HttpStatusCode.NotFound);
+        problem.Title.ShouldBe("Not Found");
+        problem.Detail.ShouldNotBeNullOrWhiteSpace();
+        problem.Detail.ShouldContain("Product with id");
+        problem.Detail.ShouldContain("not found");
+        problem.ErrorCode.ShouldBe(ErrorCatalog.Reviews.ProductNotFoundForReview);
+        problem.Type.ShouldBe($"https://api-template.local/errors/{ErrorCatalog.Reviews.ProductNotFoundForReview}");
+        problem.TraceId.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -116,13 +118,14 @@ public class ProductReviewsControllerTests
             new { Name = "No Review Product", Price = 9.99 },
             ct);
 
-        var product = await productResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var productId = product.GetProperty("id").GetString()!;
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductResponse>(TestJsonOptions.CaseInsensitive, ct);
+        product.ShouldNotBeNull();
+        var productId = product!.Id;
 
         var response = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var reviews = await response.Content.ReadFromJsonAsync<JsonElement[]>(TestJsonOptions.CaseInsensitive, ct);
+        var reviews = await response.Content.ReadFromJsonAsync<ProductReviewResponse[]>(TestJsonOptions.CaseInsensitive, ct);
         reviews.ShouldNotBeNull();
         reviews!.ShouldBeEmpty();
     }

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
+using APITemplate.Tests.Integration.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Shouldly;
@@ -32,9 +33,10 @@ public class ProductsControllerTests
         var response = await _client.GetAsync("/api/v1/products", ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        payload.GetProperty("page").GetProperty("items").ValueKind.ShouldBe(JsonValueKind.Array);
-        payload.GetProperty("facets").ValueKind.ShouldBe(JsonValueKind.Object);
+        var payload = await response.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
+        payload!.Page.Items.ShouldNotBeNull();
+        payload.Facets.ShouldNotBeNull();
     }
 
     [Fact]
@@ -61,15 +63,15 @@ public class ProductsControllerTests
 
         var createBody = await createResponse.Content.ReadAsStringAsync(ct);
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created, createBody);
-        var created = JsonSerializer.Deserialize<JsonElement>(createBody);
-        created.GetProperty("productDataIds").EnumerateArray().Select(x => x.GetGuid()).ShouldBe([productDataId]);
+        var created = JsonSerializer.Deserialize<ProductResponse>(createBody, TestJsonOptions.CaseInsensitive);
+        created.ShouldNotBeNull();
+        created!.ProductDataIds.ShouldBe([productDataId]);
 
-        var productId = created.GetProperty("id").GetGuid();
-
-        var getResponse = await _client.GetAsync($"/api/v1/products/{productId}", ct);
+        var getResponse = await _client.GetAsync($"/api/v1/products/{created.Id}", ct);
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var fetched = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        fetched.GetProperty("productDataIds").EnumerateArray().Select(x => x.GetGuid()).ShouldBe([productDataId]);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<ProductResponse>(TestJsonOptions.CaseInsensitive, ct);
+        fetched.ShouldNotBeNull();
+        fetched!.ProductDataIds.ShouldBe([productDataId]);
     }
 
     [Fact]
@@ -116,11 +118,11 @@ public class ProductsControllerTests
 
         var createBody = await createResponse.Content.ReadAsStringAsync(ct);
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created, createBody);
-        var created = JsonSerializer.Deserialize<JsonElement>(createBody);
-        var productId = created.GetProperty("id").GetGuid();
+        var created = JsonSerializer.Deserialize<ProductResponse>(createBody, TestJsonOptions.CaseInsensitive);
+        created.ShouldNotBeNull();
 
         var updateResponse = await _client.PutAsJsonAsync(
-            $"/api/v1/products/{productId}",
+            $"/api/v1/products/{created!.Id}",
             new
             {
                 name = "Renamed product",
@@ -132,10 +134,11 @@ public class ProductsControllerTests
         var updateBody = await updateResponse.Content.ReadAsStringAsync(ct);
         updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent, updateBody);
 
-        var getResponse = await _client.GetAsync($"/api/v1/products/{productId}", ct);
+        var getResponse = await _client.GetAsync($"/api/v1/products/{created.Id}", ct);
         getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var fetched = await getResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        fetched.GetProperty("productDataIds").EnumerateArray().Select(x => x.GetGuid()).ShouldBe([productDataId]);
+        var fetched = await getResponse.Content.ReadFromJsonAsync<ProductResponse>(TestJsonOptions.CaseInsensitive, ct);
+        fetched.ShouldNotBeNull();
+        fetched!.ProductDataIds.ShouldBe([productDataId]);
     }
 
     [Fact]
@@ -153,10 +156,12 @@ public class ProductsControllerTests
             new { Name = "Books", Description = "Printed books" },
             ct);
 
-        var electronics = await electronicsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var books = await booksResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var electronicsId = electronics.GetProperty("id").GetGuid();
-        var booksId = books.GetProperty("id").GetGuid();
+        var electronics = await electronicsResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        var books = await booksResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        electronics.ShouldNotBeNull();
+        books.ShouldNotBeNull();
+        var electronicsId = electronics!.Id;
+        var booksId = books!.Id;
 
         await _client.PostAsJsonAsync(
             "/api/v1/products",
@@ -174,17 +179,15 @@ public class ProductsControllerTests
         var response = await _client.GetAsync($"/api/v1/products?categoryIds={electronicsId}", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var items = payload.GetProperty("page").GetProperty("items").EnumerateArray().ToArray();
-        var categoryFacets = payload.GetProperty("facets").GetProperty("categories").EnumerateArray().ToArray();
-        var priceBuckets = payload.GetProperty("facets").GetProperty("priceBuckets").EnumerateArray().ToArray();
+        var payload = await response.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
 
-        items.Length.ShouldBe(2);
-        items.Select(item => item.GetProperty("name").GetString()).ShouldBe(["Wireless Mouse", "Wireless Keyboard"], ignoreOrder: true);
-        categoryFacets.Length.ShouldBeGreaterThanOrEqualTo(2);
-        categoryFacets[0].GetProperty("categoryName").GetString().ShouldBe("Electronics");
-        categoryFacets[0].GetProperty("count").GetInt32().ShouldBe(2);
-        priceBuckets.Single(bucket => bucket.GetProperty("label").GetString() == "0 - 50").GetProperty("count").GetInt32().ShouldBe(1);
-        priceBuckets.Single(bucket => bucket.GetProperty("label").GetString() == "50 - 100").GetProperty("count").GetInt32().ShouldBe(1);
+        payload!.Page.Items.Count().ShouldBe(2);
+        payload.Page.Items.Select(item => item.Name).ShouldBe(["Wireless Mouse", "Wireless Keyboard"], ignoreOrder: true);
+        payload.Facets.Categories.Count.ShouldBeGreaterThanOrEqualTo(2);
+        payload.Facets.Categories.First().CategoryName.ShouldBe("Electronics");
+        payload.Facets.Categories.First().Count.ShouldBe(2);
+        payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "0 - 50").Count.ShouldBe(1);
+        payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "50 - 100").Count.ShouldBe(1);
     }
 }

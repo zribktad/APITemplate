@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using APITemplate.Tests.Integration.Helpers;
 using Shouldly;
 using Xunit;
@@ -27,8 +26,9 @@ public class CategoriesControllerTests
         var getAllResponse = await _client.GetAsync("/api/v1/categories", ct);
         getAllResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var allCategories = await getAllResponse.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive, ct);
-        allCategories.GetProperty("items").EnumerateArray().ShouldBeEmpty();
+        var allCategories = await getAllResponse.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>(TestJsonOptions.CaseInsensitive, ct);
+        allCategories.ShouldNotBeNull();
+        allCategories!.Items.ShouldBeEmpty();
 
         // 2. Create category
         var createResponse = await _client.PostAsJsonAsync(
@@ -38,39 +38,41 @@ public class CategoriesControllerTests
 
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var categoryId = created.GetProperty("id").GetString();
-        categoryId.ShouldNotBeNullOrWhiteSpace();
-        created.GetProperty("name").GetString().ShouldBe("Electronics");
-        created.GetProperty("description").GetString().ShouldBe("Electronic devices");
+        var created = await createResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        created.ShouldNotBeNull();
+        created!.Id.ShouldNotBe(Guid.Empty);
+        created.Name.ShouldBe("Electronics");
+        created.Description.ShouldBe("Electronic devices");
 
         // 3. Get by id
-        var getByIdResponse = await _client.GetAsync($"/api/v1/categories/{categoryId}", ct);
+        var getByIdResponse = await _client.GetAsync($"/api/v1/categories/{created.Id}", ct);
         getByIdResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        fetched.GetProperty("name").GetString().ShouldBe("Electronics");
+        var fetched = await getByIdResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        fetched.ShouldNotBeNull();
+        fetched!.Name.ShouldBe("Electronics");
 
         // 4. Update category
         var updateResponse = await _client.PutAsJsonAsync(
-            $"/api/v1/categories/{categoryId}",
+            $"/api/v1/categories/{created.Id}",
             new { Name = "Updated Electronics", Description = "Updated description" },
             ct);
 
         updateResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         // 5. Verify update
-        var verifyResponse = await _client.GetAsync($"/api/v1/categories/{categoryId}", ct);
-        var updated = await verifyResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        updated.GetProperty("name").GetString().ShouldBe("Updated Electronics");
-        updated.GetProperty("description").GetString().ShouldBe("Updated description");
+        var verifyResponse = await _client.GetAsync($"/api/v1/categories/{created.Id}", ct);
+        var updated = await verifyResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        updated.ShouldNotBeNull();
+        updated!.Name.ShouldBe("Updated Electronics");
+        updated.Description.ShouldBe("Updated description");
 
         // 6. Delete category
-        var deleteResponse = await _client.DeleteAsync($"/api/v1/categories/{categoryId}", ct);
+        var deleteResponse = await _client.DeleteAsync($"/api/v1/categories/{created.Id}", ct);
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         // 7. Verify deletion
-        var getDeletedResponse = await _client.GetAsync($"/api/v1/categories/{categoryId}", ct);
+        var getDeletedResponse = await _client.GetAsync($"/api/v1/categories/{created.Id}", ct);
         getDeletedResponse.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
@@ -98,11 +100,10 @@ public class CategoriesControllerTests
 
         createResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        created.GetProperty("name").GetString().ShouldBe("Books");
-
-        var descriptionElement = created.GetProperty("description");
-        descriptionElement.ValueKind.ShouldBe(JsonValueKind.Null);
+        var created = await createResponse.Content.ReadFromJsonAsync<CategoryResponse>(TestJsonOptions.CaseInsensitive, ct);
+        created.ShouldNotBeNull();
+        created!.Name.ShouldBe("Books");
+        created.Description.ShouldBeNull();
     }
 
     [Fact]
@@ -117,9 +118,10 @@ public class CategoriesControllerTests
         var response = await _client.GetAsync("/api/v1/categories", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var categories = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive, ct);
-        categories.GetProperty("items").EnumerateArray().Count().ShouldBeGreaterThanOrEqualTo(2);
-        categories.GetProperty("totalCount").GetInt32().ShouldBeGreaterThanOrEqualTo(2);
+        var categories = await response.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>(TestJsonOptions.CaseInsensitive, ct);
+        categories.ShouldNotBeNull();
+        categories!.Items.Count().ShouldBeGreaterThanOrEqualTo(2);
+        categories.TotalCount.ShouldBeGreaterThanOrEqualTo(2);
     }
 
     [Fact]
@@ -134,12 +136,11 @@ public class CategoriesControllerTests
         var response = await _client.GetAsync("/api/v1/categories?pageNumber=1&pageSize=1&sortBy=name&sortDirection=asc", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(TestJsonOptions.CaseInsensitive, ct);
-        var items = payload.GetProperty("items").EnumerateArray().ToArray();
-
-        items.Length.ShouldBe(1);
-        payload.GetProperty("pageNumber").GetInt32().ShouldBe(1);
-        payload.GetProperty("pageSize").GetInt32().ShouldBe(1);
-        payload.GetProperty("totalCount").GetInt32().ShouldBeGreaterThanOrEqualTo(2);
+        var payload = await response.Content.ReadFromJsonAsync<PagedResponse<CategoryResponse>>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
+        payload!.Items.Count().ShouldBe(1);
+        payload.PageNumber.ShouldBe(1);
+        payload.PageSize.ShouldBe(1);
+        payload.TotalCount.ShouldBeGreaterThanOrEqualTo(2);
     }
 }

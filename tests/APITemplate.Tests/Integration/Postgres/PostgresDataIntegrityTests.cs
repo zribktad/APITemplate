@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
 
@@ -126,18 +125,16 @@ public sealed class PostgresDataIntegrityTests
         var response = await _client.GetAsync("/api/v1/products?query=wireless", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        var items = payload.GetProperty("page").GetProperty("items").EnumerateArray().ToArray();
-        var categoryFacets = payload.GetProperty("facets").GetProperty("categories").EnumerateArray().ToArray();
-        var priceBuckets = payload.GetProperty("facets").GetProperty("priceBuckets").EnumerateArray().ToArray();
+        var payload = await response.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
 
-        items.Length.ShouldBe(2);
-        items.Select(item => item.GetProperty("name").GetString()).ShouldBe(["Wireless Mouse", "Wireless Keyboard"], ignoreOrder: true);
-        categoryFacets.Length.ShouldBe(1);
-        categoryFacets[0].GetProperty("categoryName").GetString().ShouldBe("Electronics");
-        categoryFacets[0].GetProperty("count").GetInt32().ShouldBe(2);
-        priceBuckets.Single(bucket => bucket.GetProperty("label").GetString() == "0 - 50").GetProperty("count").GetInt32().ShouldBe(1);
-        priceBuckets.Single(bucket => bucket.GetProperty("label").GetString() == "50 - 100").GetProperty("count").GetInt32().ShouldBe(1);
+        payload!.Page.Items.Count().ShouldBe(2);
+        payload.Page.Items.Select(item => item.Name).ShouldBe(["Wireless Mouse", "Wireless Keyboard"], ignoreOrder: true);
+        payload.Facets.Categories.Count.ShouldBe(1);
+        payload.Facets.Categories.Single().CategoryName.ShouldBe("Electronics");
+        payload.Facets.Categories.Single().Count.ShouldBe(2);
+        payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "0 - 50").Count.ShouldBe(1);
+        payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "50 - 100").Count.ShouldBe(1);
     }
 
     [Fact]
@@ -469,11 +466,12 @@ public sealed class PostgresDataIntegrityTests
         var statsResponse = await _client.GetAsync($"/api/v1/categories/{categoryAId}/stats", ct);
         statsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await statsResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        payload.GetProperty("categoryId").GetGuid().ShouldBe(categoryAId);
-        payload.GetProperty("productCount").GetInt64().ShouldBe(1);
-        payload.GetProperty("averagePrice").GetDecimal().ShouldBe(100m);
-        payload.GetProperty("totalReviews").GetInt64().ShouldBe(1);
+        var payload = await statsResponse.Content.ReadFromJsonAsync<ProductCategoryStatsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
+        payload!.CategoryId.ShouldBe(categoryAId);
+        payload.ProductCount.ShouldBe(1);
+        payload.AveragePrice.ShouldBe(100m);
+        payload.TotalReviews.ShouldBe(1);
 
         // Tenant A token must not access stats of tenant B category.
         var forbiddenByIsolation = await _client.GetAsync($"/api/v1/categories/{categoryBId}/stats", ct);
@@ -485,7 +483,7 @@ public sealed class PostgresDataIntegrityTests
 
         var reviewsByProduct = await _client.GetAsync($"/api/v1/productreviews/by-product/{productAId}", ct);
         reviewsByProduct.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var reviews = await reviewsByProduct.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: ct);
+        var reviews = await reviewsByProduct.Content.ReadFromJsonAsync<ProductReviewResponse[]>(TestJsonOptions.CaseInsensitive, ct);
         reviews.ShouldNotBeNull();
         reviews!.Length.ShouldBe(1);
     }
@@ -536,24 +534,27 @@ public sealed class PostgresDataIntegrityTests
             ct);
         createProductResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
-        var createdProduct = await createProductResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        productId = createdProduct.GetProperty("id").GetGuid();
+        var createdProduct = await createProductResponse.Content.ReadFromJsonAsync<ProductResponse>(TestJsonOptions.CaseInsensitive, ct);
+        createdProduct.ShouldNotBeNull();
+        productId = createdProduct!.Id;
 
         var createReview1 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
             new { ProductId = productId, Rating = 5 },
             ct);
         createReview1.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var createdReview1 = await createReview1.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        review1Id = createdReview1.GetProperty("id").GetGuid();
+        var createdReview1 = await createReview1.Content.ReadFromJsonAsync<ProductReviewResponse>(TestJsonOptions.CaseInsensitive, ct);
+        createdReview1.ShouldNotBeNull();
+        review1Id = createdReview1!.Id;
 
         var createReview2 = await _client.PostAsJsonAsync(
             "/api/v1/productreviews",
             new { ProductId = productId, Rating = 4 },
             ct);
         createReview2.StatusCode.ShouldBe(HttpStatusCode.Created);
-        var createdReview2 = await createReview2.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        review2Id = createdReview2.GetProperty("id").GetGuid();
+        var createdReview2 = await createReview2.Content.ReadFromJsonAsync<ProductReviewResponse>(TestJsonOptions.CaseInsensitive, ct);
+        createdReview2.ShouldNotBeNull();
+        review2Id = createdReview2!.Id;
 
         var deleteResponse = await _client.DeleteAsync($"/api/v1/products/{productId}", ct);
         deleteResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -561,7 +562,7 @@ public sealed class PostgresDataIntegrityTests
         var reviewsResponse = await _client.GetAsync($"/api/v1/productreviews/by-product/{productId}", ct);
         reviewsResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var visibleReviews = await reviewsResponse.Content.ReadFromJsonAsync<JsonElement[]>(cancellationToken: ct);
+        var visibleReviews = await reviewsResponse.Content.ReadFromJsonAsync<ProductReviewResponse[]>(TestJsonOptions.CaseInsensitive, ct);
         visibleReviews.ShouldNotBeNull();
         visibleReviews.ShouldBeEmpty();
 
@@ -1034,11 +1035,12 @@ public sealed class PostgresDataIntegrityTests
         var response = await _client.GetAsync($"/api/v1/categories/{categoryId}/stats", ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
-        payload.GetProperty("categoryId").GetGuid().ShouldBe(categoryId);
-        payload.GetProperty("productCount").GetInt64().ShouldBe(0);
-        payload.GetProperty("averagePrice").GetDecimal().ShouldBe(0m);
-        payload.GetProperty("totalReviews").GetInt64().ShouldBe(0);
+        var payload = await response.Content.ReadFromJsonAsync<ProductCategoryStatsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        payload.ShouldNotBeNull();
+        payload!.CategoryId.ShouldBe(categoryId);
+        payload.ProductCount.ShouldBe(0);
+        payload.AveragePrice.ShouldBe(0m);
+        payload.TotalReviews.ShouldBe(0);
     }
 
     [Fact]
