@@ -6,7 +6,6 @@ using Microsoft.Extensions.Compliance.Redaction;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using System.ComponentModel.DataAnnotations;
-
 namespace APITemplate.Extensions;
 
 public static class LoggingExtensions
@@ -52,15 +51,15 @@ public static class LoggingExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        loggerConfiguration.Enrich.With<ActivityTraceEnricher>();
+        loggerConfiguration
+            .Enrich.FromLogContext()
+            .Enrich.With<ActivityTraceEnricher>();
 
         var options = configuration
             .GetSection(ObservabilityServiceCollectionExtensions.ObservabilitySectionName)
             .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
 
-        var serviceName = string.IsNullOrWhiteSpace(options.ServiceName)
-            ? "APITemplate"
-            : options.ServiceName;
+        var resourceAttributes = ObservabilityServiceCollectionExtensions.BuildResourceAttributes(options, environment);
         var endpoints = ObservabilityServiceCollectionExtensions.GetEnabledOtlpEndpoints(options, environment);
 
         foreach (var endpoint in endpoints)
@@ -69,12 +68,12 @@ public static class LoggingExtensions
             {
                 otel.Endpoint = endpoint;
                 otel.Protocol = OtlpProtocol.Grpc;
-                otel.ResourceAttributes = new Dictionary<string, object>
-                {
-                    ["service.name"] = serviceName,
-                    ["deployment.environment.name"] = environment.EnvironmentName,
-                    ["service.instance.id"] = Environment.MachineName
-                };
+                otel.IncludedData =
+                    IncludedData.MessageTemplateTextAttribute |
+                    IncludedData.SpecRequiredResourceAttributes |
+                    IncludedData.TraceIdField |
+                    IncludedData.SpanIdField;
+                otel.ResourceAttributes = resourceAttributes;
             });
         }
 

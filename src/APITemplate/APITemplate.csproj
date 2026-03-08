@@ -12,7 +12,9 @@
 
   <ItemGroup>
     <Compile Remove="artifacts\**\*.cs" />
+    <Compile Remove="obj-codex\**\*.cs" />
     <None Remove="artifacts\**\*" />
+    <None Remove="obj-codex\**\*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -84,6 +84,11 @@ public class ScalarAndOpenApiTests
 
         var content = await response.Content.ReadAsStringAsync(ct);
         content.ShouldContain("scalar");
+        content.ShouldContain("authorizationUrl");
+        content.ShouldContain("tokenUrl");
+        content.ShouldContain("x-scalar-redirect-uri");
+        content.ShouldContain("x-usePkce");
+        content.ShouldContain("api-template-scalar");
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using APITemplate.Application.Common.Options;
 using APITemplate.Infrastructure.Observability;
 using HotChocolate.Diagnostics;
@@ -25,7 +26,7 @@ public static class ObservabilityServiceCollectionExtensions
         services.Configure<HealthCheckPublisherOptions>(options =>
         {
             options.Delay = TimeSpan.FromSeconds(15);
-            options.Period = TimeSpan.FromSeconds(30);
+            options.Period = TimeSpan.FromMinutes(5);
         });
 
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
@@ -46,6 +47,15 @@ public static class ObservabilityServiceCollectionExtensions
                 {
                     options.RecordException = true;
                     options.Filter = httpContext => !httpContext.Request.Path.StartsWithSegments(TelemetryPathPrefixes.Health);
+                    options.EnrichWithHttpRequest = (activity, httpRequest) =>
+                    {
+                        if (TelemetryApiSurfaceResolver.Resolve(httpRequest.Path) != TelemetrySurfaces.Rest)
+                            return;
+
+                        var route = HttpRouteResolver.Resolve(httpRequest.HttpContext);
+                        activity.DisplayName = $"{httpRequest.Method} {route}";
+                        activity.SetTag(TelemetryTagKeys.HttpRoute, route);
+                    };
                 })
                 .AddHttpClientInstrumentation()
                 .AddHotChocolateInstrumentation()
@@ -142,23 +152,41 @@ public static class ObservabilityServiceCollectionExtensions
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-    private static Dictionary<string, object> BuildResourceAttributes(
+    internal static Dictionary<string, object> BuildResourceAttributes(
         ObservabilityOptions options,
         IHostEnvironment environment)
     {
         var serviceName = string.IsNullOrWhiteSpace(options.ServiceName)
             ? ObservabilityConventions.ActivitySourceName
             : options.ServiceName;
-        var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? TelemetryDefaults.Unknown;
+        var entryAssembly = Assembly.GetEntryAssembly();
+        var assemblyName = entryAssembly?.GetName().Name ?? serviceName;
+        var version = entryAssembly?.GetName().Version?.ToString() ?? TelemetryDefaults.Unknown;
+        var machineName = Environment.MachineName;
+        var processId = Environment.ProcessId;
 
         return new Dictionary<string, object>
         {
+            [TelemetryResourceAttributeKeys.AssemblyName] = assemblyName,
             [TelemetryResourceAttributeKeys.ServiceName] = serviceName,
+            [TelemetryResourceAttributeKeys.ServiceNamespace] = ObservabilityConventions.ServiceNamespace,
             [TelemetryResourceAttributeKeys.ServiceVersion] = version,
-            [TelemetryResourceAttributeKeys.ServiceInstanceId] = Environment.MachineName,
-            [TelemetryResourceAttributeKeys.DeploymentEnvironmentName] = environment.EnvironmentName
+            [TelemetryResourceAttributeKeys.ServiceInstanceId] = $"{machineName}-{processId}",
+            [TelemetryResourceAttributeKeys.DeploymentEnvironmentName] = environment.EnvironmentName,
+            [TelemetryResourceAttributeKeys.HostName] = machineName,
+            [TelemetryResourceAttributeKeys.HostArchitecture] = RuntimeInformation.OSArchitecture.ToString(),
+            [TelemetryResourceAttributeKeys.OsType] = GetOsType(),
+            [TelemetryResourceAttributeKeys.ProcessPid] = processId,
+            [TelemetryResourceAttributeKeys.ProcessRuntimeName] = ".NET",
+            [TelemetryResourceAttributeKeys.ProcessRuntimeVersion] = Environment.Version.ToString()
         };
     }
+
+    private static string GetOsType()
+        => OperatingSystem.IsWindows() ? "windows"
+        : OperatingSystem.IsLinux() ? "linux"
+        : OperatingSystem.IsMacOS() ? "darwin"
+        : TelemetryDefaults.Unknown;
 
     private static void ConfigureTracingExporters(
         TracerProviderBuilder builder,

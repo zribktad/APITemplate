@@ -58,7 +58,7 @@ public static class ApiServiceCollectionExtensions
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = (context, _) =>
             {
-                var endpoint = context.HttpContext.GetEndpoint()?.DisplayName ?? TelemetryDefaults.Unknown;
+                var endpoint = HttpRouteResolver.Resolve(context.HttpContext);
                 ApiMetrics.RecordRateLimitRejection(
                     CachePolicyNames.RateLimitPolicy,
                     context.HttpContext.Request.Method,

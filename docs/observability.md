@@ -1,5 +1,33 @@
 # Observability
 
+## Quick Connection URLs
+
+Use these URLs when connecting the API or opening the observability services locally:
+
+| Service | URL |
+|---|---|
+| API (VS Code local launch) | `http://localhost:5174` |
+| API health (VS Code local launch) | `http://localhost:5174/health` |
+| Grafana | `http://localhost:3001` |
+| Prometheus | `http://localhost:9090` |
+| Loki | `http://localhost:3100` |
+| Tempo | `http://localhost:3200` |
+| Aspire Dashboard UI | `http://localhost:18888` when an Aspire profile is running |
+| OTLP gRPC endpoint | `http://localhost:4317` |
+| OTLP HTTP endpoint | `http://localhost:4318` |
+
+For local API telemetry export:
+
+- use `http://localhost:4317` when sending to `Aspire Dashboard` in Aspire-only mode
+- use `http://localhost:18889` when sending to `Aspire Dashboard` in full observability mode
+- use `http://localhost:4317` when sending to `Grafana Alloy`
+- do not run `Aspire Dashboard` and `Alloy` on the same host OTLP port mapping at the same time unless one is remapped
+
+If you start the API from VS Code using `.NET API + Observability`, the API is available on `http://localhost:5174` and the observability UI is Grafana on `http://localhost:3001`.
+If you start the API from VS Code using `.NET API + Full Observability`, the API is available on `http://localhost:5174`, Grafana is on `http://localhost:3001`, and Aspire Dashboard is on `http://localhost:18888`.
+If you start the API from VS Code using `.NET API + Aspire Dashboard`, the dashboard UI is `http://localhost:18888`.
+`http://localhost:8080` is for the API container when the API itself runs inside Docker.
+
 ## What This Is
 
 This template uses a single observability model based on `OpenTelemetry`.
@@ -342,7 +370,7 @@ Flow:
 Local API -> localhost:4317 -> Aspire Dashboard
 ```
 
-### Option 2: API locally + full Grafana stack
+### Option 2: API locally + observability stack without Aspire
 
 Use this when you want realistic operational observability while still debugging the API locally.
 
@@ -367,7 +395,43 @@ Flow:
 Local API -> localhost:4317 -> Alloy -> Tempo/Loki/Prometheus -> Grafana
 ```
 
-### Option 3: full Docker environment
+### Option 3: API locally + full observability stack with Aspire and Grafana
+
+Use this when you want both the LGTM stack and Aspire Dashboard running together.
+
+Start the stack:
+
+```bash
+ASPIRE_OTLP_GRPC_PORT=18889 ASPIRE_OTLP_HTTP_PORT=18890 docker compose --profile aspire up -d postgres mongodb keycloak-db keycloak valkey alloy prometheus loki tempo grafana aspire-dashboard
+```
+
+Then run the API locally and send telemetry to both backends:
+
+```powershell
+$env:Observability__Aspire__Endpoint="http://localhost:18889"
+$env:Observability__Otlp__Endpoint="http://localhost:4317"
+$env:Observability__Exporters__Aspire__Enabled="true"
+$env:Observability__Exporters__Otlp__Enabled="true"
+dotnet run --project src/APITemplate
+```
+
+Default endpoints:
+
+- Grafana UI: `http://localhost:3001`
+- Aspire Dashboard UI: `http://localhost:18888`
+- Alloy OTLP gRPC exposed on host: `http://localhost:4317`
+- Alloy OTLP HTTP exposed on host: `http://localhost:4318`
+- Aspire OTLP gRPC exposed on host: `http://localhost:18889`
+- Aspire OTLP HTTP exposed on host: `http://localhost:18890`
+
+Flow:
+
+```text
+Local API -> localhost:4317 -> Alloy -> Tempo/Loki/Prometheus -> Grafana
+         -> localhost:18889 -> Aspire Dashboard
+```
+
+### Option 4: full Docker environment
 
 Use this when you want everything in containers, including the API.
 
@@ -387,7 +451,7 @@ Observability__Exporters__Aspire__Enabled: "false"
 
 That wiring is in [docker-compose.yml](/c:/users/tad/projects/api-template.worktrees/observ/docker-compose.yml).
 
-### Option 4: production-like Compose
+### Option 5: production-like Compose
 
 Use the production-like stack without Aspire:
 
@@ -416,25 +480,27 @@ The default Compose file starts these observability services:
 | `loki` | logs backend | `3100` |
 | `tempo` | traces backend | `3200` |
 | `grafana` | dashboards and exploration | `3001` |
-| `aspire-dashboard` | optional local telemetry dashboard | `18888`, host `4317`, host `4318` when profile enabled |
+| `aspire-dashboard` | optional local telemetry dashboard | `18888`, host `4317`, host `4318` by default, or `18889`, `18890` in full mode |
 
 Important detail:
 
 - `alloy` and `aspire-dashboard` both want OTLP ports on the host
-- do not run both on the same host port mapping at the same time unless you intentionally remap one of them
+- in full mode the same `aspire-dashboard` service is started with host ports `18889` and `18890` to avoid that conflict
 - the provided VS Code launch profiles already separate these modes for you
 
 ### Useful URLs
 
 | Tool | URL |
 |---|---|
-| API | `http://localhost:8080` |
+| API (VS Code local launch) | `http://localhost:5174` |
 | Grafana | `http://localhost:3001` |
 | Prometheus | `http://localhost:9090` |
 | Loki | `http://localhost:3100` |
 | Tempo | `http://localhost:3200` |
 | Aspire Dashboard | `http://localhost:18888` |
-| Health endpoint | `http://localhost:8080/health` |
+| Health endpoint (VS Code local launch) | `http://localhost:5174/health` |
+
+If the API runs as a container instead of a local VS Code process, use `http://localhost:8080` and `http://localhost:8080/health`.
 
 ## How the Full Stack Is Connected
 
@@ -453,6 +519,9 @@ What it does:
    - metrics to Prometheus remote write
 3. exposes its own metrics on `12345` for Prometheus scraping
 
+Logs are sent to Loki over its native `OTLP HTTP` ingest endpoint at `/otlp`, not through the legacy Loki exporter format.
+That matters because Grafana `Logs Drilldown` expects Loki's OpenTelemetry-aware label and metadata model.
+
 ### Tempo
 
 Tempo stores distributed traces.
@@ -468,7 +537,7 @@ Loki stores logs.
 
 In this setup:
 
-- Alloy forwards logs to Loki push API
+- Alloy forwards logs to Loki native OTLP ingest on `http://loki:3100/otlp`
 - Grafana queries Loki on `http://loki:3100`
 
 ### Prometheus
@@ -534,6 +603,7 @@ From Grafana you can:
 This repo includes VS Code profiles for observability workflows:
 
 - `.NET API + Aspire Dashboard`
+- `.NET API + Observability`
 - `.NET API + Full Observability`
 
 These profiles:
@@ -541,6 +611,12 @@ These profiles:
 - start required support services first
 - run the API locally under the debugger
 - keep the API outside Docker so local debugging stays simple
+
+Profile mapping:
+
+- `.NET API + Aspire Dashboard` starts `aspire-dashboard`, so use `http://localhost:18888`
+- `.NET API + Observability` starts `alloy`, `grafana`, `tempo`, `loki`, and `prometheus`, so use `http://localhost:3001`
+- `.NET API + Full Observability` starts the LGTM stack and `aspire-dashboard`, so use `http://localhost:3001` and `http://localhost:18888`
 
 Use them when you want the easiest developer workflow.
 
@@ -665,10 +741,11 @@ docker compose logs aspire-dashboard
 
 This is expected.
 
-Use one mode at a time:
+Use one of these modes:
 
 - Aspire mode
-- or full LGTM mode
+- observability mode without Aspire
+- full observability mode with remapped Aspire OTLP on `18889` and `18890`
 
 The launch profiles already separate these scenarios.
 
@@ -679,6 +756,9 @@ Check:
 - Alloy is forwarding logs to Loki
 - Loki is healthy
 - Grafana datasource `Loki` is provisioned
+
+If logs appear in dashboards or Explore but not in `Logs Drilldown`, check that Alloy is exporting logs to Loki via native OTLP ingest.
+The legacy `otelcol.exporter.loki` path can still show logs in normal Loki queries, but Drilldown can miss them because the OTLP resource labels and structured metadata are not exposed the same way.
 
 ### Metrics appear but no application service in dashboards
 

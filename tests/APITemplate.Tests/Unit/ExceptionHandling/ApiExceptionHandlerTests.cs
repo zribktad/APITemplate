@@ -114,6 +114,22 @@ public class ApiExceptionHandlerTests
         handled.ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task TryHandleAsync_WhenRequestIsAborted_ReturnsTrueWithoutProblemDetailsBody()
+    {
+        using var cts = new CancellationTokenSource();
+        var context = CreateHttpContext();
+        context.RequestAborted = cts.Token;
+        cts.Cancel();
+
+        var handler = new ApiExceptionHandler(_loggerMock.Object, _problemDetailsService);
+        var handled = await handler.TryHandleAsync(context, new OperationCanceledException(cts.Token), cts.Token);
+
+        handled.ShouldBeTrue();
+        context.Response.StatusCode.ShouldBe(499);
+        context.Response.Body.Length.ShouldBe(0);
+    }
+
     private static DefaultHttpContext CreateHttpContext()
     {
         var context = new DefaultHttpContext();

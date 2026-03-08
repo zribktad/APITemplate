@@ -37,7 +37,7 @@ builder.Services.AddApiVersioningConfiguration(); // Register API versioning and
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {
-    Console.Error.WriteLine($"Application terminated unexpectedly: {ex}");
+    Console.Error.WriteLine($"Application terminated unexpectedly: {ex.Message}");
     throw;
 }
 

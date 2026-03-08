@@ -80,7 +80,7 @@
       "problemMatcher": []
     },
     {
-      "label": "docker: observability up (full)",
+      "label": "docker: observability up",
       "type": "process",
       "command": "docker",
       "args": [
@@ -97,6 +97,19 @@
         "loki",
         "tempo",
         "grafana"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: observability up (full)",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$ErrorActionPreference = 'Stop'; $env:ASPIRE_OTLP_GRPC_PORT='18889'; $env:ASPIRE_OTLP_HTTP_PORT='18890'; docker compose --profile aspire up -d postgres mongodb keycloak-db keycloak valkey alloy prometheus loki tempo grafana aspire-dashboard"
       ],
       "problemMatcher": []
     },
@@ -222,6 +235,15 @@
       "label": "prepare: debug aspire",
       "dependsOn": [
         "docker: observability up (aspire)",
+        "build: api"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "prepare: debug observability",
+      "dependsOn": [
+        "docker: observability up",
         "build: api"
       ],
       "dependsOrder": "sequence",

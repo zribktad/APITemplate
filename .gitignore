@@ -25,6 +25,13 @@ artifacts/
 # .NET
 *.orig
 
+# Agent files
+.claude/**/*local*
+**/obj-codex/**
+CLAUDE.md
+AGENTS.md
+**/*codex**
+
 # Logs
 *.log
 logs/
@@ -33,8 +40,6 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Claude local files
-.claude/**/*local*
 
 # Environment / secrets
 .env
@@ -53,6 +58,3 @@ coverage/
 
 # Published output
 publish/
-
-# Other
-CLAUDE.md

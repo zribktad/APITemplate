@@ -37,7 +37,7 @@ public static class ValidationTelemetry
     }
 
     private static string ResolveRoute(ActionExecutingContext context)
-        => context.ActionDescriptor.AttributeRouteInfo?.Template
-           ?? context.HttpContext.Request.Path.Value
-           ?? TelemetryDefaults.Unknown;
+        => context.ActionDescriptor.AttributeRouteInfo?.Template is { } template
+            ? HttpRouteResolver.ReplaceVersionToken(template, context.RouteData.Values)
+            : context.HttpContext.Request.Path.Value ?? TelemetryDefaults.Unknown;
 }

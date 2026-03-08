@@ -5,6 +5,7 @@ public static class ObservabilityConventions
     public const string ActivitySourceName = "APITemplate";
     public const string MeterName = "APITemplate";
     public const string HealthMeterName = "APITemplate.Health";
+    public const string ServiceNamespace = "APITemplate";
 }
 
 public static class TelemetryMetricNames
@@ -187,7 +188,15 @@ public static class TelemetryInstrumentNames
 
 public static class TelemetryResourceAttributeKeys
 {
+    public const string AssemblyName = "assembly.name";
     public const string DeploymentEnvironmentName = "deployment.environment.name";
+    public const string HostName = "host.name";
+    public const string HostArchitecture = "host.arch";
+    public const string OsType = "os.type";
+    public const string ProcessPid = "process.pid";
+    public const string ProcessRuntimeName = "process.runtime.name";
+    public const string ProcessRuntimeVersion = "process.runtime.version";
+    public const string ServiceNamespace = "service.namespace";
     public const string ServiceInstanceId = "service.instance.id";
     public const string ServiceName = "service.name";
     public const string ServiceVersion = "service.version";

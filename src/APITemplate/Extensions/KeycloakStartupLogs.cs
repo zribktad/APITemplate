@@ -25,4 +25,10 @@ internal static partial class KeycloakStartupLogs
         Level = LogLevel.Warning,
         Message = "Keycloak not ready, retrying ({Attempt}/{MaxRetries})...")]
     public static partial void KeycloakRetrying(this ILogger logger, int attempt, int maxRetries);
+
+    [LoggerMessage(
+        EventId = 3005,
+        Level = LogLevel.Error,
+        Message = "Keycloak did not become available after {MaxRetries} retries")]
+    public static partial void KeycloakUnavailable(this ILogger logger, Exception exception, int maxRetries);
 }
