@@ -44,7 +44,7 @@ public static class AuthTelemetry
         activity?.SetTag(TelemetryTagKeys.AuthScheme, scheme);
         activity?.SetTag(TelemetryTagKeys.AuthFailureReason, reason);
         activity?.SetTag(TelemetryTagKeys.ApiSurface, surface);
-        activity?.SetStatus(ActivityStatusCode.Error, exception?.Message);
+        activity?.SetStatus(ActivityStatusCode.Error);
         if (exception is not null)
             activity?.SetTag(TelemetryTagKeys.ExceptionType, exception.GetType().Name);
     }

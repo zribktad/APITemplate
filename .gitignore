@@ -30,7 +30,6 @@ artifacts/
 **/obj-codex/**
 CLAUDE.md
 AGENTS.md
-**/*codex**
 
 # Logs
 *.log

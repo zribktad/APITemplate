@@ -127,12 +127,12 @@ Grafana
 
 Telemetry registration is intentionally centralized:
 
-- [ObservabilityServiceCollectionExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
-- [LoggingExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/LoggingExtensions.cs)
+- [ObservabilityServiceCollectionExtensions.cs](../src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
+- [LoggingExtensions.cs](../src/APITemplate/Extensions/LoggingExtensions.cs)
 
 Project-specific telemetry helpers are isolated under:
 
-- [Infrastructure/Observability](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability)
+- [Infrastructure/Observability](../src/APITemplate/Infrastructure/Observability)
 
 This keeps controllers, services, filters, auth handlers, and startup code readable.
 
@@ -192,8 +192,8 @@ Startup telemetry traces these steps:
 
 Relevant code:
 
-- [ApplicationBuilderExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/ApplicationBuilderExtensions.cs)
-- [StartupTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/StartupTelemetry.cs)
+- [ApplicationBuilderExtensions.cs](../src/APITemplate/Extensions/ApplicationBuilderExtensions.cs)
+- [StartupTelemetry.cs](../src/APITemplate/Infrastructure/Observability/StartupTelemetry.cs)
 
 ### Auth and BFF instrumentation
 
@@ -208,10 +208,10 @@ Failure-only telemetry is recorded for:
 
 Relevant code:
 
-- [AuthenticationServiceCollectionExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/AuthenticationServiceCollectionExtensions.cs)
-- [TenantClaimValidator.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Security/TenantClaimValidator.cs)
-- [CookieSessionRefresher.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Security/CookieSessionRefresher.cs)
-- [AuthTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/AuthTelemetry.cs)
+- [AuthenticationServiceCollectionExtensions.cs](../src/APITemplate/Extensions/AuthenticationServiceCollectionExtensions.cs)
+- [TenantClaimValidator.cs](../src/APITemplate/Infrastructure/Security/TenantClaimValidator.cs)
+- [CookieSessionRefresher.cs](../src/APITemplate/Infrastructure/Security/CookieSessionRefresher.cs)
+- [AuthTelemetry.cs](../src/APITemplate/Infrastructure/Observability/AuthTelemetry.cs)
 
 ### Cache instrumentation
 
@@ -226,9 +226,9 @@ Output cache telemetry includes:
 
 Relevant code:
 
-- [TenantAwareOutputCachePolicy.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Api/Cache/TenantAwareOutputCachePolicy.cs)
-- [OutputCacheInvalidationService.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Api/Cache/OutputCacheInvalidationService.cs)
-- [CacheTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/CacheTelemetry.cs)
+- [TenantAwareOutputCachePolicy.cs](../src/APITemplate/Api/Cache/TenantAwareOutputCachePolicy.cs)
+- [OutputCacheInvalidationService.cs](../src/APITemplate/Api/Cache/OutputCacheInvalidationService.cs)
+- [CacheTelemetry.cs](../src/APITemplate/Infrastructure/Observability/CacheTelemetry.cs)
 
 ### Validation and exception instrumentation
 
@@ -242,10 +242,10 @@ The API records:
 
 Relevant code:
 
-- [FluentValidationActionFilter.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Api/Filters/FluentValidationActionFilter.cs)
-- [ApiExceptionHandler.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Api/ExceptionHandling/ApiExceptionHandler.cs)
-- [ValidationTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/ValidationTelemetry.cs)
-- [ConflictTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/ConflictTelemetry.cs)
+- [FluentValidationActionFilter.cs](../src/APITemplate/Api/Filters/FluentValidationActionFilter.cs)
+- [ApiExceptionHandler.cs](../src/APITemplate/Api/ExceptionHandling/ApiExceptionHandler.cs)
+- [ValidationTelemetry.cs](../src/APITemplate/Infrastructure/Observability/ValidationTelemetry.cs)
+- [ConflictTelemetry.cs](../src/APITemplate/Infrastructure/Observability/ConflictTelemetry.cs)
 
 ### Stored procedure instrumentation
 
@@ -253,14 +253,14 @@ Stored procedures get explicit parent application spans on top of provider-level
 
 Relevant code:
 
-- [StoredProcedureExecutor.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/StoredProcedures/StoredProcedureExecutor.cs)
-- [StoredProcedureTelemetry.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Observability/StoredProcedureTelemetry.cs)
+- [StoredProcedureExecutor.cs](../src/APITemplate/Infrastructure/StoredProcedures/StoredProcedureExecutor.cs)
+- [StoredProcedureTelemetry.cs](../src/APITemplate/Infrastructure/Observability/StoredProcedureTelemetry.cs)
 
 ## How the API Connects to Observability
 
 ## Application configuration
 
-Observability settings live in [appsettings.json](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/appsettings.json):
+Observability settings live in [appsettings.json](../src/APITemplate/appsettings.json):
 
 ```json
 {
@@ -311,7 +311,7 @@ Current default behavior is:
 
 This logic lives in:
 
-- [ObservabilityServiceCollectionExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
+- [ObservabilityServiceCollectionExtensions.cs](../src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
 
 ### Environment variable examples
 
@@ -449,7 +449,7 @@ Observability__Exporters__Otlp__Enabled: "true"
 Observability__Exporters__Aspire__Enabled: "false"
 ```
 
-That wiring is in [docker-compose.yml](/c:/users/tad/projects/api-template.worktrees/observ/docker-compose.yml).
+That wiring is in [docker-compose.yml](../docker-compose.yml).
 
 ### Option 5: production-like Compose
 
@@ -465,7 +465,7 @@ This uses:
 - OTLP export to Alloy
 - the same LGTM backend pattern
 
-See [docker-compose.production.yml](/c:/users/tad/projects/api-template.worktrees/observ/docker-compose.production.yml).
+See [docker-compose.production.yml](../docker-compose.production.yml).
 
 ## Docker Services and Ports
 
@@ -506,7 +506,7 @@ If the API runs as a container instead of a local VS Code process, use `http://l
 
 ### Alloy
 
-Alloy configuration lives in [config.alloy](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/alloy/config.alloy).
+Alloy configuration lives in [config.alloy](../infrastructure/observability/alloy/config.alloy).
 
 What it does:
 
@@ -551,7 +551,7 @@ In this setup:
 
 Prometheus configuration lives in:
 
-- [prometheus.yml](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/prometheus/prometheus.yml)
+- [prometheus.yml](../infrastructure/observability/prometheus/prometheus.yml)
 
 ## Grafana
 
@@ -561,9 +561,9 @@ Grafana is provisioned from repository files. No manual datasource setup is requ
 
 Provisioning paths:
 
-- [grafana/provisioning/datasources](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/grafana/provisioning/datasources)
-- [grafana/provisioning/dashboards](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/grafana/provisioning/dashboards)
-- [grafana/dashboards](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/grafana/dashboards)
+- [grafana/provisioning/datasources](../infrastructure/observability/grafana/provisioning/datasources)
+- [grafana/provisioning/dashboards](../infrastructure/observability/grafana/provisioning/dashboards)
+- [grafana/dashboards](../infrastructure/observability/grafana/dashboards)
 
 ### Datasources
 
@@ -575,7 +575,7 @@ Provisioned datasources:
 
 Datasource provisioning file:
 
-- [datasources.yml](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/grafana/provisioning/datasources/datasources.yml)
+- [datasources.yml](../infrastructure/observability/grafana/provisioning/datasources/datasources.yml)
 
 ### Grafana credentials
 
@@ -713,9 +713,9 @@ This makes it possible to:
 
 Relevant code:
 
-- [LoggingExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/LoggingExtensions.cs)
-- [ActivityTraceEnricher.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Infrastructure/Logging/ActivityTraceEnricher.cs)
-- [RequestContextMiddleware.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Api/Middleware/RequestContextMiddleware.cs)
+- [LoggingExtensions.cs](../src/APITemplate/Extensions/LoggingExtensions.cs)
+- [ActivityTraceEnricher.cs](../src/APITemplate/Infrastructure/Logging/ActivityTraceEnricher.cs)
+- [RequestContextMiddleware.cs](../src/APITemplate/Api/Middleware/RequestContextMiddleware.cs)
 
 ## Troubleshooting
 
@@ -816,20 +816,20 @@ Because provider-level PostgreSQL spans are the most useful signal for this proj
 
 ### Application
 
-- [Program.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Program.cs)
-- [ObservabilityServiceCollectionExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
-- [LoggingExtensions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Extensions/LoggingExtensions.cs)
-- [ObservabilityOptions.cs](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/Application/Common/Options/ObservabilityOptions.cs)
-- [appsettings.json](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/appsettings.json)
-- [appsettings.Production.json](/c:/users/tad/projects/api-template.worktrees/observ/src/APITemplate/appsettings.Production.json)
+- [Program.cs](../src/APITemplate/Program.cs)
+- [ObservabilityServiceCollectionExtensions.cs](../src/APITemplate/Extensions/ObservabilityServiceCollectionExtensions.cs)
+- [LoggingExtensions.cs](../src/APITemplate/Extensions/LoggingExtensions.cs)
+- [ObservabilityOptions.cs](../src/APITemplate/Application/Common/Options/ObservabilityOptions.cs)
+- [appsettings.json](../src/APITemplate/appsettings.json)
+- [appsettings.Production.json](../src/APITemplate/appsettings.Production.json)
 
 ### Infrastructure
 
-- [docker-compose.yml](/c:/users/tad/projects/api-template.worktrees/observ/docker-compose.yml)
-- [docker-compose.production.yml](/c:/users/tad/projects/api-template.worktrees/observ/docker-compose.production.yml)
-- [config.alloy](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/alloy/config.alloy)
-- [prometheus.yml](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/prometheus/prometheus.yml)
-- [datasources.yml](/c:/users/tad/projects/api-template.worktrees/observ/infrastructure/observability/grafana/provisioning/datasources/datasources.yml)
+- [docker-compose.yml](../docker-compose.yml)
+- [docker-compose.production.yml](../docker-compose.production.yml)
+- [config.alloy](../infrastructure/observability/alloy/config.alloy)
+- [prometheus.yml](../infrastructure/observability/prometheus/prometheus.yml)
+- [datasources.yml](../infrastructure/observability/grafana/provisioning/datasources/datasources.yml)
 
 ## Summary
 
@@ -843,3 +843,4 @@ If you want the shortest mental model, it is this:
 - Loki stores logs
 - Prometheus stores metrics
 - Grafana is where you explore everything together
+

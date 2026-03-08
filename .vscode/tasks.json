@@ -103,14 +103,31 @@
     {
       "label": "docker: observability up (full)",
       "type": "process",
-      "command": "pwsh",
+      "command": "docker",
       "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        "$ErrorActionPreference = 'Stop'; $env:ASPIRE_OTLP_GRPC_PORT='18889'; $env:ASPIRE_OTLP_HTTP_PORT='18890'; docker compose --profile aspire up -d postgres mongodb keycloak-db keycloak valkey alloy prometheus loki tempo grafana aspire-dashboard"
+        "compose",
+        "--profile",
+        "aspire",
+        "up",
+        "-d",
+        "postgres",
+        "mongodb",
+        "keycloak-db",
+        "keycloak",
+        "valkey",
+        "alloy",
+        "prometheus",
+        "loki",
+        "tempo",
+        "grafana",
+        "aspire-dashboard"
       ],
+      "options": {
+        "env": {
+          "ASPIRE_OTLP_GRPC_PORT": "18889",
+          "ASPIRE_OTLP_HTTP_PORT": "18890"
+        }
+      },
       "problemMatcher": []
     },
     {

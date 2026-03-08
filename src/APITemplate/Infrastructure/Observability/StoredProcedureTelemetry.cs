@@ -31,7 +31,7 @@ public static class StoredProcedureTelemetry
         }
         catch (Exception ex)
         {
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error);
             activity?.SetTag(TelemetryTagKeys.ExceptionType, ex.GetType().Name);
             throw;
         }

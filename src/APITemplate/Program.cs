@@ -21,7 +21,7 @@ try
     builder.Services.AddApplicationServices(); // Register application services + validators.
     builder.Services.AddMongoDB(builder.Configuration); // Register Mongo context/services + Mongo health checks.
     builder.Services.AddKeycloakBffAuthentication(builder.Configuration, builder.Environment); // Register Keycloak hybrid JWT + BFF authentication.
-builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
+    builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
     builder.Services.AddGraphQLConfiguration(); // Register GraphQL schema and server services.
 
     var app = builder.Build(); // Materialize the web app from configured services.
@@ -37,7 +37,7 @@ builder.Services.AddApiVersioningConfiguration(); // Register API versioning and
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {
-    Console.Error.WriteLine($"Application terminated unexpectedly: {ex.Message}");
+    Console.Error.WriteLine($"Application terminated unexpectedly: {ex}");
     throw;
 }
 

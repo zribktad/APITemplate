@@ -11,7 +11,7 @@ namespace APITemplate.Tests.Unit.StoredProcedures;
 public sealed class StoredProcedureExecutorTests
 {
     [Fact]
-    public async Task ExecuteAsync_WhenSqlIsInvalid_Throws()
+    public async Task ExecuteAsync_WhenProviderDoesNotSupportRawSql_Throws()
     {
         await using var dbContext = CreateDbContext();
         var sut = new StoredProcedureExecutor(dbContext);

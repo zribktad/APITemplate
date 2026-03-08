@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 using Moq;
+using StackExchange.Redis;
 
 namespace APITemplate.Tests.Integration.Helpers;
 
@@ -67,8 +68,10 @@ internal static class TestServiceHelper
 
     internal static void ReplaceOutputCacheWithInMemory(IServiceCollection services)
     {
-        // Remove Valkey-backed output cache store and ValkeyOptions validation so tests use in-memory cache.
+        // Remove Valkey-backed cache services so tests use in-memory implementations
+        // and observability startup does not try to connect to a real Redis instance.
         services.RemoveAll<IOutputCacheStore>();
+        services.RemoveAll<IConnectionMultiplexer>();
         services.AddOutputCache();
         services.RemoveAll<IValidateOptions<Application.Common.Options.ValkeyOptions>>();
         services.RemoveAll<IOptionsChangeTokenSource<Application.Common.Options.ValkeyOptions>>();

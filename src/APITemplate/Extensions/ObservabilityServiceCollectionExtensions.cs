@@ -61,6 +61,7 @@ public static class ObservabilityServiceCollectionExtensions
                 .AddHotChocolateInstrumentation()
                 .AddRedisInstrumentation()
                 .AddNpgsql()
+                .AddSource(ObservabilityConventions.ActivitySourceName)
                 .AddSource(TelemetryActivitySources.MongoDbDriverDiagnosticSources);
 
             ConfigureTracingExporters(builder, otlpEndpoints, enableConsoleExporter);
