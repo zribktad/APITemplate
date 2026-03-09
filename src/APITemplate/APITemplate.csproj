@@ -25,6 +25,7 @@
   <ItemGroup>
     <!-- MongoDB -->
     <PackageReference Include="AspNetCore.HealthChecks.Redis" />
+    <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="Kot.MongoDB.Migrations" />
     <PackageReference Include="Kot.MongoDB.Migrations.DI" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />

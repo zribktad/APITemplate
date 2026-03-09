@@ -9,7 +9,6 @@ namespace APITemplate.Application.Features.Product.Services;
 public sealed class ProductService : IProductService
 {
     private readonly IProductRepository _repository;
-    private readonly IProductQueryService _queryService;
     private readonly ICategoryRepository _categoryRepository;
     private readonly IProductDataRepository _productDataRepository;
     private readonly IProductDataLinkRepository _productDataLinkRepository;
@@ -17,25 +16,36 @@ public sealed class ProductService : IProductService
 
     public ProductService(
         IProductRepository repository,
-        IProductQueryService queryService,
         ICategoryRepository categoryRepository,
         IProductDataRepository productDataRepository,
         IProductDataLinkRepository productDataLinkRepository,
         IUnitOfWork unitOfWork)
     {
         _repository = repository;
-        _queryService = queryService;
         _categoryRepository = categoryRepository;
         _productDataRepository = productDataRepository;
         _productDataLinkRepository = productDataLinkRepository;
         _unitOfWork = unitOfWork;
     }
 
-    public Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => _queryService.GetByIdAsync(id, ct);
+    public async Task<ProductResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _repository.FirstOrDefaultAsync(new ProductByIdSpecification(id), ct);
+    }
 
-    public Task<ProductsResponse> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
-        => _queryService.GetPagedAsync(filter, ct);
+    public async Task<ProductsResponse> GetAllAsync(ProductFilter filter, CancellationToken ct = default)
+    {
+        var itemsTask = _repository.ListAsync(filter, ct);
+        var totalCountTask = _repository.CountAsync(filter, ct);
+        var categoryFacetsTask = _repository.GetCategoryFacetsAsync(filter, ct);
+        var priceFacetsTask = _repository.GetPriceFacetsAsync(filter, ct);
+
+        await Task.WhenAll(itemsTask, totalCountTask, categoryFacetsTask, priceFacetsTask);
+
+        return new ProductsResponse(
+            new PagedResponse<ProductResponse>(itemsTask.Result, totalCountTask.Result, filter.PageNumber, filter.PageSize),
+            new ProductSearchFacetsResponse(categoryFacetsTask.Result, priceFacetsTask.Result));
+    }
 
     public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
     {

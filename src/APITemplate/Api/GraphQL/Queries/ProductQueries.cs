@@ -10,7 +10,7 @@ public class ProductQueries
 {
     public async Task<ProductPageResult> GetProducts(
         ProductQueryInput? input,
-        [Service] IProductQueryService queryService,
+        [Service] IProductService productService,
         [Service] IValidator<ProductFilter> validator,
         CancellationToken ct)
     {
@@ -30,7 +30,7 @@ public class ProductQueries
 
         await validator.ValidateAndThrowAppAsync(filter, ct);
 
-        var page = await queryService.GetPagedAsync(filter, ct);
+        var page = await productService.GetAllAsync(filter, ct);
         return new ProductPageResult(
             page.Page,
             page.Facets);
@@ -38,7 +38,7 @@ public class ProductQueries
 
     public async Task<ProductResponse?> GetProductById(
         Guid id,
-        [Service] IProductQueryService queryService,
+        [Service] IProductService productService,
         CancellationToken ct)
-        => await queryService.GetByIdAsync(id, ct);
+        => await productService.GetByIdAsync(id, ct);
 }

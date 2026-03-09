@@ -1,4 +1,5 @@
 using APITemplate.Application.Common.Context;
+using APITemplate.Application.Features.ProductReview.Specifications;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -13,7 +14,6 @@ namespace APITemplate.Tests.Unit.Services;
 public class ProductReviewServiceTests
 {
     private readonly Mock<IProductReviewRepository> _reviewRepoMock;
-    private readonly Mock<IProductReviewQueryService> _queryServiceMock;
     private readonly Mock<IProductRepository> _productRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IActorProvider> _actorProviderMock;
@@ -23,7 +23,6 @@ public class ProductReviewServiceTests
     public ProductReviewServiceTests()
     {
         _reviewRepoMock = new Mock<IProductReviewRepository>();
-        _queryServiceMock = new Mock<IProductReviewQueryService>();
         _productRepoMock = new Mock<IProductRepository>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _actorProviderMock = new Mock<IActorProvider>();
@@ -32,7 +31,6 @@ public class ProductReviewServiceTests
         _unitOfWorkMock.SetupImmediateTransactionExecution<ProductReview>();
         _sut = new ProductReviewService(
             _reviewRepoMock.Object,
-            _queryServiceMock.Object,
             _productRepoMock.Object,
             _unitOfWorkMock.Object,
             _actorProviderMock.Object);
@@ -43,15 +41,18 @@ public class ProductReviewServiceTests
     {
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        var responses = new List<ProductReviewResponse>
+        var items = new List<ProductReviewResponse>
         {
             new(Guid.NewGuid(), Guid.NewGuid(), userId, null, 5, DateTime.UtcNow),
             new(Guid.NewGuid(), Guid.NewGuid(), userId, null, 3, DateTime.UtcNow)
         };
 
-        _queryServiceMock
-            .Setup(q => q.GetPagedAsync(It.IsAny<ProductReviewFilter>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PagedResponse<ProductReviewResponse>(responses, 2, 1, 10));
+        _reviewRepoMock
+            .Setup(r => r.ListAsync(It.IsAny<ProductReviewSpecification>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(items);
+        _reviewRepoMock
+            .Setup(r => r.CountAsync(It.IsAny<ProductReviewCountSpecification>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
 
         var result = await _sut.GetAllAsync(new ProductReviewFilter(), ct);
 
@@ -67,21 +68,13 @@ public class ProductReviewServiceTests
         var ct = TestContext.Current.CancellationToken;
         var reviewId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        ProductReviewResponse? response = null;
-        if (reviewExists)
-        {
-            response = new ProductReviewResponse(
-                reviewId,
-                Guid.NewGuid(),
-                userId,
-                null,
-                4,
-                DateTime.UtcNow);
-        }
+        ProductReview? entity = reviewExists
+            ? new ProductReview { Id = reviewId, ProductId = Guid.NewGuid(), UserId = userId, Rating = 4, Audit = new() { CreatedAtUtc = DateTime.UtcNow } }
+            : null;
 
-        _queryServiceMock
-            .Setup(q => q.GetByIdAsync(reviewId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(response);
+        _reviewRepoMock
+            .Setup(r => r.GetByIdAsync(reviewId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(entity);
 
         var result = await _sut.GetByIdAsync(reviewId, ct);
 
@@ -103,14 +96,14 @@ public class ProductReviewServiceTests
         var ct = TestContext.Current.CancellationToken;
         var productId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var responses = new List<ProductReviewResponse>
+        var items = new List<ProductReviewResponse>
         {
             new(Guid.NewGuid(), productId, userId, null, 5, DateTime.UtcNow)
         };
 
-        _queryServiceMock
-            .Setup(q => q.GetByProductIdAsync(productId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(responses);
+        _reviewRepoMock
+            .Setup(r => r.ListAsync(It.IsAny<ProductReviewByProductIdSpecification>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(items);
 
         var result = await _sut.GetByProductIdAsync(productId, ct);
 

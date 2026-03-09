@@ -32,6 +32,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IProductReviewRepository, ProductReviewRepository>();
         services.AddScoped<IStoredProcedureExecutor, StoredProcedureExecutor>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<AuthBootstrapSeeder>();
         services.AddScoped<ISoftDeleteCascadeRule, ProductSoftDeleteCascadeRule>();

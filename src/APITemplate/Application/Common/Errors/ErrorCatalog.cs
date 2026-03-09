@@ -37,4 +37,11 @@ public static class ErrorCatalog
         public const string ProductNotFoundForReview = "REV-2101";
         public const string ReviewNotFound = "REV-0404";
     }
+
+    public static class Users
+    {
+        public const string NotFound = "USR-0404";
+        public const string EmailAlreadyExists = "USR-0409-EMAIL";
+        public const string UsernameAlreadyExists = "USR-0409-USERNAME";
+    }
 }

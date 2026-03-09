@@ -1,4 +1,6 @@
 using APITemplate.Application.Common.Context;
+using APITemplate.Application.Features.User.Interfaces;
+using APITemplate.Application.Features.User.Services;
 using APITemplate.Infrastructure.Security;
 using APITemplate.Application.Features.Category.Services;
 using APITemplate.Application.Features.Product.Services;
@@ -17,11 +19,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantProvider, HttpTenantProvider>();
         services.AddScoped<IActorProvider, HttpActorProvider>();
         services.AddScoped<IProductService, ProductService>();
-        services.AddScoped<IProductQueryService, ProductQueryService>();
-        services.AddScoped<ICategoryQueryService, CategoryQueryService>();
         services.AddScoped<IProductReviewService, ProductReviewService>();
-        services.AddScoped<IProductReviewQueryService, ProductReviewQueryService>();
         services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IUserService, UserService>();
+        services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
 
         return services;

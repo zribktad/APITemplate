@@ -668,7 +668,6 @@ public sealed class PostgresDataIntegrityTests
         {
             var service = new APITemplate.Application.Features.Product.Services.ProductService(
                 new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>()),
-                Mock.Of<IProductQueryService>(),
                 Mock.Of<ICategoryRepository>(),
                 Mock.Of<IProductDataRepository>(),
                 new ProductDataLinkRepository(deleteContext, new TestTenantProvider(tenantId, true)),
@@ -723,7 +722,6 @@ public sealed class PostgresDataIntegrityTests
             var unitOfWork = new UnitOfWork(transactionContext);
             var service = new ProductReviewService(
                 failingReviewRepository.Object,
-                Mock.Of<IProductReviewQueryService>(),
                 productRepository,
                 unitOfWork,
                 new TestActorProvider(actorId));

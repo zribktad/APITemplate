@@ -11,7 +11,7 @@ public class ProductReviewQueries
 {
     public async Task<ProductReviewPageResult> GetReviews(
         ProductReviewQueryInput? input,
-        [Service] IProductReviewQueryService queryService,
+        [Service] IProductReviewService reviewService,
         [Service] IValidator<ProductReviewFilter> validator,
         CancellationToken ct)
     {
@@ -29,21 +29,21 @@ public class ProductReviewQueries
 
         await validator.ValidateAndThrowAppAsync(filter, ct);
 
-        var page = await queryService.GetPagedAsync(filter, ct);
+        var page = await reviewService.GetAllAsync(filter, ct);
         return new ProductReviewPageResult(page);
     }
 
     public async Task<ProductReviewResponse?> GetReviewById(
         Guid id,
-        [Service] IProductReviewQueryService queryService,
+        [Service] IProductReviewService reviewService,
         CancellationToken ct)
-        => await queryService.GetByIdAsync(id, ct);
+        => await reviewService.GetByIdAsync(id, ct);
 
     public async Task<ProductReviewPageResult> GetReviewsByProductId(
         Guid productId,
         int pageNumber,
         int pageSize,
-        [Service] IProductReviewQueryService queryService,
+        [Service] IProductReviewService reviewService,
         [Service] IValidator<ProductReviewFilter> validator,
         CancellationToken ct)
     {
@@ -51,7 +51,7 @@ public class ProductReviewQueries
 
         await validator.ValidateAndThrowAppAsync(filter, ct);
 
-        var page = await queryService.GetPagedAsync(filter, ct);
+        var page = await reviewService.GetAllAsync(filter, ct);
         return new ProductReviewPageResult(page);
     }
 }

@@ -1,4 +1,5 @@
 using APITemplate.Application.Features.Category.Mappings;
+using APITemplate.Application.Features.Category.Specifications;
 using CategoryEntity = APITemplate.Domain.Entities.Category;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -7,21 +8,25 @@ namespace APITemplate.Application.Features.Category.Services;
 public sealed class CategoryService : ICategoryService
 {
     private readonly ICategoryRepository _repository;
-    private readonly ICategoryQueryService _queryService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CategoryService(ICategoryRepository repository, ICategoryQueryService queryService, IUnitOfWork unitOfWork)
+    public CategoryService(ICategoryRepository repository, IUnitOfWork unitOfWork)
     {
         _repository = repository;
-        _queryService = queryService;
         _unitOfWork = unitOfWork;
     }
 
-    public Task<PagedResponse<CategoryResponse>> GetAllAsync(CategoryFilter filter, CancellationToken ct = default)
-        => _queryService.GetPagedAsync(filter, ct);
+    public async Task<PagedResponse<CategoryResponse>> GetAllAsync(CategoryFilter filter, CancellationToken ct = default)
+    {
+        var items = await _repository.ListAsync(new CategorySpecification(filter), ct);
+        var totalCount = await _repository.CountAsync(new CategoryCountSpecification(filter), ct);
+        return new PagedResponse<CategoryResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
+    }
 
-    public Task<CategoryResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => _queryService.GetByIdAsync(id, ct);
+    public async Task<CategoryResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _repository.FirstOrDefaultAsync(new CategoryByIdSpecification(id), ct);
+    }
 
     public async Task<CategoryResponse> CreateAsync(CreateCategoryRequest request, CancellationToken ct = default)
     {

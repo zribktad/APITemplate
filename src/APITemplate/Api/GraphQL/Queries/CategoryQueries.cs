@@ -11,7 +11,7 @@ public sealed class CategoryQueries
 {
     public async Task<CategoryPageResult> GetCategories(
         CategoryQueryInput? input,
-        [Service] ICategoryQueryService queryService,
+        [Service] ICategoryService categoryService,
         [Service] IValidator<CategoryFilter> validator,
         CancellationToken ct)
     {
@@ -24,13 +24,13 @@ public sealed class CategoryQueries
 
         await validator.ValidateAndThrowAppAsync(filter, ct);
 
-        var page = await queryService.GetPagedAsync(filter, ct);
+        var page = await categoryService.GetAllAsync(filter, ct);
         return new CategoryPageResult(page);
     }
 
     public async Task<CategoryResponse?> GetCategoryById(
         Guid id,
-        [Service] ICategoryQueryService queryService,
+        [Service] ICategoryService categoryService,
         CancellationToken ct)
-        => await queryService.GetByIdAsync(id, ct);
+        => await categoryService.GetByIdAsync(id, ct);
 }

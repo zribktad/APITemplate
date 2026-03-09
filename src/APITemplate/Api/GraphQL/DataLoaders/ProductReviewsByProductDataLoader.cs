@@ -1,21 +1,21 @@
 namespace APITemplate.Api.GraphQL.DataLoaders;
 public sealed class ProductReviewsByProductDataLoader : BatchDataLoader<Guid, ProductReviewResponse[]>
 {
-    private readonly IProductReviewQueryService _queryService;
+    private readonly IProductReviewService _reviewService;
 
     public ProductReviewsByProductDataLoader(
-        IProductReviewQueryService queryService,
+        IProductReviewService reviewService,
         IBatchScheduler batchScheduler,
         DataLoaderOptions options = default!)
         : base(batchScheduler, options)
     {
-        _queryService = queryService;
+        _reviewService = reviewService;
     }
 
     protected override async Task<IReadOnlyDictionary<Guid, ProductReviewResponse[]>> LoadBatchAsync(
         IReadOnlyList<Guid> productIds,
         CancellationToken ct)
     {
-        return await _queryService.GetByProductIdsAsync(productIds, ct);
+        return await _reviewService.GetByProductIdsAsync(productIds, ct);
     }
 }

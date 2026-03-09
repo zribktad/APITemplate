@@ -1,5 +1,6 @@
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Features.ProductReview.Mappings;
+using APITemplate.Application.Features.ProductReview.Specifications;
 using ProductReviewEntity = APITemplate.Domain.Entities.ProductReview;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -8,33 +9,52 @@ namespace APITemplate.Application.Features.ProductReview.Services;
 public sealed class ProductReviewService : IProductReviewService
 {
     private readonly IProductReviewRepository _reviewRepository;
-    private readonly IProductReviewQueryService _queryService;
     private readonly IProductRepository _productRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IActorProvider _actorProvider;
 
     public ProductReviewService(
         IProductReviewRepository reviewRepository,
-        IProductReviewQueryService queryService,
         IProductRepository productRepository,
         IUnitOfWork unitOfWork,
         IActorProvider actorProvider)
     {
         _reviewRepository = reviewRepository;
-        _queryService = queryService;
         _productRepository = productRepository;
         _unitOfWork = unitOfWork;
         _actorProvider = actorProvider;
     }
 
-    public Task<PagedResponse<ProductReviewResponse>> GetAllAsync(ProductReviewFilter filter, CancellationToken ct = default)
-        => _queryService.GetPagedAsync(filter, ct);
+    public async Task<PagedResponse<ProductReviewResponse>> GetAllAsync(ProductReviewFilter filter, CancellationToken ct = default)
+    {
+        var items = await _reviewRepository.ListAsync(new ProductReviewSpecification(filter), ct);
+        var totalCount = await _reviewRepository.CountAsync(new ProductReviewCountSpecification(filter), ct);
+        return new PagedResponse<ProductReviewResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
+    }
 
-    public Task<IReadOnlyList<ProductReviewResponse>> GetByProductIdAsync(Guid productId, CancellationToken ct = default)
-        => _queryService.GetByProductIdAsync(productId, ct);
+    public async Task<ProductReviewResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var item = await _reviewRepository.GetByIdAsync(id, ct);
+        return item?.ToResponse();
+    }
 
-    public Task<ProductReviewResponse?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => _queryService.GetByIdAsync(id, ct);
+    public async Task<IReadOnlyList<ProductReviewResponse>> GetByProductIdAsync(Guid productId, CancellationToken ct = default)
+        => await _reviewRepository.ListAsync(new ProductReviewByProductIdSpecification(productId), ct);
+
+    public async Task<IReadOnlyDictionary<Guid, ProductReviewResponse[]>> GetByProductIdsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken ct = default)
+    {
+        if (productIds.Count == 0)
+            return new Dictionary<Guid, ProductReviewResponse[]>();
+
+        var reviews = await _reviewRepository.ListAsync(new ProductReviewByProductIdsSpecification(productIds), ct);
+        var lookup = reviews.ToLookup(r => r.ProductId);
+
+        return productIds
+            .Distinct()
+            .ToDictionary(id => id, id => lookup[id].ToArray());
+    }
 
     public async Task<ProductReviewResponse> CreateAsync(CreateProductReviewRequest request, CancellationToken ct = default)
     {

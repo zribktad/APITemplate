@@ -7,8 +7,8 @@
 
 ## User Workflows
 
-- [ ] Add user registration workflow.
-- [ ] Add user lifecycle workflows such as activation, deactivation, and role management.
+- [x] Add user registration workflow.
+- [x] Add user lifecycle workflows such as activation, deactivation, and role management.
 
 ## Tenant Management
 

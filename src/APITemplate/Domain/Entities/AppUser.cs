@@ -19,4 +19,6 @@ public sealed class AppUser : IAuditableTenantEntity
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedBy { get; set; }
+
+    public static string NormalizeUsername(string username) => username.Trim().ToUpperInvariant();
 }

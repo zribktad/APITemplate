@@ -13,7 +13,6 @@ namespace APITemplate.Tests.Unit.Services;
 public class ProductServiceTests
 {
     private readonly Mock<IProductRepository> _repositoryMock;
-    private readonly Mock<IProductQueryService> _queryServiceMock;
     private readonly Mock<ICategoryRepository> _categoryRepositoryMock;
     private readonly Mock<IProductDataRepository> _productDataRepositoryMock;
     private readonly Mock<IProductDataLinkRepository> _productDataLinkRepositoryMock;
@@ -23,7 +22,6 @@ public class ProductServiceTests
     public ProductServiceTests()
     {
         _repositoryMock = new Mock<IProductRepository>();
-        _queryServiceMock = new Mock<IProductQueryService>();
         _categoryRepositoryMock = new Mock<ICategoryRepository>();
         _productDataRepositoryMock = new Mock<IProductDataRepository>();
         _productDataLinkRepositoryMock = new Mock<IProductDataLinkRepository>();
@@ -32,7 +30,6 @@ public class ProductServiceTests
         _unitOfWorkMock.SetupImmediateTransactionExecution<Product>();
         _sut = new ProductService(
             _repositoryMock.Object,
-            _queryServiceMock.Object,
             _categoryRepositoryMock.Object,
             _productDataRepositoryMock.Object,
             _productDataLinkRepositoryMock.Object,
@@ -46,14 +43,12 @@ public class ProductServiceTests
     {
         var ct = TestContext.Current.CancellationToken;
         var productId = Guid.NewGuid();
-        ProductResponse? response = null;
-        if (productExists)
-        {
-            response = new ProductResponse(productId, "Test Product", "A test product", 9.99m, DateTime.UtcNow, []);
-        }
+        ProductResponse? response = productExists
+            ? new ProductResponse(productId, "Test Product", "A test product", 9.99m, DateTime.UtcNow, [])
+            : null;
 
-        _queryServiceMock
-            .Setup(q => q.GetByIdAsync(productId, It.IsAny<CancellationToken>()))
+        _repositoryMock
+            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<ProductByIdSpecification>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
         var result = await _sut.GetByIdAsync(productId, ct);
@@ -369,19 +364,19 @@ public class ProductServiceTests
     public async Task GetAllAsync_ReturnsAllProducts()
     {
         var ct = TestContext.Current.CancellationToken;
-        var responses = new List<ProductResponse>
-        {
-            new(Guid.NewGuid(), "Product 1", null, 10m, DateTime.UtcNow, []),
-            new(Guid.NewGuid(), "Product 2", null, 20m, DateTime.UtcNow, [])
-        };
+        var filter = new ProductFilter();
+        IReadOnlyList<ProductResponse> items =
+        [
+            new ProductResponse(Guid.NewGuid(), "Product 1", null, 10m, DateTime.UtcNow, []),
+            new ProductResponse(Guid.NewGuid(), "Product 2", null, 20m, DateTime.UtcNow, [])
+        ];
 
-        _queryServiceMock
-            .Setup(q => q.GetPagedAsync(It.IsAny<ProductFilter>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProductsResponse(
-                new PagedResponse<ProductResponse>(responses, 2, 1, 10),
-                new ProductSearchFacetsResponse([], [])));
+        _repositoryMock.Setup(r => r.ListAsync(filter, It.IsAny<CancellationToken>())).ReturnsAsync(items);
+        _repositoryMock.Setup(r => r.CountAsync(filter, It.IsAny<CancellationToken>())).ReturnsAsync(2);
+        _repositoryMock.Setup(r => r.GetCategoryFacetsAsync(filter, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _repositoryMock.Setup(r => r.GetPriceFacetsAsync(filter, It.IsAny<CancellationToken>())).ReturnsAsync([]);
 
-        var result = await _sut.GetAllAsync(new ProductFilter(), ct);
+        var result = await _sut.GetAllAsync(filter, ct);
 
         result.Page.Items.Count().ShouldBe(2);
         result.Page.TotalCount.ShouldBe(2);
