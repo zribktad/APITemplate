@@ -15,7 +15,6 @@ namespace APITemplate.Api.Controllers.V1;
 [Route("api/v{version:apiVersion}/[controller]")]
 public sealed class UsersController : ControllerBase
 {
-    private const string DefaultApiVersion = "1.0";
     private readonly IUserService _userService;
 
     public UsersController(IUserService userService)
@@ -59,7 +58,7 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var user = await _userService.CreateAsync(request, ct);
-        var version = HttpContext.GetRequestedApiVersion()?.ToString() ?? DefaultApiVersion;
+        var version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
         return CreatedAtAction(nameof(GetById), new { id = user.Id, version }, user);
     }
 

@@ -16,8 +16,8 @@ internal static class UserFilterCriteria
 
         if (!string.IsNullOrWhiteSpace(filter.Email))
         {
-            var normalizedEmail = AppUser.NormalizeEmail(filter.Email);
-            query.Where(u => u.NormalizedEmail == normalizedEmail);
+            var normalizedEmail = filter.Email.Trim().ToUpperInvariant();
+            query.Where(u => u.Email.ToUpper() == normalizedEmail);
         }
 
         if (filter.IsActive.HasValue)

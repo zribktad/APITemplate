@@ -45,7 +45,6 @@ public class UserRepositoryTests : IDisposable
         persisted.ShouldNotBeNull();
         persisted!.Username.ShouldBe("testuser");
         persisted.Email.ShouldBe("test@example.com");
-        persisted.NormalizedEmail.ShouldBe(AppUser.NormalizeEmail("test@example.com"));
     }
 
     [Fact]
@@ -161,7 +160,6 @@ public class UserRepositoryTests : IDisposable
             Username = username,
             NormalizedUsername = AppUser.NormalizeUsername(username),
             Email = email,
-            NormalizedEmail = AppUser.NormalizeEmail(email),
             PasswordHash = "hashed",
             IsActive = true,
             Role = UserRole.User,
