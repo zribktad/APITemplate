@@ -4,6 +4,7 @@ using APITemplate.Application.Features.Product.Specifications;
 using APITemplate.Infrastructure.Persistence;
 using Ardalis.Specification.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace APITemplate.Infrastructure.Repositories;
 

@@ -11,7 +11,7 @@ public sealed class TransactionDefaultsOptions
     public int RetryCount { get; set; } = 3;
     public int RetryDelaySeconds { get; set; } = 5;
 
-    internal TransactionOptions Resolve(TransactionOptions? overrides)
+    public TransactionOptions Resolve(TransactionOptions? overrides)
     {
         var resolved = new TransactionOptions
         {

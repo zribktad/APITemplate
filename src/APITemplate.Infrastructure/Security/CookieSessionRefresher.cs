@@ -5,12 +5,13 @@ using APITemplate.Application.Common.Security;
 using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace APITemplate.Infrastructure.Security;
 
-internal static class CookieSessionRefresher
+public static class CookieSessionRefresher
 {
     public static async Task OnValidatePrincipal(CookieValidatePrincipalContext context)
     {

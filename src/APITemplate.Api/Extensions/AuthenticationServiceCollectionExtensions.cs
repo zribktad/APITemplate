@@ -1,5 +1,6 @@
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
+using APITemplate.Application.Options;
 using APITemplate.Domain.Enums;
 using APITemplate.Infrastructure.Health;
 using APITemplate.Infrastructure.Observability;

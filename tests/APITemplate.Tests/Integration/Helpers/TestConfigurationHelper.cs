@@ -12,6 +12,7 @@ internal static class TestConfigurationHelper
 
         return new Dictionary<string, string?>
         {
+            ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=apitemplate_tests;Username=postgres;Password=postgres",
             ["Keycloak:realm"] = "api-template",
             ["Keycloak:auth-server-url"] = "http://localhost:8180/",
             ["Keycloak:resource"] = "api-template",

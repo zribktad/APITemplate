@@ -2,6 +2,7 @@ using System.Security.Claims;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace APITemplate.Infrastructure.Security;

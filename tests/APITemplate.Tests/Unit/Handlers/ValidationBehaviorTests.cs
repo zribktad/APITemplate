@@ -21,7 +21,7 @@ public sealed class ValidationBehaviorTests
 
         var act = () => sut.Handle(
             new CreateWidgetCommand(new CreateWidgetRequest(string.Empty)),
-            () => Task.FromResult("ok"),
+            _ => Task.FromResult("ok"),
             TestContext.Current.CancellationToken);
 
         await Should.ThrowAsync<APITemplate.Domain.Exceptions.ValidationException>(act);
@@ -40,7 +40,7 @@ public sealed class ValidationBehaviorTests
         var wasCalled = false;
         var result = await sut.Handle(
             new CreateWidgetCommand(new CreateWidgetRequest("widget")),
-            () =>
+            _ =>
             {
                 wasCalled = true;
                 return Task.FromResult("ok");

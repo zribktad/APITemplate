@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Http;
 
 namespace APITemplate.Infrastructure.Observability;
 

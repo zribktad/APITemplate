@@ -7,5 +7,6 @@
 
   <ItemGroup>
     <PackageReference Include="Ardalis.Specification" />
+    <PackageReference Include="MongoDB.Bson" />
   </ItemGroup>
 </Project>

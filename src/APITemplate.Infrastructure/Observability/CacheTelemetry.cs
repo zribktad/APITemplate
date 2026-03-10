@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.Http;
 
 namespace APITemplate.Infrastructure.Observability;
 

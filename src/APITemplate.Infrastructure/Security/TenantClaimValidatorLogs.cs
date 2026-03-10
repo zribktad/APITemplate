@@ -1,4 +1,5 @@
 using APITemplate.Infrastructure.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace APITemplate.Infrastructure.Security;
 

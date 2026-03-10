@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Http;
 
 namespace APITemplate.Infrastructure.Security;
 
