@@ -253,18 +253,33 @@ classDiagram
 
 ## 📂 Project Structure
 
-This architecture deliberately leverages a single project (`APITemplate.csproj`) broken up securely by namespaces to mirror a traditional Clean Architecture without the multirepo/multiproject overhead:
+This architecture now uses a strict four-project Clean Architecture split with CQRS/MediatR:
 
 ```text
-src/APITemplate/
-├── Api/              # Presentation Tier (V1 REST Controllers, GraphQL Queries/Mutations, Cache policies, Global Middleware)
-├── Application/      # Business Logic (Services, DTOs, FluentValidation, Ardalis Specs, Error catalog)
-├── Domain/           # Core Logic (Entities, Value Objects, Domain Exceptions, Interfaces)
-├── Infrastructure/   # Outer boundaries (AppDbContext, MongoDbContext, EF Core Repositories, MongoDB Repositories, Unit of Work, Logging redaction)
-└── Extensions/       # Startup IoC container bootstrappers
+src/APITemplate.Api/
+├── Api/              # Presentation tier (REST controllers, GraphQL, middleware, cache, exception handling)
+├── Extensions/       # Composition root and startup bootstrappers
+├── Program.cs
+└── appsettings*.json
+src/APITemplate.Application/
+├── Common/           # Cross-cutting application concerns (validation, security, behaviors, options)
+├── Features/         # Vertical slices with commands, queries, handlers, DTOs, mappings, validators
+└── Options/
+src/APITemplate.Domain/
+├── Entities/
+├── Enums/
+├── Exceptions/
+└── Interfaces/
+src/APITemplate.Infrastructure/
+├── Persistence/      # EF Core / Mongo persistence and Unit of Work
+├── Repositories/
+├── StoredProcedures/
+├── Security/
+├── Observability/
+└── Migrations/
 tests/APITemplate.Tests/
-├── Integration/      # End-to-End API endpoint testing bridging a real/in-memory DB via WebApplicationFactory
-└── Unit/             # Isolated internal service logic tests
+├── Integration/      # End-to-end HTTP and data-integrity tests
+└── Unit/             # Isolated handler, repository, middleware and infrastructure tests
 ```
 
 ---
@@ -934,10 +949,10 @@ ProductDataResponse  (Type, Id, Title, Width, Height, Format, ...)
 While not natively shipped via default configuration files, this structure allows simple portability across cloud ecosystems:
 
 **GitHub Actions / Azure Pipelines Structure:**
-1. **Restore:** `dotnet restore src/APITemplate.sln`
-2. **Build:** `dotnet build --no-restore src/APITemplate.sln`
-3. **Test:** `dotnet test --no-build src/APITemplate.sln`
-4. **Publish Container:** `docker build -t apitemplate-image:1.0 -f src/APITemplate/Dockerfile .`
+1. **Restore:** `dotnet restore APITemplate.slnx`
+2. **Build:** `dotnet build --no-restore APITemplate.slnx`
+3. **Test:** `dotnet test --no-build APITemplate.slnx`
+4. **Publish Container:** `docker build -t apitemplate-image:1.0 -f src/APITemplate.Api/Dockerfile .`
 5. **Push Registry:** `docker push <registry>/apitemplate-image:1.0`
 
 Because the application encompasses the database (natively via DI) and HTTP context fully self-contained using containerization, it scales efficiently behind Kubernetes Ingress (Nginx) or any App Service / Container Apps equivalent, maintaining state natively using PostgreSQL and MongoDB.
@@ -1009,10 +1024,10 @@ Start the infrastructure services only, then run the API on the host:
 docker compose up -d postgres mongodb keycloak valkey
 ```
 
-Apply your connection strings in `src/APITemplate/appsettings.Development.json`, then run:
+Apply your connection strings in `src/APITemplate.Api/appsettings.Development.json`, then run:
 
 ```bash
-dotnet run --project src/APITemplate
+dotnet run --project src/APITemplate.Api
 ```
 
 EF Core migrations and MongoDB migrations run automatically at startup — no manual `dotnet ef database update` needed.

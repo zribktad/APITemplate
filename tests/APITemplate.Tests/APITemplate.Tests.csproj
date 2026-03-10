@@ -26,7 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\APITemplate\APITemplate.csproj" />
+    <ProjectReference Include="..\..\src\APITemplate.Api\APITemplate.Api.csproj" />
+    <ProjectReference Include="..\..\src\APITemplate.Application\APITemplate.Application.csproj" />
+    <ProjectReference Include="..\..\src\APITemplate.Infrastructure\APITemplate.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\APITemplate.Domain\APITemplate.Domain.csproj" />
   </ItemGroup>
 
 </Project>

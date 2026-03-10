@@ -233,7 +233,28 @@ internal static class PackagePolicyTestFiles
         => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
     public static string ReadProjectXml(string repoRoot)
-        => File.ReadAllText(Path.Combine(repoRoot, "src", "APITemplate", "APITemplate.csproj"));
+    {
+        var projectPaths = new[]
+        {
+            Path.Combine(repoRoot, "src", "APITemplate.Api", "APITemplate.Api.csproj"),
+            Path.Combine(repoRoot, "src", "APITemplate.Application", "APITemplate.Application.csproj"),
+            Path.Combine(repoRoot, "src", "APITemplate.Infrastructure", "APITemplate.Infrastructure.csproj")
+        };
+
+        var packageReferences = projectPaths
+            .Select(path => XDocument.Parse(File.ReadAllText(path)))
+            .SelectMany(document => document
+                .Descendants()
+                .Where(node => node.Name.LocalName == "PackageReference")
+                .Select(node => new XElement(node)))
+            .ToList();
+
+        var aggregateDocument = new XDocument(
+            new XElement("Project",
+                new XElement("ItemGroup", packageReferences)));
+
+        return aggregateDocument.ToString();
+    }
 
     public static string ReadCentralPackageXml(string repoRoot)
         => File.ReadAllText(Path.Combine(repoRoot, "Directory.Packages.props"));

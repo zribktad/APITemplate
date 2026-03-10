@@ -154,7 +154,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: src/APITemplate/Dockerfile
+      dockerfile: src/APITemplate.Api/Dockerfile
     ports:
       - "8080:8080"
     environment:
