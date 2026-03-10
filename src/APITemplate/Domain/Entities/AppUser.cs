@@ -8,6 +8,7 @@ public sealed class AppUser : IAuditableTenantEntity
     public required string Username { get; set; }
     public string NormalizedUsername { get; set; } = string.Empty;
     public required string Email { get; set; }
+    public string NormalizedEmail { get; set; } = string.Empty;
     public required string PasswordHash { get; set; }
     public bool IsActive { get; set; } = true;
     public UserRole Role { get; set; } = UserRole.User;
@@ -21,4 +22,5 @@ public sealed class AppUser : IAuditableTenantEntity
     public Guid? DeletedBy { get; set; }
 
     public static string NormalizeUsername(string username) => username.Trim().ToUpperInvariant();
+    public static string NormalizeEmail(string email) => email.Trim().ToUpperInvariant();
 }

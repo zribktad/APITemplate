@@ -114,14 +114,28 @@ public static class AuthenticationServiceCollectionExtensions
         AuthSettings settings,
         IHostEnvironment environment)
     {
+        var isDevelopment = environment.IsDevelopment();
+
         options.Authority = settings.Authority;
         options.Audience = settings.Keycloak.Resource;
-        options.RequireHttpsMetadata = !environment.IsDevelopment();
+        options.RequireHttpsMetadata = !isDevelopment;
         options.TokenValidationParameters = new TokenValidationParameters
         {
+            LogTokenId = isDevelopment,
+            LogValidationExceptions = isDevelopment,
+            RequireExpirationTime = true,
+            RequireSignedTokens = true,
+            RequireAudience = true,
+            SaveSigninToken = false,
+            TryAllDecryptionKeys = true,
+            TryAllIssuerSigningKeys = true,
+            ValidateActor = false,
             ValidateIssuer = true,
             ValidateAudience = true,
-            ValidateLifetime = true
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ValidateTokenReplay = false,
+            ClockSkew = TimeSpan.FromMinutes(5)
         };
         options.Events = new JwtBearerEvents
         {
