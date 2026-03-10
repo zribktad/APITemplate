@@ -2,8 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
-
-using APITemplate.Application.Features.ProductReview.Services;
+using APITemplate.Application.Features.Product;
+using APITemplate.Application.Features.Product.Repositories;
+using APITemplate.Application.Features.ProductReview;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
@@ -666,14 +667,14 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var service = new APITemplate.Application.Features.Product.Services.ProductService(
+            var handler = new ProductRequestHandlers(
                 new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>()),
                 Mock.Of<ICategoryRepository>(),
                 Mock.Of<IProductDataRepository>(),
                 new ProductDataLinkRepository(deleteContext, new TestTenantProvider(tenantId, true)),
                 new UnitOfWork(deleteContext));
 
-            await service.DeleteAsync(product.Id, ct);
+            await handler.Handle(new DeleteProductCommand(product.Id), ct);
         }
 
         await using var verifyContext = await CreateDbContextAsync(false, Guid.Empty, actorId, ct);
@@ -720,14 +721,14 @@ public sealed class PostgresDataIntegrityTests
                     throw new InvalidOperationException(expectedMessage);
                 });
             var unitOfWork = new UnitOfWork(transactionContext);
-            var service = new ProductReviewService(
+            var handler = new ProductReviewRequestHandlers(
                 failingReviewRepository.Object,
                 productRepository,
                 unitOfWork,
                 new TestActorProvider(actorId));
 
             var ex = await Should.ThrowAsync<InvalidOperationException>(() =>
-                service.CreateAsync(new CreateProductReviewRequest(product.Id, "rollback", 4), ct));
+                handler.Handle(new CreateProductReviewCommand(new CreateProductReviewRequest(product.Id, "rollback", 4)), ct));
 
             ex.Message.ShouldBe(expectedMessage);
         }
@@ -1052,7 +1053,7 @@ public sealed class PostgresDataIntegrityTests
         mongoRepositoryMock.Reset();
         mongoRepositoryMock
             .Setup(r => r.GetByIdAsync(productDataId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ImageProductData { Id = productDataId, Title = "Image" });
+            .ReturnsAsync(new ImageProductData { Id = productDataId, TenantId = tenantId, Title = "Image" });
 
         var tenant = new Tenant { Id = tenantId, Code = $"tenant-pd-{Guid.NewGuid():N}", Name = "Tenant ProductData" };
         var category = new Category { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Category-PD-{Guid.NewGuid():N}" };

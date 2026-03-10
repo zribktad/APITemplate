@@ -63,7 +63,7 @@ public class ProductDataControllerTests
         var ct = TestContext.Current.CancellationToken;
         IntegrationAuthHelper.Authenticate(_client);
 
-        var image = new ImageProductData { Title = "Banner", Width = 800, Height = 600, Format = "jpg", FileSizeBytes = 200000 };
+        var image = new ImageProductData { TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001"), Title = "Banner", Width = 800, Height = 600, Format = "jpg", FileSizeBytes = 200000 };
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(image.Id, It.IsAny<CancellationToken>()))
@@ -154,7 +154,7 @@ public class ProductDataControllerTests
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ImageProductData { Id = id, Title = "Image" });
+            .ReturnsAsync(new ImageProductData { Id = id, TenantId = Guid.Parse("00000000-0000-0000-0000-000000000001"), Title = "Image" });
 
         var response = await _client.DeleteAsync($"/api/v1/product-data/{id}", ct);
 

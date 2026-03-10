@@ -1,0 +1,13 @@
+global using APITemplate.Application.Common.Contracts;
+global using APITemplate.Application.Common.DTOs;
+global using APITemplate.Application.Common.Errors;
+global using APITemplate.Application.Common.Options;
+global using APITemplate.Application.Common.Security;
+global using APITemplate.Application.Options;
+global using APITemplate.Domain.Interfaces;
+global using APITemplate.Application.Features.Category.DTOs;
+global using APITemplate.Application.Features.Product.DTOs;
+global using APITemplate.Application.Features.Product.Repositories;
+global using APITemplate.Application.Features.ProductData.DTOs;
+global using APITemplate.Application.Features.ProductReview.DTOs;
+global using APITemplate.Application.Features.User.DTOs;
