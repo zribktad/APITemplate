@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Security.Claims;
+using APITemplate.Application.Common.Security;
 using APITemplate.Infrastructure.Observability;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog.Context;
@@ -28,8 +30,15 @@ public sealed class RequestContextMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var correlationId = ResolveCorrelationId(context);
-        var sw = Stopwatch.StartNew();
+        var stopwatch = Stopwatch.StartNew();
         var traceId = Activity.Current?.TraceId.ToHexString() ?? context.TraceIdentifier;
+        var tenantId = context.User.FindFirstValue(CustomClaimTypes.TenantId);
+
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            Activity.Current?.SetTag(TelemetryTagKeys.TenantId, tenantId);
+        }
+
         context.Items[CorrelationIdItemKey] = correlationId;
         context.Response.Headers[CorrelationIdHeader] = correlationId;
         context.Response.Headers["X-Trace-Id"] = traceId;
@@ -38,13 +47,14 @@ public sealed class RequestContextMiddleware
         // Response headers are finalized here so elapsed time reflects full downstream execution.
         context.Response.OnStarting(() =>
         {
-            context.Response.Headers["X-Elapsed-Ms"] = sw.ElapsedMilliseconds.ToString();
+            context.Response.Headers["X-Elapsed-Ms"] = stopwatch.ElapsedMilliseconds.ToString();
             return Task.CompletedTask;
         });
 
         try
         {
             using (LogContext.PushProperty("CorrelationId", correlationId))
+            using (LogContext.PushProperty("TenantId", tenantId ?? string.Empty))
             {
                 await _next(context);
             }

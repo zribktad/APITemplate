@@ -62,4 +62,60 @@ public sealed class ValidationBehaviorTests
             RuleFor(x => x.Name).NotEmpty();
         }
     }
+
+    [Fact]
+    public async Task Handle_WhenCollectionItemIsInvalid_ThrowsValidationException()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IValidator<OrderLineRequest>, OrderLineRequestValidator>();
+
+        var sut = new ValidationBehavior<CreateOrderCommand, string>(
+            services.BuildServiceProvider(),
+            []);
+
+        var act = () => sut.Handle(
+            new CreateOrderCommand(new CreateOrderRequest([new OrderLineRequest(string.Empty), new OrderLineRequest("valid")])),
+            _ => Task.FromResult("ok"),
+            TestContext.Current.CancellationToken);
+
+        await Should.ThrowAsync<APITemplate.Domain.Exceptions.ValidationException>(act);
+    }
+
+    [Fact]
+    public async Task Handle_WhenCollectionItemsAreValid_InvokesNextDelegate()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IValidator<OrderLineRequest>, OrderLineRequestValidator>();
+
+        var sut = new ValidationBehavior<CreateOrderCommand, string>(
+            services.BuildServiceProvider(),
+            []);
+
+        var wasCalled = false;
+        var result = await sut.Handle(
+            new CreateOrderCommand(new CreateOrderRequest([new OrderLineRequest("one"), new OrderLineRequest("two")])),
+            _ =>
+            {
+                wasCalled = true;
+                return Task.FromResult("ok");
+            },
+            TestContext.Current.CancellationToken);
+
+        wasCalled.ShouldBeTrue();
+        result.ShouldBe("ok");
+    }
+
+    private sealed record OrderLineRequest(string Name);
+
+    private sealed record CreateOrderRequest(IReadOnlyCollection<OrderLineRequest> Lines);
+
+    private sealed record CreateOrderCommand(CreateOrderRequest Request) : IRequest<string>;
+
+    private sealed class OrderLineRequestValidator : AbstractValidator<OrderLineRequest>
+    {
+        public OrderLineRequestValidator()
+        {
+            RuleFor(x => x.Name).NotEmpty();
+        }
+    }
 }

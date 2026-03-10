@@ -190,4 +190,55 @@ public class ProductsControllerTests
         payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "0 - 50").Count.ShouldBe(1);
         payload.Facets.PriceBuckets.Single(bucket => bucket.Label == "50 - 100").Count.ShouldBe(1);
     }
+
+    [Fact]
+    public async Task GetAll_AfterCreate_ReturnsNewProduct_WhenCacheIsInvalidated()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        IntegrationAuthHelper.Authenticate(_client);
+
+        var initialResponse = await _client.GetAsync("/api/v1/products", ct);
+        initialResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var initialPayload = await initialResponse.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        initialPayload.ShouldNotBeNull();
+        var initialCount = initialPayload!.Page.Items.Count();
+
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/v1/products",
+            new
+            {
+                name = "Cached product",
+                description = "Created while cache is warm",
+                price = 10
+            },
+            ct);
+
+        var createBody = await createResponse.Content.ReadAsStringAsync(ct);
+        createResponse.StatusCode.ShouldBe(HttpStatusCode.Created, createBody);
+
+        var secondResponse = await _client.GetAsync("/api/v1/products", ct);
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var secondPayload = await secondResponse.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
+        secondPayload.ShouldNotBeNull();
+        secondPayload!.Page.Items.Count().ShouldBe(initialCount + 1);
+    }
+
+    [Fact]
+    public async Task GetAll_WhenRateLimitExceeded_ReturnsTooManyRequests()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        IntegrationAuthHelper.Authenticate(_client);
+
+        HttpResponseMessage? lastResponse = null;
+
+        for (var i = 0; i < 110; i++)
+        {
+            lastResponse = await _client.GetAsync("/api/v1/products", ct);
+            if (lastResponse.StatusCode == HttpStatusCode.TooManyRequests)
+                break;
+        }
+
+        lastResponse.ShouldNotBeNull();
+        lastResponse!.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
 }

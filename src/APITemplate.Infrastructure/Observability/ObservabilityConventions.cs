@@ -35,6 +35,7 @@ public static class TelemetryTagKeys
 {
     public const string ApiSurface = "apitemplate.api.surface";
     public const string Authenticated = "apitemplate.authenticated";
+    public const string TenantId = "tenant.id";
     public const string AuthScheme = "auth.scheme";
     public const string AuthFailureReason = "auth.failure_reason";
     public const string CacheOutcome = "cache.outcome";

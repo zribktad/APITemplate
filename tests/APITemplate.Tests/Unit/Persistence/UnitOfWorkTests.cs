@@ -445,6 +445,37 @@ public class UnitOfWorkTests
         (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(0);
     }
 
+    [Fact]
+    public async Task ExecuteInTransactionAsync_WhenProviderDoesNotSupportTransactions_SavesWithoutExplicitTransaction()
+    {
+        var executionStrategy = new RecordingExecutionStrategy();
+        await using var dbContext = CreateDbContext();
+
+        var sut = new UnitOfWork(
+            dbContext,
+            new TransactionDefaultsOptions(),
+            NullLogger<UnitOfWork>.Instance,
+            _ => executionStrategy,
+            () => null,
+            (_, _) => throw new InvalidOperationException("Transactions are not supported by this provider."));
+
+        await sut.ExecuteInTransactionAsync(
+            async () =>
+            {
+                dbContext.Categories.Add(new Category
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "NoTx"
+                });
+
+                await Task.CompletedTask;
+            },
+            TestContext.Current.CancellationToken);
+
+        executionStrategy.ExecuteAsyncCallCount.ShouldBe(1);
+        (await dbContext.Categories.CountAsync(TestContext.Current.CancellationToken)).ShouldBe(1);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
