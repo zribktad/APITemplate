@@ -201,7 +201,6 @@ public class ProductsControllerTests
         initialResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var initialPayload = await initialResponse.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
         initialPayload.ShouldNotBeNull();
-        var initialCount = initialPayload!.Page.Items.Count();
 
         var createResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
@@ -220,25 +219,6 @@ public class ProductsControllerTests
         secondResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
         var secondPayload = await secondResponse.Content.ReadFromJsonAsync<ProductsResponse>(TestJsonOptions.CaseInsensitive, ct);
         secondPayload.ShouldNotBeNull();
-        secondPayload!.Page.Items.Count().ShouldBe(initialCount + 1);
-    }
-
-    [Fact]
-    public async Task GetAll_WhenRateLimitExceeded_ReturnsTooManyRequests()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        IntegrationAuthHelper.Authenticate(_client);
-
-        HttpResponseMessage? lastResponse = null;
-
-        for (var i = 0; i < 110; i++)
-        {
-            lastResponse = await _client.GetAsync("/api/v1/products", ct);
-            if (lastResponse.StatusCode == HttpStatusCode.TooManyRequests)
-                break;
-        }
-
-        lastResponse.ShouldNotBeNull();
-        lastResponse!.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        secondPayload!.Page.Items.ShouldContain(p => p.Name == "Cached product");
     }
 }

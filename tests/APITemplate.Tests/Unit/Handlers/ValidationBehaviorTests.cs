@@ -15,8 +15,10 @@ public sealed class ValidationBehaviorTests
         var services = new ServiceCollection();
         services.AddSingleton<IValidator<CreateWidgetRequest>, CreateWidgetRequestValidator>();
 
+        using var provider = services.BuildServiceProvider();
+
         var sut = new ValidationBehavior<CreateWidgetCommand, string>(
-            services.BuildServiceProvider(),
+            provider,
             []);
 
         var act = () => sut.Handle(
@@ -33,8 +35,10 @@ public sealed class ValidationBehaviorTests
         var services = new ServiceCollection();
         services.AddSingleton<IValidator<CreateWidgetRequest>, CreateWidgetRequestValidator>();
 
+        using var provider = services.BuildServiceProvider();
+
         var sut = new ValidationBehavior<CreateWidgetCommand, string>(
-            services.BuildServiceProvider(),
+            provider,
             []);
 
         var wasCalled = false;
@@ -69,12 +73,14 @@ public sealed class ValidationBehaviorTests
         var services = new ServiceCollection();
         services.AddSingleton<IValidator<OrderLineRequest>, OrderLineRequestValidator>();
 
+        using var provider = services.BuildServiceProvider();
+
         var sut = new ValidationBehavior<CreateOrderCommand, string>(
-            services.BuildServiceProvider(),
+            provider,
             []);
 
         var act = () => sut.Handle(
-            new CreateOrderCommand(new CreateOrderRequest([new OrderLineRequest(string.Empty), new OrderLineRequest("valid")])),
+            new CreateOrderCommand([new OrderLineRequest(string.Empty), new OrderLineRequest("valid")]),
             _ => Task.FromResult("ok"),
             TestContext.Current.CancellationToken);
 
@@ -87,13 +93,15 @@ public sealed class ValidationBehaviorTests
         var services = new ServiceCollection();
         services.AddSingleton<IValidator<OrderLineRequest>, OrderLineRequestValidator>();
 
+        using var provider = services.BuildServiceProvider();
+
         var sut = new ValidationBehavior<CreateOrderCommand, string>(
-            services.BuildServiceProvider(),
+            provider,
             []);
 
         var wasCalled = false;
         var result = await sut.Handle(
-            new CreateOrderCommand(new CreateOrderRequest([new OrderLineRequest("one"), new OrderLineRequest("two")])),
+            new CreateOrderCommand([new OrderLineRequest("one"), new OrderLineRequest("two")]),
             _ =>
             {
                 wasCalled = true;
@@ -107,9 +115,7 @@ public sealed class ValidationBehaviorTests
 
     private sealed record OrderLineRequest(string Name);
 
-    private sealed record CreateOrderRequest(IReadOnlyCollection<OrderLineRequest> Lines);
-
-    private sealed record CreateOrderCommand(CreateOrderRequest Request) : IRequest<string>;
+    private sealed record CreateOrderCommand(IReadOnlyCollection<OrderLineRequest> Lines) : IRequest<string>;
 
     private sealed class OrderLineRequestValidator : AbstractValidator<OrderLineRequest>
     {

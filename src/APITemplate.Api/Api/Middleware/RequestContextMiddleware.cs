@@ -33,10 +33,11 @@ public sealed class RequestContextMiddleware
         var stopwatch = Stopwatch.StartNew();
         var traceId = Activity.Current?.TraceId.ToHexString() ?? context.TraceIdentifier;
         var tenantId = context.User.FindFirstValue(CustomClaimTypes.TenantId);
+        var effectiveTenantId = !string.IsNullOrWhiteSpace(tenantId) ? tenantId : string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(tenantId))
+        if (!string.IsNullOrWhiteSpace(effectiveTenantId))
         {
-            Activity.Current?.SetTag(TelemetryTagKeys.TenantId, tenantId);
+            Activity.Current?.SetTag(TelemetryTagKeys.TenantId, effectiveTenantId);
         }
 
         context.Items[CorrelationIdItemKey] = correlationId;
@@ -54,7 +55,7 @@ public sealed class RequestContextMiddleware
         try
         {
             using (LogContext.PushProperty("CorrelationId", correlationId))
-            using (LogContext.PushProperty("TenantId", tenantId ?? string.Empty))
+            using (LogContext.PushProperty("TenantId", effectiveTenantId))
             {
                 await _next(context);
             }

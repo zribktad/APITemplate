@@ -40,7 +40,7 @@ public static class ApplicationBuilderExtensions
 
     /// <summary>
     /// Cross-cutting request context: correlation ID stamping, elapsed-time header, and
-    /// structured Serilog request logging. Runs first so every downstream log entry is enriched.
+    /// structured Serilog request logging. Runs early so every downstream log entry is enriched.
     /// </summary>
     public static WebApplication UseRequestContextPipeline(this WebApplication app)
     {
@@ -172,10 +172,11 @@ public static class ApplicationBuilderExtensions
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
         app.UseExceptionHandler();         // Global exception handling — must be outermost.
-        app.UseRequestContextPipeline();   // Correlation enrichment + structured request logging.
         app.UseApiDocumentation();         // Scalar / OpenAPI — development only.
         app.UseHttpsRedirection();
         app.UseSecurityPipeline();         // CORS → Authentication → CSRF → Authorization.
+        app.UseRequestContextPipeline();   // Correlation enrichment + structured request logging (after auth for tenant context).
+        app.UseApiDocumentation();         // Scalar / OpenAPI — development only.
         app.UseRateLimiter();
         app.UseOutputCache();
 

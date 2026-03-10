@@ -457,7 +457,7 @@ public class UnitOfWorkTests
             NullLogger<UnitOfWork>.Instance,
             _ => executionStrategy,
             () => null,
-            (_, _) => throw new InvalidOperationException("Transactions are not supported by this provider."));
+            (_, _) => throw new NotSupportedException("Transactions are not supported by this provider."));
 
         await sut.ExecuteInTransactionAsync(
             async () =>
