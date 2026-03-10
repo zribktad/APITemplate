@@ -112,7 +112,7 @@ internal sealed class FakeCookieAuthStartupFilter : IStartupFilter
                 if (ctx.Request.Headers.TryGetValue("X-Test-Cookie-Auth", out _))
                 {
                     var identity = new ClaimsIdentity(
-                        [new Claim(ClaimTypes.Name, "testuser"), new Claim("sub", Guid.NewGuid().ToString())],
+                        [new Claim(ClaimTypes.Name, "testuser"), new Claim(AuthConstants.Claims.Subject, Guid.NewGuid().ToString())],
                         BffAuthenticationSchemes.Cookie);
                     ctx.User = new ClaimsPrincipal(identity);
                 }

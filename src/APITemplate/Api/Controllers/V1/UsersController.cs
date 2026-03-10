@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using APITemplate.Application.Common.DTOs;
 using APITemplate.Application.Common.Security;
@@ -12,7 +13,6 @@ namespace APITemplate.Api.Controllers.V1;
 [ApiVersion(1.0)]
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
-[Authorize(Policy = AuthorizationPolicies.PlatformAdminOnly)]
 public sealed class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -23,6 +23,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<ActionResult<PagedResponse<UserResponse>>> GetAll(
         [FromQuery] UserFilter filter, CancellationToken ct)
     {
@@ -31,6 +32,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken ct)
     {
         var user = await _userService.GetByIdAsync(id, ct);
@@ -38,10 +40,12 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet("me")]
-    [Authorize]
     public async Task<ActionResult<UserResponse>> GetMe(CancellationToken ct)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(AuthConstants.Claims.Subject);
+
         if (userId is null || !Guid.TryParse(userId, out var id))
             return Unauthorized();
 
@@ -50,13 +54,16 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var user = await _userService.CreateAsync(request, ct);
-        return CreatedAtAction(nameof(GetById), new { id = user.Id, version = "1.0" }, user);
+        var version = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
+        return CreatedAtAction(nameof(GetById), new { id = user.Id, version }, user);
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest request, CancellationToken ct)
     {
         await _userService.UpdateAsync(id, request, ct);
@@ -64,6 +71,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/activate")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
     {
         await _userService.ActivateAsync(id, ct);
@@ -71,6 +79,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/deactivate")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
     {
         await _userService.DeactivateAsync(id, ct);
@@ -78,6 +87,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/role")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<IActionResult> ChangeRole(Guid id, ChangeUserRoleRequest request, CancellationToken ct)
     {
         await _userService.ChangeRoleAsync(id, request, ct);
@@ -85,6 +95,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _userService.DeleteAsync(id, ct);

@@ -52,12 +52,12 @@ graph TB
 
 ## Authentication Methods
 
-| Method | Client | Token visible to JS? |
-|--------|--------|----------------------|
-| **Scalar OAuth2** | Scalar UI (dev tool) | Yes (in Scalar memory only) |
-| **JWT Bearer** | Mobile apps, Postman, curl | Yes (client manages it) |
-| **Client Credentials** | Microservices, background jobs | N/A (machine-to-machine) |
-| **BFF Cookie** | SPA frontend (browser) | **No** — httpOnly cookie, tokens in Valkey |
+| Method                 | Client                         | Token visible to JS?                       |
+| ---------------------- | ------------------------------ | ------------------------------------------ |
+| **Scalar OAuth2**      | Scalar UI (dev tool)           | Yes (in Scalar memory only)                |
+| **JWT Bearer**         | Mobile apps, Postman, curl     | Yes (client manages it)                    |
+| **Client Credentials** | Microservices, background jobs | N/A (machine-to-machine)                   |
+| **BFF Cookie**         | SPA frontend (browser)         | **No** — httpOnly cookie, tokens in Valkey |
 
 ---
 
@@ -69,19 +69,19 @@ graph TB
 docker compose up -d
 ```
 
-| Service     | Port  | Description              |
-|-------------|-------|--------------------------|
-| PostgreSQL  | 5432  | Application database     |
-| MongoDB     | 27017 | Product data storage     |
-| Keycloak    | 8180  | Identity provider        |
-| Valkey      | 6379  | Session store + cache    |
+| Service    | Port  | Description           |
+| ---------- | ----- | --------------------- |
+| PostgreSQL | 5432  | Application database  |
+| MongoDB    | 27017 | Product data storage  |
+| Keycloak   | 8180  | Identity provider     |
+| Valkey     | 6379  | Session store + cache |
 
 ### 2. Default Credentials
 
-| Service                | Username | Password  |
-|------------------------|----------|-----------|
-| Keycloak Admin Console | admin    | admin     |
-| Application User       | admin    | Admin123  |
+| Service                | Username | Password |
+| ---------------------- | -------- | -------- |
+| Keycloak Admin Console | admin    | admin    |
+| Application User       | admin    | Admin123 |
 
 Default user has role **PlatformAdmin** and tenant `00000000-0000-0000-0000-000000000001`.
 
@@ -118,7 +118,7 @@ Client (Postman, mobile app, microservice)
 ▼
 [ Authorization Middleware ]
   - Fallback policy: requires authenticated user (Bearer OR Cookie)
-  - PlatformAdminOnly: requires role "PlatformAdmin"
+  - PlatformAdmin: requires role "PlatformAdmin"
 ▼
 Controller Action
 ```
@@ -299,32 +299,32 @@ graph LR
 
 JWT tokens must contain these claims:
 
-| Claim                | Description                    | Required                              |
-|----------------------|--------------------------------|---------------------------------------|
-| `sub`                | Subject (user ID)              | Yes                                   |
-| `preferred_username` | Username                       | Yes                                   |
-| `email`              | User email                     | Yes                                   |
-| `tenant_id`          | Tenant GUID (custom claim)     | Yes (user tokens) / No (service acct) |
-| `realm_access.roles` | Keycloak realm roles (JSON)    | No                                    |
-| `aud`                | Must include `api-template`    | Yes                                   |
-| `iss`                | Keycloak realm issuer URL      | Yes                                   |
+| Claim                | Description                 | Required                              |
+| -------------------- | --------------------------- | ------------------------------------- |
+| `sub`                | Subject (user ID)           | Yes                                   |
+| `preferred_username` | Username                    | Yes                                   |
+| `email`              | User email                  | Yes                                   |
+| `tenant_id`          | Tenant GUID (custom claim)  | Yes (user tokens) / No (service acct) |
+| `realm_access.roles` | Keycloak realm roles (JSON) | No                                    |
+| `aud`                | Must include `api-template` | Yes                                   |
+| `iss`                | Keycloak realm issuer URL   | Yes                                   |
 
 **Claim mapping by `KeycloakClaimMapper`:**
 
-| Keycloak claim         | .NET ClaimType         |
-|------------------------|------------------------|
-| `preferred_username`   | `ClaimTypes.Name`      |
-| `realm_access.roles[]` | `ClaimTypes.Role`      |
+| Keycloak claim         | .NET ClaimType                              |
+| ---------------------- | ------------------------------------------- |
+| `preferred_username`   | `ClaimTypes.Name`                           |
+| `realm_access.roles[]` | `ClaimTypes.Role`                           |
 | `tenant_id`            | `CustomClaimTypes.TenantId` (`"tenant_id"`) |
 
 ---
 
 ## Authorization Policies
 
-| Policy              | Requirement                          | Used on               |
-|---------------------|--------------------------------------|-----------------------|
-| Fallback (default)  | Authenticated via Bearer OR Cookie   | All endpoints         |
-| `PlatformAdminOnly` | Role: `PlatformAdmin`                | Admin-only endpoints  |
+| Policy             | Requirement                        | Used on              |
+| ------------------ | ---------------------------------- | -------------------- |
+| Fallback (default) | Authenticated via Bearer OR Cookie | All endpoints        |
+| `PlatformAdmin`    | Role: `PlatformAdmin`              | Admin-only endpoints |
 
 ---
 
@@ -332,12 +332,12 @@ JWT tokens must contain these claims:
 
 All under `/api/v1/bff/`:
 
-| Endpoint               | Auth required | Description                                      |
-|------------------------|---------------|--------------------------------------------------|
-| `GET /bff/login`       | No            | Initiates OIDC login, optional `?returnUrl=`     |
-| `GET /bff/logout`      | Cookie        | Clears session in Valkey, signs out of Keycloak  |
-| `GET /bff/user`        | Cookie        | Returns current user claims as JSON              |
-| `GET /bff/csrf`        | No            | Returns CSRF header name/value contract          |
+| Endpoint          | Auth required | Description                                     |
+| ----------------- | ------------- | ----------------------------------------------- |
+| `GET /bff/login`  | No            | Initiates OIDC login, optional `?returnUrl=`    |
+| `GET /bff/logout` | Cookie        | Clears session in Valkey, signs out of Keycloak |
+| `GET /bff/user`   | Cookie        | Returns current user claims as JSON             |
+| `GET /bff/csrf`   | No            | Returns CSRF header name/value contract         |
 
 **`GET /bff/user` response:**
 ```json
@@ -356,12 +356,12 @@ Returns `401` (not redirect) when unauthenticated — SPA should redirect to `/a
 
 ## Session & Token Lifecycle
 
-| Setting                      | Default | Config key                               |
-|------------------------------|---------|------------------------------------------|
-| Session timeout              | 60 min  | `Bff:SessionTimeoutMinutes`              |
-| Sliding expiration           | enabled | `CookieAuthenticationOptions`            |
-| Token refresh threshold      | 2 min   | `Bff:TokenRefreshThresholdMinutes`       |
-| Scopes requested from OIDC   | openid, profile, email, offline_access | `Bff:Scopes` |
+| Setting                    | Default                                | Config key                         |
+| -------------------------- | -------------------------------------- | ---------------------------------- |
+| Session timeout            | 60 min                                 | `Bff:SessionTimeoutMinutes`        |
+| Sliding expiration         | enabled                                | `CookieAuthenticationOptions`      |
+| Token refresh threshold    | 2 min                                  | `Bff:TokenRefreshThresholdMinutes` |
+| Scopes requested from OIDC | openid, profile, email, offline_access | `Bff:Scopes`                       |
 
 **Token refresh trigger:** On every cookie-authenticated request, `CookieSessionRefresher` checks if the access token expires within `TokenRefreshThresholdMinutes`. If so, it silently calls Keycloak `/token` with `grant_type=refresh_token` and updates the session in Valkey.
 
@@ -383,42 +383,42 @@ Realm auto-imported on `docker compose up` from `infrastructure/keycloak/realms/
 
 ### Roles
 
-| Role            | Description            |
-|-----------------|------------------------|
-| `PlatformAdmin` | Full platform access   |
-| `User`          | Regular tenant user    |
+| Role            | Description          |
+| --------------- | -------------------- |
+| `PlatformAdmin` | Full platform access |
+| `User`          | Regular tenant user  |
 
 ### Client: `api-template`
 
-| Setting                  | Value                                      |
-|--------------------------|--------------------------------------------|
-| Type                     | Confidential                               |
-| Secret                   | `dev-client-secret` (dev only)             |
-| Standard Flow            | Enabled (Authorization Code + PKCE S256)   |
-| Service Accounts         | Enabled (Client Credentials grant)         |
-| Direct Access Grants     | Disabled (password grant removed in OAuth 2.1) |
-| PKCE                     | Required (`S256`)                          |
-| Redirect URIs            | `http://localhost:5174/*`, `http://localhost:8080/*` |
+| Setting              | Value                                                |
+| -------------------- | ---------------------------------------------------- |
+| Type                 | Confidential                                         |
+| Secret               | `dev-client-secret` (dev only)                       |
+| Standard Flow        | Enabled (Authorization Code + PKCE S256)             |
+| Service Accounts     | Enabled (Client Credentials grant)                   |
+| Direct Access Grants | Disabled (password grant removed in OAuth 2.1)       |
+| PKCE                 | Required (`S256`)                                    |
+| Redirect URIs        | `http://localhost:5174/*`, `http://localhost:8080/*` |
 
 > **OAuth 2.1 compliance:** All Authorization Code flows (BFF, Scalar, mobile) enforce PKCE (`code_challenge_method=S256`).
 
 ### Custom Protocol Mappers
 
-| Mapper         | Type              | Source attribute | JWT claim             |
-|----------------|-------------------|------------------|-----------------------|
-| `tenant_id`    | User Attribute    | `tenant_id`      | `tenant_id`           |
-| audience-mapper| Audience Mapper   | —                | `aud`                 |
-| realm-roles    | Realm Role Mapper | realm roles      | `realm_access.roles`  |
+| Mapper          | Type              | Source attribute | JWT claim            |
+| --------------- | ----------------- | ---------------- | -------------------- |
+| `tenant_id`     | User Attribute    | `tenant_id`      | `tenant_id`          |
+| audience-mapper | Audience Mapper   | —                | `aud`                |
+| realm-roles     | Realm Role Mapper | realm roles      | `realm_access.roles` |
 
 ### Standard Keycloak Endpoints
 
-| Endpoint      | URL                                                               |
-|---------------|-------------------------------------------------------------------|
-| Discovery     | `/realms/{realm}/.well-known/openid-configuration`                |
-| Token         | `/realms/{realm}/protocol/openid-connect/token`                   |
-| Authorization | `/realms/{realm}/protocol/openid-connect/auth`                    |
-| Logout        | `/realms/{realm}/protocol/openid-connect/logout`                  |
-| UserInfo      | `/realms/{realm}/protocol/openid-connect/userinfo`                |
+| Endpoint      | URL                                                |
+| ------------- | -------------------------------------------------- |
+| Discovery     | `/realms/{realm}/.well-known/openid-configuration` |
+| Token         | `/realms/{realm}/protocol/openid-connect/token`    |
+| Authorization | `/realms/{realm}/protocol/openid-connect/auth`     |
+| Logout        | `/realms/{realm}/protocol/openid-connect/logout`   |
+| UserInfo      | `/realms/{realm}/protocol/openid-connect/userinfo` |
 
 When the API sets `options.Authority`, ASP.NET auto-discovers all endpoints via the Discovery URL.
 
@@ -458,13 +458,13 @@ When the API sets `options.Authority`, ASP.NET auto-discovers all endpoints via 
 
 ### Production Environment Variables
 
-| Variable                           | Description                       |
-|------------------------------------|-----------------------------------|
-| `KC_HOSTNAME`                      | Keycloak external hostname        |
-| `Keycloak__realm`                  | Keycloak realm name               |
-| `Keycloak__resource`               | Client ID                         |
-| `Keycloak__credentials__secret`    | Client secret                     |
-| `Valkey__ConnectionString`         | Valkey/Redis connection string    |
+| Variable                        | Description                    |
+| ------------------------------- | ------------------------------ |
+| `KC_HOSTNAME`                   | Keycloak external hostname     |
+| `Keycloak__realm`               | Keycloak realm name            |
+| `Keycloak__resource`            | Client ID                      |
+| `Keycloak__credentials__secret` | Client secret                  |
+| `Valkey__ConnectionString`      | Valkey/Redis connection string |
 
 ---
 
@@ -494,24 +494,24 @@ Test tokens are signed with RSA-256 using an in-memory test key pair and include
 
 ## Key Source Files
 
-| File | Description |
-|------|-------------|
+| File                                                      | Description                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------------ |
 | `Extensions/AuthenticationServiceCollectionExtensions.cs` | All auth registration: JWT Bearer + Cookie + OIDC + policies |
-| `Extensions/ApplicationBuilderExtensions.cs` | Middleware pipeline order |
-| `Api/Controllers/V1/BffController.cs` | BFF endpoints: login / logout / user / csrf |
-| `Api/Middleware/CsrfValidationMiddleware.cs` | CSRF header enforcement for cookie-authenticated requests |
-| `Api/OpenApi/BearerSecuritySchemeDocumentTransformer.cs` | Registers OAuth2 flow in Scalar/OpenAPI spec |
-| `Application/Common/Options/BffOptions.cs` | BFF configuration model |
-| `Application/Common/Options/KeycloakOptions.cs` | Keycloak configuration model |
-| `Application/Common/Security/BffAuthenticationSchemes.cs` | Auth scheme name constants |
-| `Application/Common/Security/AuthorizationPolicies.cs` | Policy name constants |
-| `Application/Common/Security/CustomClaimTypes.cs` | Custom claim type constants (`tenant_id`) |
-| `Infrastructure/Security/ValkeyTicketStore.cs` | Server-side session store (Valkey); cookie holds only GUID |
-| `Infrastructure/Security/CookieSessionRefresher.cs` | Silent token refresh on cookie validation |
-| `Infrastructure/Security/TenantClaimValidator.cs` | Validates tenant_id claim; maps Keycloak claims |
-| `Infrastructure/Security/KeycloakClaimMapper.cs` | Maps preferred_username + realm roles to .NET claim types |
-| `Infrastructure/Security/KeycloakUrlHelper.cs` | Builds Keycloak authority URL |
-| `Infrastructure/Health/KeycloakHealthCheck.cs` | Keycloak health check endpoint |
-| `infrastructure/keycloak/realms/api-template-realm.json` | Keycloak realm auto-import |
+| `Extensions/ApplicationBuilderExtensions.cs`              | Middleware pipeline order                                    |
+| `Api/Controllers/V1/BffController.cs`                     | BFF endpoints: login / logout / user / csrf                  |
+| `Api/Middleware/CsrfValidationMiddleware.cs`              | CSRF header enforcement for cookie-authenticated requests    |
+| `Api/OpenApi/BearerSecuritySchemeDocumentTransformer.cs`  | Registers OAuth2 flow in Scalar/OpenAPI spec                 |
+| `Application/Common/Options/BffOptions.cs`                | BFF configuration model                                      |
+| `Application/Common/Options/KeycloakOptions.cs`           | Keycloak configuration model                                 |
+| `Application/Common/Security/BffAuthenticationSchemes.cs` | Auth scheme name constants                                   |
+| `Application/Common/Security/AuthorizationPolicies.cs`    | Policy name constants                                        |
+| `Application/Common/Security/CustomClaimTypes.cs`         | Custom claim type constants (`tenant_id`)                    |
+| `Infrastructure/Security/ValkeyTicketStore.cs`            | Server-side session store (Valkey); cookie holds only GUID   |
+| `Infrastructure/Security/CookieSessionRefresher.cs`       | Silent token refresh on cookie validation                    |
+| `Infrastructure/Security/TenantClaimValidator.cs`         | Validates tenant_id claim; maps Keycloak claims              |
+| `Infrastructure/Security/KeycloakClaimMapper.cs`          | Maps preferred_username + realm roles to .NET claim types    |
+| `Infrastructure/Security/KeycloakUrlHelper.cs`            | Builds Keycloak authority URL                                |
+| `Infrastructure/Health/KeycloakHealthCheck.cs`            | Keycloak health check endpoint                               |
+| `infrastructure/keycloak/realms/api-template-realm.json`  | Keycloak realm auto-import                                   |
 
 

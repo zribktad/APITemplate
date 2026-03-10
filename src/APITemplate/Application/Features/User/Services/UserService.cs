@@ -33,12 +33,10 @@ public sealed class UserService : IUserService
 
     public async Task<PagedResponse<UserResponse>> GetPagedAsync(UserFilter filter, CancellationToken ct = default)
     {
-        var itemsTask = _repository.ListAsync(new UserFilterSpecification(filter), ct);
-        var countTask = _repository.CountAsync(new UserCountSpecification(filter), ct);
+        var items = await _repository.ListAsync(new UserFilterSpecification(filter), ct);
+        var totalCount = await _repository.CountAsync(new UserCountSpecification(filter), ct);
 
-        await Task.WhenAll(itemsTask, countTask);
-
-        return new PagedResponse<UserResponse>(itemsTask.Result, countTask.Result, filter.PageNumber, filter.PageSize);
+        return new PagedResponse<UserResponse>(items, totalCount, filter.PageNumber, filter.PageSize);
     }
 
     public async Task<UserResponse> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
@@ -79,28 +77,13 @@ public sealed class UserService : IUserService
     }
 
     public async Task ActivateAsync(Guid id, CancellationToken ct = default)
-    {
-        var user = await GetUserOrThrowAsync(id, ct);
-        user.IsActive = true;
-        await _repository.UpdateAsync(user, ct);
-        await _unitOfWork.CommitAsync(ct);
-    }
+        => await UpdateUserAsync(id, user => user.IsActive = true, ct);
 
     public async Task DeactivateAsync(Guid id, CancellationToken ct = default)
-    {
-        var user = await GetUserOrThrowAsync(id, ct);
-        user.IsActive = false;
-        await _repository.UpdateAsync(user, ct);
-        await _unitOfWork.CommitAsync(ct);
-    }
+        => await UpdateUserAsync(id, user => user.IsActive = false, ct);
 
     public async Task ChangeRoleAsync(Guid id, ChangeUserRoleRequest request, CancellationToken ct = default)
-    {
-        var user = await GetUserOrThrowAsync(id, ct);
-        user.Role = request.Role;
-        await _repository.UpdateAsync(user, ct);
-        await _unitOfWork.CommitAsync(ct);
-    }
+        => await UpdateUserAsync(id, user => user.Role = request.Role, ct);
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
@@ -113,6 +96,14 @@ public sealed class UserService : IUserService
     {
         return await _repository.GetByIdAsync(id, ct)
             ?? throw new NotFoundException(nameof(AppUser), id, ErrorCatalog.Users.NotFound);
+    }
+
+    private async Task UpdateUserAsync(Guid id, Action<AppUser> applyUpdate, CancellationToken ct)
+    {
+        var user = await GetUserOrThrowAsync(id, ct);
+        applyUpdate(user);
+        await _repository.UpdateAsync(user, ct);
+        await _unitOfWork.CommitAsync(ct);
     }
 
     private async Task ValidateEmailUniqueAsync(string email, CancellationToken ct)

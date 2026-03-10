@@ -9,8 +9,19 @@ using OidcTokenValidatedContext = Microsoft.AspNetCore.Authentication.OpenIdConn
 
 namespace APITemplate.Infrastructure.Security;
 
+/// <summary>
+/// Validates tenant-related claims after JWT/OIDC token validation and normalizes
+/// Keycloak claims into standard .NET claim types used by authorization policies.
+/// </summary>
 public static class TenantClaimValidator
 {
+    /// <summary>
+    /// JWT Bearer token callback executed after signature and lifetime checks.
+    /// Maps Keycloak claims, enforces tenant claim presence for user tokens, and logs
+    /// authentication details for diagnostics.
+    /// </summary>
+    /// <param name="context">The JWT token validation context.</param>
+    /// <returns>A completed task.</returns>
     public static Task OnTokenValidated(JwtTokenValidatedContext context)
     {
         var identity = context.Principal?.Identity as ClaimsIdentity;
@@ -28,6 +39,12 @@ public static class TenantClaimValidator
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// OpenID Connect token callback executed after token validation in BFF login flow.
+    /// Applies the same tenant and claim-mapping rules as JWT Bearer validation.
+    /// </summary>
+    /// <param name="context">The OIDC token validation context.</param>
+    /// <returns>A completed task.</returns>
     public static Task OnTokenValidated(OidcTokenValidatedContext context)
     {
         var identity = context.Principal?.Identity as ClaimsIdentity;
@@ -45,6 +62,11 @@ public static class TenantClaimValidator
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Checks whether the principal has a non-empty GUID value in the <c>tenant_id</c> claim.
+    /// </summary>
+    /// <param name="principal">The authenticated principal.</param>
+    /// <returns><c>true</c> when a valid tenant claim exists; otherwise <c>false</c>.</returns>
     public static bool HasValidTenantClaim(ClaimsPrincipal? principal)
     {
         return principal?.HasClaim(

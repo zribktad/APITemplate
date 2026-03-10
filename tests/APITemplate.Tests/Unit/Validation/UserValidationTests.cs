@@ -52,6 +52,17 @@ public class CreateUserRequestValidatorTests
     }
 
     [Fact]
+    public void NullPassword_StopsAfterEmptyValidation()
+    {
+        var result = _sut.Validate(new CreateUserRequest("user", "valid@email.com", null!));
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldNotContain(e => e.ErrorMessage.Contains("uppercase"));
+        result.Errors.ShouldNotContain(e => e.ErrorMessage.Contains("digit"));
+        result.Errors.ShouldNotContain(e => e.ErrorMessage.Contains("special"));
+    }
+
+    [Fact]
     public void PasswordWithoutUppercase_IsInvalid()
     {
         var result = _sut.Validate(new CreateUserRequest("user", "valid@email.com", "password1!"));

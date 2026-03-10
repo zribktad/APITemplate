@@ -24,6 +24,10 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .IsRequired()
             .HasMaxLength(320);
 
+        builder.Property(u => u.NormalizedEmail)
+            .IsRequired()
+            .HasMaxLength(320);
+
         builder.Property(u => u.PasswordHash)
             .IsRequired()
             .HasMaxLength(1000);
@@ -45,6 +49,6 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(u => new { u.TenantId, u.NormalizedUsername }).IsUnique();
-        builder.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
+        builder.HasIndex(u => new { u.TenantId, u.NormalizedEmail }).IsUnique();
     }
 }

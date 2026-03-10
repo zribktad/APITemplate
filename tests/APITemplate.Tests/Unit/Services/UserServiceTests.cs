@@ -299,6 +299,7 @@ public class UserServiceTests
             Username = "testuser",
             NormalizedUsername = AppUser.NormalizeUsername("testuser"),
             Email = "test@example.com",
+            NormalizedEmail = AppUser.NormalizeEmail("test@example.com"),
             PasswordHash = "hashed",
             IsActive = isActive,
             Role = role,

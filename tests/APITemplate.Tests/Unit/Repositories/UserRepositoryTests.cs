@@ -1,4 +1,6 @@
 using APITemplate.Application.Common.Context;
+using APITemplate.Application.Features.User.DTOs;
+using APITemplate.Application.Features.User.Specifications;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Enums;
 using APITemplate.Infrastructure.Persistence;
@@ -59,6 +61,19 @@ public class UserRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task ExistsByEmailAsync_WhenEmailDiffersOnlyByCase_ReturnsTrue()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var user = CreateUser("user1", "Exists@Test.com");
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync(ct);
+
+        var result = await _sut.ExistsByEmailAsync("exists@test.com", ct);
+
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task ExistsByEmailAsync_WhenNotExists_ReturnsFalse()
     {
         var result = await _sut.ExistsByEmailAsync("nonexistent@test.com", TestContext.Current.CancellationToken);
@@ -107,6 +122,34 @@ public class UserRepositoryTests : IDisposable
         var result = await _sut.GetByIdAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
         result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ListAsync_WithUsernameFilter_UsesNormalizedUsernameContains()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _dbContext.Users.AddRange(
+            CreateUser("AlphaAdmin", "alpha@example.com"),
+            CreateUser("betauser", "beta@example.com"));
+        await _dbContext.SaveChangesAsync(ct);
+
+        var result = await _sut.ListAsync(new UserFilterSpecification(new UserFilter(Username: "alpha")), ct);
+
+        result.Select(user => user.Username).ShouldBe(["AlphaAdmin"]);
+    }
+
+    [Fact]
+    public async Task ListAsync_WithEmailFilter_RequiresExactCaseInsensitiveMatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        _dbContext.Users.AddRange(
+            CreateUser("exact", "Exact.Match@Test.com"),
+            CreateUser("partial", "other@test.com"));
+        await _dbContext.SaveChangesAsync(ct);
+
+        var result = await _sut.ListAsync(new UserFilterSpecification(new UserFilter(Email: "exact.match@test.com")), ct);
+
+        result.Select(user => user.Username).ShouldBe(["exact"]);
     }
 
     private static AppUser CreateUser(string username, string email)

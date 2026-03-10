@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
-using System.IdentityModel.Tokens.Jwt;
+using APITemplate.Application.Common.Security;
 using Microsoft.Extensions.Options;
 
 namespace APITemplate.Infrastructure.Security;
@@ -33,8 +33,7 @@ public sealed class HttpActorProvider : IActorProvider
             var user = _httpContextAccessor.HttpContext?.User;
             // Prefer stable subject-style identifiers first, then name-like claims, then configured system fallback.
             var raw = user?.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? user?.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                ?? user?.FindFirstValue("sub")
+                ?? user?.FindFirstValue(AuthConstants.Claims.Subject)
                 ?? user?.FindFirstValue(ClaimTypes.Name);
 
             return Guid.TryParse(raw, out var id) ? id : _systemIdentity.DefaultActorId;

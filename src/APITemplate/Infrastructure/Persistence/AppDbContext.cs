@@ -254,7 +254,10 @@ public sealed class AppDbContext : DbContext
     private static void EnsureEntityNormalization(IAuditableTenantEntity entity)
     {
         if (entity is AppUser user)
+        {
             user.NormalizedUsername = AppUser.NormalizeUsername(user.Username);
+            user.NormalizedEmail = AppUser.NormalizeEmail(user.Email);
+        }
     }
 
     private static void ResetSoftDelete(IAuditableTenantEntity entity)

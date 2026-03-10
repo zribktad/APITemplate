@@ -54,6 +54,7 @@ public static class AuthConstants
 
     public static class Claims
     {
+        public const string Subject = "sub";
         public const string RealmAccess = "realm_access";
         public const string Roles = "roles";
         public const string PreferredUsername = "preferred_username";

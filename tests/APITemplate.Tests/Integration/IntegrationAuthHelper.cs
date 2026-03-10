@@ -32,7 +32,7 @@ internal static class IntegrationAuthHelper
 
         var claims = new List<Claim>
         {
-            new("sub", id.ToString()),
+            new(AuthConstants.Claims.Subject, id.ToString()),
             new("preferred_username", username ?? "admin"),
             new(ClaimTypes.Email, $"{username ?? "admin"}@example.com"),
             new(CustomClaimTypes.TenantId, tenant.ToString()),
