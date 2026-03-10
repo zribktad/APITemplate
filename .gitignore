@@ -27,6 +27,7 @@ artifacts/
 
 # Agent files
 .claude/**/*local*
+.cursor/**
 **/obj-codex/**
 CLAUDE.md
 AGENTS.md
@@ -57,3 +58,4 @@ coverage/
 
 # Published output
 publish/
+

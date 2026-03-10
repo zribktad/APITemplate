@@ -5,9 +5,26 @@ namespace APITemplate.Domain.Entities;
 public sealed class AppUser : IAuditableTenantEntity
 {
     public Guid Id { get; set; }
+    /// <summary>
+    /// Original username exactly as entered by the user (preserves casing and formatting).
+    /// </summary>
     public required string Username { get; set; }
+
+    /// <summary>
+    /// Uppercase, trimmed version of the username.
+    /// Used for fast database indexing, case-insensitive uniqueness checks (preventing impersonation), and reliable logins.
+    /// </summary>
     public string NormalizedUsername { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Original email exactly as entered by the user. Required for correct email delivery (RFC compliance).
+    /// </summary>
     public required string Email { get; set; }
+
+    /// <summary>
+    /// Uppercase, trimmed version of the email.
+    /// Used for fast database indexing, case-insensitive uniqueness checks (preventing impersonation), and reliable logins.
+    /// </summary>
     public string NormalizedEmail { get; set; } = string.Empty;
     public required string PasswordHash { get; set; }
     public bool IsActive { get; set; } = true;
