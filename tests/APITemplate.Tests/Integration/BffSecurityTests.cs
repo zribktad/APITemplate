@@ -1,6 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using APITemplate.Application.Common.Security;
+using APITemplate.Domain.Enums;
 using APITemplate.Tests.Integration.Helpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -46,8 +47,7 @@ public sealed class BffSecurityTests
             ct);
 
         // CSRF passes; request reaches the controller where the empty body fails validation.
-        // Any non-403 status confirms CSRF did not block the request.
-        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ internal sealed class FakeCookieAuthStartupFilter : IStartupFilter
                         [
                             new Claim(ClaimTypes.Name, "testuser"),
                             new Claim(AuthConstants.Claims.Subject, Guid.NewGuid().ToString()),
-                            new Claim(ClaimTypes.Role, "PlatformAdmin")
+                            new Claim(ClaimTypes.Role, UserRole.PlatformAdmin.ToString())
                         ],
                         BffAuthenticationSchemes.Cookie);
                     ctx.User = new ClaimsPrincipal(identity);

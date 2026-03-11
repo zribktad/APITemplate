@@ -205,12 +205,18 @@ public static class AuthenticationServiceCollectionExtensions
                 .Build())
             .AddPolicy(
                 AuthorizationPolicies.PlatformAdmin,
-                policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()))
+                policy => policy
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
+                    .RequireAuthenticatedUser()
+                    .RequireRole(UserRole.PlatformAdmin.ToString()))
             .AddPolicy(
                 AuthorizationPolicies.TenantAdmin,
-                policy => policy.RequireRole(
-                    UserRole.TenantAdmin.ToString(),
-                    UserRole.PlatformAdmin.ToString()))
+                policy => policy
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
+                    .RequireAuthenticatedUser()
+                    .RequireRole(
+                        UserRole.TenantAdmin.ToString(),
+                        UserRole.PlatformAdmin.ToString()))
             .AddPermissionPolicies();
     }
 

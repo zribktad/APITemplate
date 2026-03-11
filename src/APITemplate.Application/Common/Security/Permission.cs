@@ -49,7 +49,7 @@ public static class Permission
         {
             foreach (var field in nestedType.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
             {
-                if (field is { IsLiteral: true, FieldType.Name: "String" } &&
+                if (field.IsLiteral && field.FieldType == typeof(string) &&
                     field.GetRawConstantValue() is string value)
                 {
                     permissions.Add(value);

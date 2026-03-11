@@ -1,5 +1,6 @@
 using APITemplate.Api.Authorization;
 using APITemplate.Application.Common.Security;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 
 namespace APITemplate.Extensions;
@@ -11,7 +12,9 @@ public static class AuthorizationBuilderExtensions
         foreach (var permission in Permission.All)
         {
             builder.AddPolicy(permission, policy =>
-                policy.AddRequirements(new PermissionRequirement(permission)));
+                policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
+                    .RequireAuthenticatedUser()
+                    .AddRequirements(new PermissionRequirement(permission)));
         }
 
         return builder;

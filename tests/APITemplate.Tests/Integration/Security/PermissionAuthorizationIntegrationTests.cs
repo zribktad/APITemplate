@@ -138,13 +138,15 @@ public class PermissionAuthorizationIntegrationTests
             "/api/v1/products",
             new { Name = "Review Target", Description = "For review", Price = 5.00 },
             ct);
+        productResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         var product = await productResponse.Content.ReadFromJsonAsync<ProductResponse>(
             TestJsonOptions.CaseInsensitive, ct);
+        product.ShouldNotBeNull();
 
         // Then create a review as User
         var response = await client.PostAsJsonAsync(
             "/api/v1/productreviews",
-            new { ProductId = product!.Id, Rating = 5, Comment = "Great!" },
+            new { ProductId = product.Id, Rating = 5, Comment = "Great!" },
             ct);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
