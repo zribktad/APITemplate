@@ -1,3 +1,5 @@
+using APITemplate.Api.Authorization;
+using APITemplate.Application.Common.Security;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +19,7 @@ public sealed class ProductDataController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(Permission.ProductData.Read)]
     public async Task<ActionResult<List<ProductDataResponse>>> GetAll([FromQuery] string? type, CancellationToken ct)
     {
         var items = await _sender.Send(new GetProductDataQuery(type), ct);
@@ -24,6 +27,7 @@ public sealed class ProductDataController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permission.ProductData.Read)]
     public async Task<ActionResult<ProductDataResponse>> GetById(Guid id, CancellationToken ct)
     {
         var item = await _sender.Send(new GetProductDataByIdQuery(id), ct);
@@ -31,6 +35,7 @@ public sealed class ProductDataController : ControllerBase
     }
 
     [HttpPost("image")]
+    [RequirePermission(Permission.ProductData.Create)]
     public async Task<ActionResult<ProductDataResponse>> CreateImage(
         CreateImageProductDataRequest request, CancellationToken ct)
     {
@@ -39,6 +44,7 @@ public sealed class ProductDataController : ControllerBase
     }
 
     [HttpPost("video")]
+    [RequirePermission(Permission.ProductData.Create)]
     public async Task<ActionResult<ProductDataResponse>> CreateVideo(
         CreateVideoProductDataRequest request, CancellationToken ct)
     {
@@ -47,6 +53,7 @@ public sealed class ProductDataController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permission.ProductData.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteProductDataCommand(id), ct);

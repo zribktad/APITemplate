@@ -1,3 +1,4 @@
+using APITemplate.Api.Authorization;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Options;
@@ -193,6 +194,9 @@ public static class AuthenticationServiceCollectionExtensions
 
     private static void ConfigureAuthorization(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IRolePermissionMap, StaticRolePermissionMap>();
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
         services.AddKeycloakAuthorization(configuration)
             .AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
@@ -201,7 +205,19 @@ public static class AuthenticationServiceCollectionExtensions
                 .Build())
             .AddPolicy(
                 AuthorizationPolicies.PlatformAdmin,
-                policy => policy.RequireRole(UserRole.PlatformAdmin.ToString()));
+                policy => policy
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
+                    .RequireAuthenticatedUser()
+                    .RequireRole(UserRole.PlatformAdmin.ToString()))
+            .AddPolicy(
+                AuthorizationPolicies.TenantAdmin,
+                policy => policy
+                    .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, BffAuthenticationSchemes.Cookie)
+                    .RequireAuthenticatedUser()
+                    .RequireRole(
+                        UserRole.TenantAdmin.ToString(),
+                        UserRole.PlatformAdmin.ToString()))
+            .AddPermissionPolicies();
     }
 
     private static void ConfigureKeycloakInfrastructure(IServiceCollection services)

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using APITemplate.Api.Authorization;
 using APITemplate.Application.Common.DTOs;
 using APITemplate.Application.Common.Security;
 using Asp.Versioning;
@@ -22,7 +23,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Read)]
     public async Task<ActionResult<PagedResponse<UserResponse>>> GetAll(
         [FromQuery] UserFilter filter, CancellationToken ct)
     {
@@ -31,7 +32,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Read)]
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken ct)
     {
         var user = await _sender.Send(new GetUserByIdQuery(id), ct);
@@ -53,7 +54,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Create)]
     public async Task<ActionResult<UserResponse>> Create(CreateUserRequest request, CancellationToken ct)
     {
         var user = await _sender.Send(new CreateUserCommand(request), ct);
@@ -62,7 +63,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Update)]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest request, CancellationToken ct)
     {
         await _sender.Send(new UpdateUserCommand(id, request), ct);
@@ -70,7 +71,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/activate")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Update)]
     public async Task<IActionResult> Activate(Guid id, CancellationToken ct)
     {
         await _sender.Send(new ActivateUserCommand(id), ct);
@@ -78,7 +79,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/deactivate")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Update)]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeactivateUserCommand(id), ct);
@@ -86,7 +87,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}/role")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Update)]
     public async Task<IActionResult> ChangeRole(Guid id, ChangeUserRoleRequest request, CancellationToken ct)
     {
         await _sender.Send(new ChangeUserRoleCommand(id, request), ct);
@@ -94,7 +95,7 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = AuthorizationPolicies.PlatformAdmin)]
+    [RequirePermission(Permission.Users.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteUserCommand(id), ct);

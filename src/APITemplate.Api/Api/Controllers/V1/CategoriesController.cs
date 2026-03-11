@@ -1,4 +1,6 @@
+using APITemplate.Api.Authorization;
 using APITemplate.Api.Cache;
+using APITemplate.Application.Common.Security;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(Permission.Categories.Read)]
     [OutputCache(PolicyName = CachePolicyNames.Categories)]
     public async Task<ActionResult<PagedResponse<CategoryResponse>>> GetAll([FromQuery] CategoryFilter filter, CancellationToken ct)
     {
@@ -27,6 +30,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permission.Categories.Read)]
     [OutputCache(PolicyName = CachePolicyNames.Categories)]
     public async Task<ActionResult<CategoryResponse>> GetById(Guid id, CancellationToken ct)
     {
@@ -35,6 +39,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpPost]
+    [RequirePermission(Permission.Categories.Create)]
     public async Task<ActionResult<CategoryResponse>> Create(CreateCategoryRequest request, CancellationToken ct)
     {
         var category = await _sender.Send(new CreateCategoryCommand(request), ct);
@@ -42,6 +47,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [RequirePermission(Permission.Categories.Update)]
     public async Task<IActionResult> Update(Guid id, UpdateCategoryRequest request, CancellationToken ct)
     {
         await _sender.Send(new UpdateCategoryCommand(id, request), ct);
@@ -49,6 +55,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permission.Categories.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteCategoryCommand(id), ct);
@@ -60,6 +67,7 @@ public sealed class CategoriesController : ControllerBase
     /// <c>get_product_category_stats(p_category_id)</c> stored procedure via EF Core FromSql.
     /// </summary>
     [HttpGet("{id:guid}/stats")]
+    [RequirePermission(Permission.Categories.Read)]
     [OutputCache(PolicyName = CachePolicyNames.Categories)]
     public async Task<ActionResult<ProductCategoryStatsResponse>> GetStats(Guid id, CancellationToken ct)
     {

@@ -71,6 +71,12 @@ internal static class IntegrationAuthHelper
         return userId;
     }
 
+    public static void AuthenticateAsUser(HttpClient client, Guid? userId = null, Guid? tenantId = null)
+        => Authenticate(client, userId, tenantId, username: "user", role: UserRole.User);
+
+    public static void AuthenticateAsTenantAdmin(HttpClient client, Guid? userId = null, Guid? tenantId = null)
+        => Authenticate(client, userId, tenantId, username: "tenantadmin", role: UserRole.TenantAdmin);
+
     public static async Task<(Tenant Tenant, AppUser User)> SeedTenantUserAsync(
         IServiceProvider services,
         string username,

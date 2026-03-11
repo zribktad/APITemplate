@@ -1,3 +1,4 @@
+using APITemplate.Application.Common.Security;
 using HotChocolate.Authorization;
 using MediatR;
 
@@ -7,6 +8,7 @@ namespace APITemplate.Api.GraphQL.Mutations;
 [ExtendObjectType(typeof(ProductMutations))]
 public class ProductReviewMutations
 {
+    [Authorize(Policy = Permission.ProductReviews.Create)]
     public async Task<ProductReviewResponse> CreateProductReview(
         CreateProductReviewRequest input,
         [Service] ISender sender,
@@ -15,6 +17,7 @@ public class ProductReviewMutations
         return await sender.Send(new CreateProductReviewCommand(input), ct);
     }
 
+    [Authorize(Policy = Permission.ProductReviews.Delete)]
     public async Task<bool> DeleteProductReview(
         Guid id,
         [Service] ISender sender,

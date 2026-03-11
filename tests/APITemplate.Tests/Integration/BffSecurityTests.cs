@@ -1,11 +1,15 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.Encodings.Web;
 using APITemplate.Application.Common.Security;
+using APITemplate.Domain.Enums;
 using APITemplate.Tests.Integration.Helpers;
-using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace APITemplate.Tests.Integration;
@@ -45,9 +49,8 @@ public sealed class BffSecurityTests
             new StringContent("{}", System.Text.Encoding.UTF8, "application/json"),
             ct);
 
-        // CSRF passes; authorization middleware rejects the fake cookie identity (no real session),
-        // so we expect 401 rather than 403 (which would mean CSRF blocked the request).
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        // CSRF passes; request reaches the controller where the empty body fails validation.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -81,10 +84,11 @@ public sealed class BffSecurityTests
 }
 
 /// <summary>
-/// Extends <see cref="CustomWebApplicationFactory"/> with a startup filter that fabricates a
-/// cookie-authenticated <see cref="System.Security.Claims.ClaimsPrincipal"/> when the
-/// <c>X-Test-Cookie-Auth: 1</c> request header is present. This lets CSRF tests simulate
-/// cookie sessions without a real Keycloak login.
+/// Extends <see cref="CustomWebApplicationFactory"/> by replacing the real BFF Cookie
+/// authentication handler with <see cref="FakeCookieAuthHandler"/>. When the
+/// <c>X-Test-Cookie-Auth: 1</c> request header is present, the handler returns
+/// an authenticated principal so that authorization policies that explicitly list the
+/// <c>BffCookie</c> scheme authenticate correctly.
 /// </summary>
 public sealed class BffSecurityWebApplicationFactory : CustomWebApplicationFactory
 {
@@ -94,31 +98,46 @@ public sealed class BffSecurityWebApplicationFactory : CustomWebApplicationFacto
 
         builder.ConfigureTestServices(services =>
         {
-            services.AddSingleton<IStartupFilter, FakeCookieAuthStartupFilter>();
+            // Replace the real BffCookie handler with the fake one by swapping the handler type
+            // in the existing SchemeBuilder — avoids "scheme already exists" errors.
+            services.PostConfigure<AuthenticationOptions>(options =>
+            {
+                if (options.SchemeMap.TryGetValue(BffAuthenticationSchemes.Cookie, out var builder))
+                    builder.HandlerType = typeof(FakeCookieAuthHandler);
+            });
         });
     }
 }
 
-internal sealed class FakeCookieAuthStartupFilter : IStartupFilter
+/// <summary>
+/// A fake authentication handler registered under the <c>BffCookie</c> scheme.
+/// Returns <see cref="AuthenticateResult.Success"/> with a fabricated principal when
+/// the <c>X-Test-Cookie-Auth: 1</c> request header is present; otherwise
+/// <see cref="AuthenticateResult.NoResult"/>.
+/// </summary>
+internal sealed class FakeCookieAuthHandler(
+    IOptionsMonitor<AuthenticationSchemeOptions> options,
+    ILoggerFactory logger,
+    UrlEncoder encoder)
+    : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
-        app =>
-        {
-            // Insert before the rest of the pipeline so we can pre-populate HttpContext.User.
-            // UseAuthentication won't overwrite an already-authenticated user when the
-            // default JWT Bearer scheme finds no token in the request.
-            app.Use(async (ctx, nextMiddleware) =>
-            {
-                if (ctx.Request.Headers.TryGetValue("X-Test-Cookie-Auth", out _))
-                {
-                    var identity = new ClaimsIdentity(
-                        [new Claim(ClaimTypes.Name, "testuser"), new Claim(AuthConstants.Claims.Subject, Guid.NewGuid().ToString())],
-                        BffAuthenticationSchemes.Cookie);
-                    ctx.User = new ClaimsPrincipal(identity);
-                }
-                await nextMiddleware(ctx);
-            });
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        if (!Request.Headers.ContainsKey("X-Test-Cookie-Auth"))
+            return Task.FromResult(AuthenticateResult.NoResult());
 
-            next(app);
-        };
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "testuser"),
+                new Claim(AuthConstants.Claims.Subject, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Role, UserRole.PlatformAdmin.ToString())
+            ],
+            BffAuthenticationSchemes.Cookie);
+
+        var ticket = new AuthenticationTicket(
+            new ClaimsPrincipal(identity),
+            BffAuthenticationSchemes.Cookie);
+
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
 }

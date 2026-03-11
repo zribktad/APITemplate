@@ -1,4 +1,6 @@
+using APITemplate.Api.Authorization;
 using APITemplate.Api.Cache;
+using APITemplate.Application.Common.Security;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +21,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet]
+    [RequirePermission(Permission.Products.Read)]
     [OutputCache(PolicyName = CachePolicyNames.Products)]
     public async Task<ActionResult<ProductsResponse>> GetAll([FromQuery] ProductFilter filter, CancellationToken ct)
     {
@@ -27,6 +30,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permission.Products.Read)]
     [OutputCache(PolicyName = CachePolicyNames.Products)]
     public async Task<ActionResult<ProductResponse>> GetById(Guid id, CancellationToken ct)
     {
@@ -35,6 +39,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [RequirePermission(Permission.Products.Create)]
     public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken ct)
     {
         var product = await _sender.Send(new CreateProductCommand(request), ct);
@@ -42,6 +47,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [RequirePermission(Permission.Products.Update)]
     public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct)
     {
         await _sender.Send(new UpdateProductCommand(id, request), ct);
@@ -49,6 +55,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permission.Products.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteProductCommand(id), ct);

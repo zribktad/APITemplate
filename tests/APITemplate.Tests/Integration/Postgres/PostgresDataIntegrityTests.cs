@@ -527,7 +527,7 @@ public sealed class PostgresDataIntegrityTests
             categoryId = category.Id;
         }
 
-        IntegrationAuthHelper.Authenticate(_client, userId: seededUser.Id, tenantId: tenant.Id, username: username, role: Domain.Enums.UserRole.User);
+        IntegrationAuthHelper.Authenticate(_client, userId: seededUser.Id, tenantId: tenant.Id, username: username, role: Domain.Enums.UserRole.TenantAdmin);
 
         var createProductResponse = await _client.PostAsJsonAsync(
             "/api/v1/products",
