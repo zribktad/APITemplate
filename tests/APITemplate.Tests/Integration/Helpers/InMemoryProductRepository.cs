@@ -3,7 +3,6 @@ using APITemplate.Infrastructure.Persistence;
 using APITemplate.Infrastructure.Repositories;
 using Ardalis.Specification.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace APITemplate.Tests.Integration.Helpers;
 
@@ -18,8 +17,8 @@ internal sealed class InMemoryProductRepository : ProductRepository
         new("500+", 500m, null, 0)
     ];
 
-    public InMemoryProductRepository(AppDbContext dbContext, IServiceScopeFactory scopeFactory)
-        : base(dbContext, scopeFactory)
+    public InMemoryProductRepository(AppDbContext dbContext)
+        : base(dbContext)
     {
     }
 

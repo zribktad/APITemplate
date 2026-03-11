@@ -4,6 +4,9 @@ using APITemplate.Application.Features.User.Specifications;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Enums;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
+using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -23,7 +26,7 @@ public class UserRepositoryTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new AppDbContext(options, new TestTenantProvider(), new TestActorProvider());
+        _dbContext = CreateDbContext(options);
         _sut = new UserRepository(_dbContext);
     }
 
@@ -166,6 +169,21 @@ public class UserRepositoryTests : IDisposable
             TenantId = TestTenantId,
             Audit = new() { CreatedAtUtc = DateTime.UtcNow }
         };
+    }
+
+    private static AppDbContext CreateDbContext(DbContextOptions<AppDbContext> options)
+    {
+        var stateManager = new AuditableEntityStateManager();
+
+        return new AppDbContext(
+            options,
+            new TestTenantProvider(),
+            new TestActorProvider(),
+            TimeProvider.System,
+            [],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
     }
 
     private sealed class TestTenantProvider : ITenantProvider

@@ -2,9 +2,11 @@ using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Application.Common.Context;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
+using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
@@ -14,7 +16,6 @@ public class ProductRepositoryTests : IDisposable
 {
     private static readonly Guid TestTenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private readonly AppDbContext _dbContext;
-    private readonly ServiceProvider _serviceProvider;
     private readonly ProductRepository _sut;
 
     public ProductRepositoryTests()
@@ -23,16 +24,12 @@ public class ProductRepositoryTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _dbContext = new AppDbContext(options, new TestTenantProvider(), new TestActorProvider());
-        var services = new ServiceCollection();
-        services.AddSingleton(_dbContext);
-        _serviceProvider = services.BuildServiceProvider();
-        _sut = new ProductRepository(_dbContext, _serviceProvider.GetRequiredService<IServiceScopeFactory>());
+        _dbContext = CreateDbContext(options);
+        _sut = new ProductRepository(_dbContext);
     }
 
     public void Dispose()
     {
-        _serviceProvider.Dispose();
         _dbContext.Dispose();
     }
 
@@ -126,6 +123,21 @@ public class ProductRepositoryTests : IDisposable
             Price = price,
             Audit = new() { CreatedAtUtc = DateTime.UtcNow }
         };
+    }
+
+    private static AppDbContext CreateDbContext(DbContextOptions<AppDbContext> options)
+    {
+        var stateManager = new AuditableEntityStateManager();
+
+        return new AppDbContext(
+            options,
+            new TestTenantProvider(),
+            new TestActorProvider(),
+            TimeProvider.System,
+            [],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
     }
 
     private sealed class TestTenantProvider : ITenantProvider

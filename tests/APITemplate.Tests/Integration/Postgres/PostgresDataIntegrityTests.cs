@@ -10,12 +10,16 @@ using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
 using APITemplate.Extensions;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
 using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.Repositories;
 using APITemplate.Tests.Integration.Helpers;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -612,8 +616,8 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var repository = new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>());
-            var unitOfWork = new UnitOfWork(deleteContext);
+            var repository = new ProductRepository(deleteContext);
+            var unitOfWork = CreateUnitOfWork(deleteContext);
 
             await repository.DeleteAsync(product.Id, ct);
             await unitOfWork.CommitAsync(ct);
@@ -669,11 +673,11 @@ public sealed class PostgresDataIntegrityTests
         await using (var deleteContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
             var handler = new ProductRequestHandlers(
-                new ProductRepository(deleteContext, _factory.Services.GetRequiredService<IServiceScopeFactory>()),
+                new ProductRepository(deleteContext),
                 Mock.Of<ICategoryRepository>(),
                 Mock.Of<IProductDataRepository>(),
                 new ProductDataLinkRepository(deleteContext, new TestTenantProvider(tenantId, true)),
-                new UnitOfWork(deleteContext),
+                CreateUnitOfWork(deleteContext),
                 Mock.Of<IPublisher>());
 
             await handler.Handle(new DeleteProductCommand(product.Id), ct);
@@ -713,7 +717,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var transactionContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var productRepository = new ProductRepository(transactionContext, _factory.Services.GetRequiredService<IServiceScopeFactory>());
+            var productRepository = new ProductRepository(transactionContext);
             var failingReviewRepository = new Mock<IProductReviewRepository>();
             failingReviewRepository
                 .Setup(repository => repository.AddAsync(It.IsAny<ProductReview>(), It.IsAny<CancellationToken>()))
@@ -722,7 +726,7 @@ public sealed class PostgresDataIntegrityTests
                     transactionContext.ProductReviews.Add(entity);
                     throw new InvalidOperationException(expectedMessage);
                 });
-            var unitOfWork = new UnitOfWork(transactionContext);
+            var unitOfWork = CreateUnitOfWork(transactionContext);
             var handler = new ProductReviewRequestHandlers(
                 failingReviewRepository.Object,
                 productRepository,
@@ -765,7 +769,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var unitOfWork = new UnitOfWork(dbContext);
+            var unitOfWork = CreateUnitOfWork(dbContext);
 
             await unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -836,7 +840,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var unitOfWork = new UnitOfWork(dbContext);
+            var unitOfWork = CreateUnitOfWork(dbContext);
 
             var act = () => unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -885,7 +889,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var unitOfWork = new UnitOfWork(dbContext);
+            var unitOfWork = CreateUnitOfWork(dbContext);
 
             await unitOfWork.ExecuteInTransactionAsync(async () =>
             {
@@ -929,7 +933,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var unitOfWork = new UnitOfWork(dbContext);
+            var unitOfWork = CreateUnitOfWork(dbContext);
 
             var ex = await Should.ThrowAsync<InvalidOperationException>(() =>
                 unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -970,7 +974,7 @@ public sealed class PostgresDataIntegrityTests
 
         await using (var dbContext = await CreateDbContextAsync(true, tenantId, actorId, ct))
         {
-            var unitOfWork = new UnitOfWork(dbContext);
+            var unitOfWork = CreateUnitOfWork(dbContext);
 
             var ex = await Should.ThrowAsync<InvalidOperationException>(() =>
                 unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -1102,16 +1106,26 @@ public sealed class PostgresDataIntegrityTests
         PersistenceServiceCollectionExtensions.ConfigurePostgresDbContext(optionsBuilder, connectionString, transactionDefaults);
         var options = optionsBuilder.Options;
 
+        var stateManager = new AuditableEntityStateManager();
         var context = new AppDbContext(
             options,
             new TestTenantProvider(tenantId, hasTenant),
             new TestActorProvider(actorId),
             TimeProvider.System,
-            [new ProductSoftDeleteCascadeRule()]);
+            [new ProductSoftDeleteCascadeRule()],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
 
         await context.Database.OpenConnectionAsync(ct);
         return context;
     }
+
+    private static UnitOfWork CreateUnitOfWork(AppDbContext dbContext)
+        => new(
+            dbContext,
+            Options.Create(new TransactionDefaultsOptions()),
+            NullLogger<UnitOfWork>.Instance);
 
     private sealed class TestTenantProvider(Guid tenantId, bool hasTenant) : ITenantProvider
     {

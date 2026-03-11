@@ -1,6 +1,9 @@
 using APITemplate.Application.Common.Context;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
+using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -26,7 +29,17 @@ public sealed class StoredProcedureExecutorTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        return new AppDbContext(options, new TestTenantProvider(), new TestActorProvider());
+        var stateManager = new AuditableEntityStateManager();
+
+        return new AppDbContext(
+            options,
+            new TestTenantProvider(),
+            new TestActorProvider(),
+            TimeProvider.System,
+            [],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
     }
 
     private sealed class TestTenantProvider : ITenantProvider

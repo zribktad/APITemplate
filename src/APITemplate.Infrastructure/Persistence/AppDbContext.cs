@@ -50,37 +50,12 @@ public sealed class AppDbContext : DbContext
     public AppDbContext(
         DbContextOptions<AppDbContext> options,
         ITenantProvider tenantProvider,
-        IActorProvider actorProvider) : this(options, tenantProvider, actorProvider, TimeProvider.System, [])
-    {
-    }
-
-    public AppDbContext(
-        DbContextOptions<AppDbContext> options,
-        ITenantProvider tenantProvider,
-        IActorProvider actorProvider,
-        TimeProvider timeProvider,
-        IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules)
-        : this(
-            options,
-            tenantProvider,
-            actorProvider,
-            timeProvider,
-            softDeleteCascadeRules,
-            new AppUserEntityNormalizationService(),
-            new AuditableEntityStateManager(),
-            null)
-    {
-    }
-
-    public AppDbContext(
-        DbContextOptions<AppDbContext> options,
-        ITenantProvider tenantProvider,
         IActorProvider actorProvider,
         TimeProvider timeProvider,
         IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules,
         IEntityNormalizationService entityNormalizationService,
         IAuditableEntityStateManager entityStateManager,
-        ISoftDeleteProcessor? softDeleteProcessor) : base(options)
+        ISoftDeleteProcessor softDeleteProcessor) : base(options)
     {
         _tenantProvider = tenantProvider;
         _actorProvider = actorProvider;
@@ -88,7 +63,7 @@ public sealed class AppDbContext : DbContext
         _softDeleteCascadeRules = softDeleteCascadeRules.ToList();
         _entityNormalizationService = entityNormalizationService;
         _entityStateManager = entityStateManager;
-        _softDeleteProcessor = softDeleteProcessor ?? new SoftDeleteProcessor(entityStateManager);
+        _softDeleteProcessor = softDeleteProcessor;
     }
 
     public DbSet<Product> Products => Set<Product>();

@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace APITemplate.Infrastructure.Persistence;
 
@@ -29,29 +28,6 @@ public sealed class UnitOfWork : IUnitOfWork
     private readonly DbContextCommandTimeoutScope _commandTimeoutScope;
     private int _savepointCounter;
     private TransactionOptions? _activeTransactionOptions;
-
-    /// <summary>
-    /// Creates a <see cref="UnitOfWork"/> with the default template transaction settings.
-    /// Intended primarily for direct construction in tests or narrow infrastructure scenarios.
-    /// </summary>
-    /// <param name="dbContext">EF Core context that tracks staged relational changes for the current scope.</param>
-    public UnitOfWork(AppDbContext dbContext)
-        : this(dbContext, Options.Create(new TransactionDefaultsOptions()), NullLogger<UnitOfWork>.Instance)
-    {
-    }
-
-    /// <summary>
-    /// Creates a <see cref="UnitOfWork"/> that uses configured transaction defaults for explicit transactions.
-    /// </summary>
-    /// <param name="dbContext">EF Core context that tracks staged relational changes for the current scope.</param>
-    /// <param name="transactionDefaults">
-    /// Configured defaults used to resolve the effective isolation level, timeout, and retry policy
-    /// for outermost <see cref="ExecuteInTransactionAsync"/> calls.
-    /// </param>
-    public UnitOfWork(AppDbContext dbContext, IOptions<TransactionDefaultsOptions> transactionDefaults)
-        : this(dbContext, transactionDefaults, NullLogger<UnitOfWork>.Instance)
-    {
-    }
 
     /// <summary>
     /// Creates a <see cref="UnitOfWork"/> that uses configured transaction defaults for explicit transactions.

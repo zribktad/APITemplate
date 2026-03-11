@@ -2,6 +2,9 @@ using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Options;
 using APITemplate.Domain.Entities;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
+using APITemplate.Infrastructure.Persistence.SoftDelete;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -68,7 +71,17 @@ public class AuthBootstrapSeederTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        return new AppDbContext(options, new TestTenantProvider(), new TestActorProvider());
+        var stateManager = new AuditableEntityStateManager();
+
+        return new AppDbContext(
+            options,
+            new TestTenantProvider(),
+            new TestActorProvider(),
+            TimeProvider.System,
+            [],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
     }
 
     private static AuthBootstrapSeeder CreateSeeder(AppDbContext dbContext)

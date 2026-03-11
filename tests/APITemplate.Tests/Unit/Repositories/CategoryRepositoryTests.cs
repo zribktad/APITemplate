@@ -3,6 +3,9 @@ using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Application.Common.Context;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
+using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.Repositories;
 using APITemplate.Infrastructure.StoredProcedures;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +30,7 @@ public class CategoryRepositoryTests : IDisposable
             .Options;
 
         _tenantProvider = new TestTenantProvider();
-        _dbContext = new AppDbContext(options, _tenantProvider, new TestActorProvider());
+        _dbContext = CreateDbContext(options, _tenantProvider);
         _spExecutorMock = new Mock<IStoredProcedureExecutor>();
         _sut = new CategoryRepository(_dbContext, _spExecutorMock.Object, _tenantProvider);
     }
@@ -178,6 +181,21 @@ public class CategoryRepositoryTests : IDisposable
             Description = description,
             Audit = new() { CreatedAtUtc = DateTime.UtcNow }
         };
+    }
+
+    private static AppDbContext CreateDbContext(DbContextOptions<AppDbContext> options, ITenantProvider tenantProvider)
+    {
+        var stateManager = new AuditableEntityStateManager();
+
+        return new AppDbContext(
+            options,
+            tenantProvider,
+            new TestActorProvider(),
+            TimeProvider.System,
+            [],
+            new AppUserEntityNormalizationService(),
+            stateManager,
+            new SoftDeleteProcessor(stateManager));
     }
 
     private sealed class TestTenantProvider : ITenantProvider

@@ -4,7 +4,6 @@ using APITemplate.Application.Features.Product.Specifications;
 using APITemplate.Infrastructure.Persistence;
 using Ardalis.Specification.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace APITemplate.Infrastructure.Repositories;
 
@@ -20,8 +19,6 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
     ];
 
     public ProductRepository(AppDbContext dbContext) : base(dbContext) { }
-
-    public ProductRepository(AppDbContext dbContext, IServiceScopeFactory _) : this(dbContext) { }
 
     public virtual Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
