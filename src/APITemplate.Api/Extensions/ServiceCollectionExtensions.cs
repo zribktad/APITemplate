@@ -1,6 +1,7 @@
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Behaviors;
 using APITemplate.Application.Common.Security;
+using APITemplate.Api.Cache;
 using APITemplate.Application.Features.Product;
 using APITemplate.Infrastructure.Security;
 using APITemplate.Application.Features.Product.Validation;
@@ -22,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<CreateProductCommand>();
+            cfg.RegisterServicesFromAssemblyContaining<CacheInvalidationNotificationHandler>();
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
 

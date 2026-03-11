@@ -1,8 +1,9 @@
 using APITemplate.Application.Common.Context;
 using APITemplate.Domain.Entities;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
 using APITemplate.Infrastructure.Persistence.SoftDelete;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace APITemplate.Infrastructure.Persistence;
 
@@ -38,8 +39,10 @@ public sealed class AppDbContext : DbContext
     private readonly ITenantProvider _tenantProvider;
     private readonly IActorProvider _actorProvider;
     private readonly TimeProvider _timeProvider;
-    // Explicit soft-delete cascade rules registered via DI.
     private readonly IReadOnlyCollection<ISoftDeleteCascadeRule> _softDeleteCascadeRules;
+    private readonly IEntityNormalizationService _entityNormalizationService;
+    private readonly IAuditableEntityStateManager _entityStateManager;
+    private readonly ISoftDeleteProcessor _softDeleteProcessor;
 
     private Guid CurrentTenantId => _tenantProvider.TenantId;
     private bool HasTenant => _tenantProvider.HasTenant;
@@ -56,12 +59,36 @@ public sealed class AppDbContext : DbContext
         ITenantProvider tenantProvider,
         IActorProvider actorProvider,
         TimeProvider timeProvider,
-        IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules) : base(options)
+        IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules)
+        : this(
+            options,
+            tenantProvider,
+            actorProvider,
+            timeProvider,
+            softDeleteCascadeRules,
+            new AppUserEntityNormalizationService(),
+            new AuditableEntityStateManager(),
+            null)
+    {
+    }
+
+    public AppDbContext(
+        DbContextOptions<AppDbContext> options,
+        ITenantProvider tenantProvider,
+        IActorProvider actorProvider,
+        TimeProvider timeProvider,
+        IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules,
+        IEntityNormalizationService entityNormalizationService,
+        IAuditableEntityStateManager entityStateManager,
+        ISoftDeleteProcessor? softDeleteProcessor) : base(options)
     {
         _tenantProvider = tenantProvider;
         _actorProvider = actorProvider;
         _timeProvider = timeProvider;
         _softDeleteCascadeRules = softDeleteCascadeRules.ToList();
+        _entityNormalizationService = entityNormalizationService;
+        _entityStateManager = entityStateManager;
+        _softDeleteProcessor = softDeleteProcessor ?? new SoftDeleteProcessor(entityStateManager);
     }
 
     public DbSet<Product> Products => Set<Product>();
@@ -151,127 +178,24 @@ public sealed class AppDbContext : DbContext
             switch (entry.State)
             {
                 case EntityState.Added:
-                    EnsureEntityNormalization(entity);
-                    StampAddedEntity(entry, entity, now, actor);
+                    _entityNormalizationService.Normalize(entity);
+                    _entityStateManager.StampAdded(entry, entity, now, actor, HasTenant, CurrentTenantId);
                     break;
                 case EntityState.Modified:
-                    EnsureEntityNormalization(entity);
-                    MarkUpdated(entity, now, actor);
+                    _entityNormalizationService.Normalize(entity);
+                    _entityStateManager.StampModified(entity, now, actor);
                     break;
                 case EntityState.Deleted:
-                    await StampSoftDeletedEntityAsync(entry, entity, now, actor, cancellationToken);
+                    await _softDeleteProcessor.ProcessAsync(
+                        this,
+                        entry,
+                        entity,
+                        now,
+                        actor,
+                        _softDeleteCascadeRules,
+                        cancellationToken);
                     break;
             }
         }
-    }
-
-    /// <summary>
-    /// Fills creation/update metadata for newly added entities and assigns tenant identity when missing.
-    /// </summary>
-    private void StampAddedEntity(EntityEntry entry, IAuditableTenantEntity entity, DateTime now, Guid actor)
-    {
-        if (entity is Tenant tenant && tenant.TenantId == Guid.Empty)
-            tenant.TenantId = tenant.Id;
-
-        // Auto-stamp tenant ownership for new tenant-bound rows when request context provides tenant identity.
-        if (entity.TenantId == Guid.Empty && HasTenant)
-            entity.TenantId = CurrentTenantId;
-
-        entity.Audit.CreatedAtUtc = now;
-        entity.Audit.CreatedBy = actor;
-        MarkUpdated(entity, now, actor);
-        ResetSoftDelete(entity);
-        entry.State = EntityState.Added;
-    }
-
-    /// <summary>
-    /// Converts a hard delete into a soft delete update and performs soft-cascade for dependent rows.
-    /// </summary>
-    private async Task StampSoftDeletedEntityAsync(
-        EntityEntry entry, IAuditableTenantEntity entity, DateTime now, Guid actor, CancellationToken cancellationToken)
-    {
-        var visited = new HashSet<IAuditableTenantEntity>(ReferenceEqualityComparer.Instance);
-        await SoftDeleteWithRulesAsync(entry, entity, now, actor, visited, cancellationToken);
-    }
-
-    /// <summary>
-    /// Performs explicit soft-delete cascade based on registered rules.
-    /// Each rule describes its own dependent graph (no implicit navigation traversal).
-    /// </summary>
-    private async Task SoftDeleteWithRulesAsync(
-        EntityEntry entry,
-        IAuditableTenantEntity entity,
-        DateTime now,
-        Guid actor,
-        HashSet<IAuditableTenantEntity> visited,
-        CancellationToken cancellationToken)
-    {
-        if (!visited.Add(entity))
-            return;
-
-        entry.State = EntityState.Modified;
-        MarkSoftDeleted(entity, now, actor);
-        EnsureAuditOwnedEntryState(entry, now, actor);
-
-        foreach (var rule in _softDeleteCascadeRules.Where(r => r.CanHandle(entity)))
-        {
-            var dependents = await rule.GetDependentsAsync(this, entity, cancellationToken);
-            foreach (var dependent in dependents)
-            {
-                if (dependent.IsDeleted || dependent.TenantId != entity.TenantId)
-                    continue;
-
-                var dependentEntry = Entry(dependent);
-                await SoftDeleteWithRulesAsync(dependentEntry, dependent, now, actor, visited, cancellationToken);
-            }
-        }
-    }
-
-    /// <summary>
-    /// When entity state transitions from Deleted to Modified, EF can keep owned entries in Deleted state.
-    /// For table-split owned Audit this would null-out required columns on update.
-    /// Force the owned Audit entry back to Modified and stamp updated metadata.
-    /// </summary>
-    private static void EnsureAuditOwnedEntryState(EntityEntry ownerEntry, DateTime now, Guid actor)
-    {
-        var auditEntry = ownerEntry.Reference(nameof(IAuditableTenantEntity.Audit)).TargetEntry;
-        if (auditEntry is null)
-            return;
-
-        if (auditEntry.State is EntityState.Deleted or EntityState.Detached or EntityState.Unchanged)
-            auditEntry.State = EntityState.Modified;
-
-        auditEntry.Property(nameof(AuditInfo.UpdatedAtUtc)).CurrentValue = now;
-        auditEntry.Property(nameof(AuditInfo.UpdatedBy)).CurrentValue = actor;
-    }
-
-    private static void MarkUpdated(IAuditableTenantEntity entity, DateTime now, Guid actor)
-    {
-        entity.Audit.UpdatedAtUtc = now;
-        entity.Audit.UpdatedBy = actor;
-    }
-
-    private static void EnsureEntityNormalization(IAuditableTenantEntity entity)
-    {
-        if (entity is AppUser user)
-        {
-            user.NormalizedUsername = AppUser.NormalizeUsername(user.Username);
-            user.NormalizedEmail = AppUser.NormalizeEmail(user.Email);
-        }
-    }
-
-    private static void ResetSoftDelete(IAuditableTenantEntity entity)
-    {
-        entity.IsDeleted = false;
-        entity.DeletedAtUtc = null;
-        entity.DeletedBy = null;
-    }
-
-    private static void MarkSoftDeleted(IAuditableTenantEntity entity, DateTime now, Guid actor)
-    {
-        entity.IsDeleted = true;
-        entity.DeletedAtUtc = now;
-        entity.DeletedBy = actor;
-        MarkUpdated(entity, now, actor);
     }
 }

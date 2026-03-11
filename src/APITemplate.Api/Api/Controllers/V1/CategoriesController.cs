@@ -12,14 +12,10 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class CategoriesController : ControllerBase
 {
     private readonly ISender _sender;
-    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public CategoriesController(
-        ISender sender,
-        IOutputCacheInvalidationService outputCacheInvalidationService)
+    public CategoriesController(ISender sender)
     {
         _sender = sender;
-        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -42,7 +38,6 @@ public sealed class CategoriesController : ControllerBase
     public async Task<ActionResult<CategoryResponse>> Create(CreateCategoryRequest request, CancellationToken ct)
     {
         var category = await _sender.Send(new CreateCategoryCommand(request), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return CreatedAtAction(nameof(GetById), new { id = category.Id, version = "1.0" }, category);
     }
 
@@ -50,7 +45,6 @@ public sealed class CategoriesController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateCategoryRequest request, CancellationToken ct)
     {
         await _sender.Send(new UpdateCategoryCommand(id, request), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return NoContent();
     }
 
@@ -58,7 +52,6 @@ public sealed class CategoriesController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteCategoryCommand(id), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Categories, ct);
         return NoContent();
     }
 

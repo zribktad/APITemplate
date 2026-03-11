@@ -1,6 +1,7 @@
 using APITemplate.Application.Features.Product.Mappings;
 using APITemplate.Application.Features.Product.Repositories;
 using APITemplate.Application.Features.Product.Specifications;
+using APITemplate.Application.Common.Events;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
@@ -31,6 +32,23 @@ public sealed class ProductRequestHandlers :
     private readonly IProductDataRepository _productDataRepository;
     private readonly IProductDataLinkRepository _productDataLinkRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPublisher _publisher;
+
+    public ProductRequestHandlers(
+        IProductRepository repository,
+        ICategoryRepository categoryRepository,
+        IProductDataRepository productDataRepository,
+        IProductDataLinkRepository productDataLinkRepository,
+        IUnitOfWork unitOfWork,
+        IPublisher publisher)
+    {
+        _repository = repository;
+        _categoryRepository = categoryRepository;
+        _productDataRepository = productDataRepository;
+        _productDataLinkRepository = productDataLinkRepository;
+        _unitOfWork = unitOfWork;
+        _publisher = publisher;
+    }
 
     public ProductRequestHandlers(
         IProductRepository repository,
@@ -38,12 +56,14 @@ public sealed class ProductRequestHandlers :
         IProductDataRepository productDataRepository,
         IProductDataLinkRepository productDataLinkRepository,
         IUnitOfWork unitOfWork)
+        : this(
+            repository,
+            categoryRepository,
+            productDataRepository,
+            productDataLinkRepository,
+            unitOfWork,
+            NullPublisher.Instance)
     {
-        _repository = repository;
-        _categoryRepository = categoryRepository;
-        _productDataRepository = productDataRepository;
-        _productDataLinkRepository = productDataLinkRepository;
-        _unitOfWork = unitOfWork;
     }
 
     public async Task<ProductResponse?> Handle(GetProductByIdQuery request, CancellationToken ct)
@@ -90,6 +110,7 @@ public sealed class ProductRequestHandlers :
             return entity;
         }, ct);
 
+        await _publisher.Publish(new ProductsChangedNotification(), ct);
         return product.ToResponse();
     }
 
@@ -120,6 +141,8 @@ public sealed class ProductRequestHandlers :
 
             await _repository.UpdateAsync(product, ct);
         }, ct);
+
+        await _publisher.Publish(new ProductsChangedNotification(), ct);
     }
 
     public async Task Handle(DeleteProductCommand command, CancellationToken ct)
@@ -135,6 +158,9 @@ public sealed class ProductRequestHandlers :
             product.SoftDeleteProductDataLinks();
             await _repository.DeleteAsync(product, ct);
         }, ct);
+
+        await _publisher.Publish(new ProductsChangedNotification(), ct);
+        await _publisher.Publish(new ProductReviewsChangedNotification(), ct);
     }
 
     private async Task ValidateCategoryExistsAsync(Guid? categoryId, CancellationToken ct)

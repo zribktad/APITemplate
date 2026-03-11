@@ -1,5 +1,6 @@
 using APITemplate.Application.Features.Category.Mappings;
 using APITemplate.Application.Features.Category.Specifications;
+using APITemplate.Application.Common.Events;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MediatR;
@@ -29,11 +30,18 @@ public sealed class CategoryRequestHandlers :
 {
     private readonly ICategoryRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPublisher _publisher;
 
-    public CategoryRequestHandlers(ICategoryRepository repository, IUnitOfWork unitOfWork)
+    public CategoryRequestHandlers(ICategoryRepository repository, IUnitOfWork unitOfWork, IPublisher publisher)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
+        _publisher = publisher;
+    }
+
+    public CategoryRequestHandlers(ICategoryRepository repository, IUnitOfWork unitOfWork)
+        : this(repository, unitOfWork, NullPublisher.Instance)
+    {
     }
 
     public async Task<PagedResponse<CategoryResponse>> Handle(GetCategoriesQuery request, CancellationToken ct)
@@ -67,6 +75,7 @@ public sealed class CategoryRequestHandlers :
             return entity;
         }, ct);
 
+        await _publisher.Publish(new CategoriesChangedNotification(), ct);
         return category.ToResponse();
     }
 
@@ -85,6 +94,8 @@ public sealed class CategoryRequestHandlers :
 
             await _repository.UpdateAsync(category, ct);
         }, ct);
+
+        await _publisher.Publish(new CategoriesChangedNotification(), ct);
     }
 
     public async Task Handle(DeleteCategoryCommand command, CancellationToken ct)
@@ -93,5 +104,7 @@ public sealed class CategoryRequestHandlers :
         {
             await _repository.DeleteAsync(command.Id, ct, ErrorCatalog.Categories.NotFound);
         }, ct);
+
+        await _publisher.Publish(new CategoriesChangedNotification(), ct);
     }
 }

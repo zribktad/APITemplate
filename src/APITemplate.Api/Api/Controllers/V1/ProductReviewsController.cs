@@ -12,14 +12,10 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class ProductReviewsController : ControllerBase
 {
     private readonly ISender _sender;
-    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public ProductReviewsController(
-        ISender sender,
-        IOutputCacheInvalidationService outputCacheInvalidationService)
+    public ProductReviewsController(ISender sender)
     {
         _sender = sender;
-        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -50,7 +46,6 @@ public sealed class ProductReviewsController : ControllerBase
     public async Task<ActionResult<ProductReviewResponse>> Create(CreateProductReviewRequest request, CancellationToken ct)
     {
         var review = await _sender.Send(new CreateProductReviewCommand(request), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Reviews, ct);
         return CreatedAtAction(nameof(GetById), new { id = review.Id, version = "1.0" }, review);
     }
 
@@ -58,7 +53,6 @@ public sealed class ProductReviewsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteProductReviewCommand(id), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Reviews, ct);
         return NoContent();
     }
 }

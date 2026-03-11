@@ -12,14 +12,10 @@ namespace APITemplate.Api.Controllers.V1;
 public sealed class ProductsController : ControllerBase
 {
     private readonly ISender _sender;
-    private readonly IOutputCacheInvalidationService _outputCacheInvalidationService;
 
-    public ProductsController(
-        ISender sender,
-        IOutputCacheInvalidationService outputCacheInvalidationService)
+    public ProductsController(ISender sender)
     {
         _sender = sender;
-        _outputCacheInvalidationService = outputCacheInvalidationService;
     }
 
     [HttpGet]
@@ -42,7 +38,6 @@ public sealed class ProductsController : ControllerBase
     public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken ct)
     {
         var product = await _sender.Send(new CreateProductCommand(request), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Products, ct);
         return CreatedAtAction(nameof(GetById), new { id = product.Id, version = "1.0" }, product);
     }
 
@@ -50,7 +45,6 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateProductRequest request, CancellationToken ct)
     {
         await _sender.Send(new UpdateProductCommand(id, request), ct);
-        await _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Products, ct);
         return NoContent();
     }
 
@@ -58,9 +52,6 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         await _sender.Send(new DeleteProductCommand(id), ct);
-        await _outputCacheInvalidationService.EvictAsync(
-            [CachePolicyNames.Products, CachePolicyNames.Reviews],
-            ct);
         return NoContent();
     }
 }

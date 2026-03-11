@@ -4,6 +4,8 @@ using APITemplate.Application.Features.Product.Repositories;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Infrastructure.Health;
 using APITemplate.Infrastructure.Persistence;
+using APITemplate.Infrastructure.Persistence.Auditing;
+using APITemplate.Infrastructure.Persistence.EntityNormalization;
 using APITemplate.Infrastructure.Persistence.SoftDelete;
 using APITemplate.Infrastructure.Repositories;
 using APITemplate.Infrastructure.StoredProcedures;
@@ -36,6 +38,9 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddSingleton<IEntityNormalizationService, AppUserEntityNormalizationService>();
+        services.AddSingleton<IAuditableEntityStateManager, AuditableEntityStateManager>();
+        services.AddSingleton<ISoftDeleteProcessor, SoftDeleteProcessor>();
         services.AddScoped<AuthBootstrapSeeder>();
         services.AddScoped<ISoftDeleteCascadeRule, ProductSoftDeleteCascadeRule>();
         services.AddSingleton(TimeProvider.System);

@@ -1,4 +1,5 @@
 using APITemplate.Application.Common.Context;
+using APITemplate.Application.Common.Events;
 using APITemplate.Application.Features.Product.Repositories;
 using APITemplate.Application.Features.ProductReview.Mappings;
 using APITemplate.Application.Features.ProductReview.Specifications;
@@ -34,17 +35,29 @@ public sealed class ProductReviewRequestHandlers :
     private readonly IProductRepository _productRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IActorProvider _actorProvider;
+    private readonly IPublisher _publisher;
+
+    public ProductReviewRequestHandlers(
+        IProductReviewRepository reviewRepository,
+        IProductRepository productRepository,
+        IUnitOfWork unitOfWork,
+        IActorProvider actorProvider,
+        IPublisher publisher)
+    {
+        _reviewRepository = reviewRepository;
+        _productRepository = productRepository;
+        _unitOfWork = unitOfWork;
+        _actorProvider = actorProvider;
+        _publisher = publisher;
+    }
 
     public ProductReviewRequestHandlers(
         IProductReviewRepository reviewRepository,
         IProductRepository productRepository,
         IUnitOfWork unitOfWork,
         IActorProvider actorProvider)
+        : this(reviewRepository, productRepository, unitOfWork, actorProvider, NullPublisher.Instance)
     {
-        _reviewRepository = reviewRepository;
-        _productRepository = productRepository;
-        _unitOfWork = unitOfWork;
-        _actorProvider = actorProvider;
     }
 
     public async Task<PagedResponse<ProductReviewResponse>> Handle(GetProductReviewsQuery request, CancellationToken ct)
@@ -108,6 +121,7 @@ public sealed class ProductReviewRequestHandlers :
             return entity;
         }, ct);
 
+        await _publisher.Publish(new ProductReviewsChangedNotification(), ct);
         return review.ToResponse();
     }
 
@@ -128,5 +142,7 @@ public sealed class ProductReviewRequestHandlers :
         {
             await _reviewRepository.DeleteAsync(command.Id, ct, ErrorCatalog.Reviews.ReviewNotFound);
         }, ct);
+
+        await _publisher.Publish(new ProductReviewsChangedNotification(), ct);
     }
 }
