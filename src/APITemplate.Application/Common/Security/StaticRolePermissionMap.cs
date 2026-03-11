@@ -46,7 +46,7 @@ public sealed class StaticRolePermissionMap : IRolePermissionMap
 
         return new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
-            [UserRole.PlatformAdmin.ToString()] = Permission.All.ToHashSet(StringComparer.Ordinal),
+            [UserRole.PlatformAdmin.ToString()] = Permission.All,
             [UserRole.TenantAdmin.ToString()] = tenantAdminPermissions,
             [UserRole.User.ToString()] = userPermissions
         };
