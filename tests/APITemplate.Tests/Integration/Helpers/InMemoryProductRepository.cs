@@ -30,15 +30,11 @@ internal sealed class InMemoryProductRepository : IProductRepository
         _inner = new InnerRepository(dbContext);
     }
 
-    public Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
     {
         var specification = new ProductSpecification(filter);
         var query = SpecificationEvaluator.Default.GetQuery(_dbContext.Products.AsQueryable(), specification);
-        return query.ToListAsync(ct).ContinueWith(
-            task => (IReadOnlyList<ProductResponse>)task.Result,
-            ct,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+        return await query.ToListAsync(ct);
     }
 
     public Task<int> CountAsync(ProductFilter filter, CancellationToken ct = default)

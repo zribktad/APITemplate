@@ -55,7 +55,6 @@ public sealed class ProductRequestHandlers :
 
     public async Task<ProductsResponse> Handle(GetProductsQuery request, CancellationToken ct)
     {
-        // Keep all reads on the request-scoped DbContext so items/count/facets reflect one logical snapshot.
         var items = await _repository.ListAsync(request.Filter, ct);
         var totalCount = await _repository.CountAsync(request.Filter, ct);
         var categoryFacets = await _repository.GetCategoryFacetsAsync(request.Filter, ct);
