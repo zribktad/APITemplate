@@ -51,20 +51,19 @@ public sealed class ProductRequestHandlers :
 
     public async Task<ProductsResponse> Handle(GetProductsQuery request, CancellationToken ct)
     {
-        var itemsTask = _repository.ListAsync(request.Filter, ct);
-        var totalCountTask = _repository.CountAsync(request.Filter, ct);
-        var categoryFacetsTask = _repository.GetCategoryFacetsAsync(request.Filter, ct);
-        var priceFacetsTask = _repository.GetPriceFacetsAsync(request.Filter, ct);
-
-        await Task.WhenAll(itemsTask, totalCountTask, categoryFacetsTask, priceFacetsTask);
+        // Keep all reads on the request-scoped DbContext so items/count/facets reflect one logical snapshot.
+        var items = await _repository.ListAsync(request.Filter, ct);
+        var totalCount = await _repository.CountAsync(request.Filter, ct);
+        var categoryFacets = await _repository.GetCategoryFacetsAsync(request.Filter, ct);
+        var priceFacets = await _repository.GetPriceFacetsAsync(request.Filter, ct);
 
         return new ProductsResponse(
             new PagedResponse<ProductResponse>(
-                itemsTask.Result,
-                totalCountTask.Result,
+                items,
+                totalCount,
                 request.Filter.PageNumber,
                 request.Filter.PageSize),
-            new ProductSearchFacetsResponse(categoryFacetsTask.Result, priceFacetsTask.Result));
+            new ProductSearchFacetsResponse(categoryFacets, priceFacets));
     }
 
     public async Task<ProductResponse> Handle(CreateProductCommand command, CancellationToken ct)

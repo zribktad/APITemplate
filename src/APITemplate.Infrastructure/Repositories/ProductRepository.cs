@@ -19,12 +19,9 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
         new("500+", 500m, null, 0)
     ];
 
-    private readonly IServiceScopeFactory _scopeFactory;
+    public ProductRepository(AppDbContext dbContext) : base(dbContext) { }
 
-    public ProductRepository(AppDbContext dbContext, IServiceScopeFactory scopeFactory) : base(dbContext)
-    {
-        _scopeFactory = scopeFactory;
-    }
+    public ProductRepository(AppDbContext dbContext, IServiceScopeFactory _) : this(dbContext) { }
 
     public virtual Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
@@ -101,12 +98,8 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
                 .ToArray();
         });
 
-    protected async Task<TResult> WithDbContextAsync<TResult>(Func<AppDbContext, Task<TResult>> action)
-    {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await action(dbContext);
-    }
+    protected Task<TResult> WithDbContextAsync<TResult>(Func<AppDbContext, Task<TResult>> action)
+        => action(AppDb);
 
     private sealed record PriceFacetCounts(
         int ZeroToFifty,

@@ -185,7 +185,7 @@ public static class ApplicationBuilderExtensions
     public static WebApplication MapApplicationEndpoints(this WebApplication app)
     {
         app.MapControllers().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
-        app.MapGraphQL();
+        app.MapGraphQL().RequireRateLimiting(CachePolicyNames.RateLimitPolicy);
         app.MapNitroApp("/graphql/ui");
         app.UseHealthChecks();
 
