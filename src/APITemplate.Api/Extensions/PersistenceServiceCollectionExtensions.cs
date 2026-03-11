@@ -37,6 +37,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IStoredProcedureExecutor, StoredProcedureExecutor>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IDbTransactionProvider, EfCoreTransactionProvider>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IEntityNormalizationService, AppUserEntityNormalizationService>();
         services.AddSingleton<IAuditableEntityStateManager, AuditableEntityStateManager>();

@@ -1125,7 +1125,8 @@ public sealed class PostgresDataIntegrityTests
         => new(
             dbContext,
             Options.Create(new TransactionDefaultsOptions()),
-            NullLogger<UnitOfWork>.Instance);
+            NullLogger<UnitOfWork>.Instance,
+            new EfCoreTransactionProvider(dbContext));
 
     private sealed class TestTenantProvider(Guid tenantId, bool hasTenant) : ITenantProvider
     {

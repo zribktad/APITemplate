@@ -20,9 +20,7 @@ public sealed class UnitOfWork : IUnitOfWork
     private readonly AppDbContext _dbContext;
     private readonly TransactionDefaultsOptions _transactionDefaults;
     private readonly ILogger<UnitOfWork> _logger;
-    private readonly Func<TransactionOptions, IExecutionStrategy> _executionStrategyFactory;
-    private readonly Func<IDbContextTransaction?> _currentTransactionAccessor;
-    private readonly Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> _beginTransactionAsync;
+    private readonly IDbTransactionProvider _transactionProvider;
     private readonly ManagedTransactionScope _managedTransactionScope = new();
     private readonly DbContextTrackedStateManager _trackedStateManager;
     private readonly DbContextCommandTimeoutScope _commandTimeoutScope;
@@ -38,34 +36,17 @@ public sealed class UnitOfWork : IUnitOfWork
     /// for outermost <see cref="ExecuteInTransactionAsync"/> calls.
     /// </param>
     /// <param name="logger">Logger used for transaction orchestration diagnostics.</param>
+    /// <param name="transactionProvider">Provides transaction management operations for the underlying database.</param>
     public UnitOfWork(
         AppDbContext dbContext,
         IOptions<TransactionDefaultsOptions> transactionDefaults,
-        ILogger<UnitOfWork> logger)
-        : this(
-            dbContext,
-            transactionDefaults.Value,
-            logger,
-            options => CreateExecutionStrategy(dbContext, options),
-            () => dbContext.Database.CurrentTransaction,
-            dbContext.Database.BeginTransactionAsync)
-    {
-    }
-
-    internal UnitOfWork(
-        AppDbContext dbContext,
-        TransactionDefaultsOptions transactionDefaults,
         ILogger<UnitOfWork> logger,
-        Func<TransactionOptions, IExecutionStrategy> executionStrategyFactory,
-        Func<IDbContextTransaction?> currentTransactionAccessor,
-        Func<IsolationLevel, CancellationToken, Task<IDbContextTransaction>> beginTransactionAsync)
+        IDbTransactionProvider transactionProvider)
     {
         _dbContext = dbContext;
-        _transactionDefaults = transactionDefaults;
+        _transactionDefaults = transactionDefaults.Value;
         _logger = logger;
-        _executionStrategyFactory = executionStrategyFactory;
-        _currentTransactionAccessor = currentTransactionAccessor;
-        _beginTransactionAsync = beginTransactionAsync;
+        _transactionProvider = transactionProvider;
         _trackedStateManager = new DbContextTrackedStateManager(dbContext);
         _commandTimeoutScope = new DbContextCommandTimeoutScope(dbContext);
     }
@@ -91,7 +72,7 @@ public sealed class UnitOfWork : IUnitOfWork
 
         var effectiveOptions = _transactionDefaults.Resolve(null);
         _logger.CommitStarted(effectiveOptions.RetryEnabled ?? true, effectiveOptions.TimeoutSeconds);
-        var strategy = _executionStrategyFactory(effectiveOptions);
+        var strategy = _transactionProvider.CreateExecutionStrategy(effectiveOptions);
         return strategy.ExecuteAsync(
             async cancellationToken =>
             {
@@ -151,7 +132,7 @@ public sealed class UnitOfWork : IUnitOfWork
         CancellationToken ct = default,
         TransactionOptions? options = null)
     {
-        var currentTransaction = _currentTransactionAccessor();
+        var currentTransaction = _transactionProvider.CurrentTransaction;
         if (currentTransaction is not null)
             return await ExecuteWithinSavepointAsync(currentTransaction, action, options, ct);
 
@@ -216,7 +197,7 @@ public sealed class UnitOfWork : IUnitOfWork
         TransactionOptions effectiveOptions,
         CancellationToken ct)
     {
-        var strategy = _executionStrategyFactory(effectiveOptions);
+        var strategy = _transactionProvider.CreateExecutionStrategy(effectiveOptions);
         var previousActiveOptions = _activeTransactionOptions;
 
         return await strategy.ExecuteAsync(
@@ -233,7 +214,7 @@ public sealed class UnitOfWork : IUnitOfWork
                 IDbContextTransaction? transaction = null;
                 try
                 {
-                    transaction = await _beginTransactionAsync(
+                    transaction = await _transactionProvider.BeginTransactionAsync(
                         effectiveOptions.IsolationLevel!.Value,
                         cancellationToken);
                     _logger.DatabaseTransactionOpened();
@@ -326,18 +307,6 @@ public sealed class UnitOfWork : IUnitOfWork
         {
         }
     }
-
-    /// <summary>
-    /// Builds the EF Core execution strategy for the effective transaction policy.
-    /// Retry-enabled transactions use Npgsql's retrying strategy; disabled retries fall back to a non-retrying strategy.
-    /// </summary>
-    /// <param name="dbContext">Context used by the execution strategy.</param>
-    /// <param name="effectiveOptions">Resolved transaction policy for the outermost transaction boundary.</param>
-    /// <returns>An execution strategy matching the effective retry policy.</returns>
-    private static IExecutionStrategy CreateExecutionStrategy(
-        DbContext dbContext,
-        TransactionOptions effectiveOptions)
-        => UnitOfWorkExecutionStrategyFactory.Create(dbContext, effectiveOptions);
 
     private static bool IsTransactionNotSupported(Exception ex)
         => ex is InvalidOperationException or NotSupportedException;

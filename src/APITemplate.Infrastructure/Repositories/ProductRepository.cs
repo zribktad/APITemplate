@@ -20,7 +20,7 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
 
     public ProductRepository(AppDbContext dbContext) : base(dbContext) { }
 
-    public virtual Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
+    public Task<IReadOnlyList<ProductResponse>> ListAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
         {
             var specification = new ProductSpecification(filter);
@@ -28,7 +28,7 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
             return (IReadOnlyList<ProductResponse>)await query.ToListAsync(ct);
         });
 
-    public virtual Task<int> CountAsync(ProductFilter filter, CancellationToken ct = default)
+    public Task<int> CountAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
         {
             var specification = new ProductCountSpecification(filter);
@@ -36,7 +36,7 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
             return await query.CountAsync(ct);
         });
 
-    public virtual Task<IReadOnlyList<ProductCategoryFacetValue>> GetCategoryFacetsAsync(ProductFilter filter, CancellationToken ct = default)
+    public Task<IReadOnlyList<ProductCategoryFacetValue>> GetCategoryFacetsAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
         {
             var specification = new ProductCategoryFacetSpecification(filter);
@@ -63,7 +63,7 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
                 .ToArrayAsync(ct);
         });
 
-    public virtual Task<IReadOnlyList<ProductPriceFacetBucketResponse>> GetPriceFacetsAsync(ProductFilter filter, CancellationToken ct = default)
+    public Task<IReadOnlyList<ProductPriceFacetBucketResponse>> GetPriceFacetsAsync(ProductFilter filter, CancellationToken ct = default)
         => WithDbContextAsync(async dbContext =>
         {
             var specification = new ProductPriceFacetSpecification(filter);
@@ -95,7 +95,7 @@ public class ProductRepository : RepositoryBase<Product>, IProductRepository
                 .ToArray();
         });
 
-    protected Task<TResult> WithDbContextAsync<TResult>(Func<AppDbContext, Task<TResult>> action)
+    private Task<TResult> WithDbContextAsync<TResult>(Func<AppDbContext, Task<TResult>> action)
         => action(AppDb);
 
     private sealed record PriceFacetCounts(
