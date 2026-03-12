@@ -21,15 +21,22 @@ public static class PersistenceServiceCollectionExtensions
     public const string TransactionsSectionName = "Persistence:Transactions";
 
     public static IServiceCollection AddPersistence(
-        this IServiceCollection services, IConfiguration configuration)
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection")!;
-        var transactionDefaults = configuration.GetSection(TransactionsSectionName).Get<TransactionDefaultsOptions>() ?? new TransactionDefaultsOptions();
+        var transactionDefaults =
+            configuration.GetSection(TransactionsSectionName).Get<TransactionDefaultsOptions>()
+            ?? new TransactionDefaultsOptions();
 
-        services.Configure<TransactionDefaultsOptions>(configuration.GetSection(TransactionsSectionName));
+        services.Configure<TransactionDefaultsOptions>(
+            configuration.GetSection(TransactionsSectionName)
+        );
 
         services.AddDbContext<AppDbContext>(options =>
-            ConfigurePostgresDbContext(options, connectionString, transactionDefaults));
+            ConfigurePostgresDbContext(options, connectionString, transactionDefaults)
+        );
 
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IProductDataLinkRepository, ProductDataLinkRepository>();
@@ -37,6 +44,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IStoredProcedureExecutor, StoredProcedureExecutor>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IDbTransactionProvider, EfCoreTransactionProvider>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IEntityNormalizationService, AppUserEntityNormalizationService>();
@@ -44,9 +52,11 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<ISoftDeleteProcessor, SoftDeleteProcessor>();
         services.AddScoped<AuthBootstrapSeeder>();
         services.AddScoped<ISoftDeleteCascadeRule, ProductSoftDeleteCascadeRule>();
+        services.AddScoped<ISoftDeleteCascadeRule, TenantSoftDeleteCascadeRule>();
         services.AddSingleton(TimeProvider.System);
 
-        services.AddHealthChecks()
+        services
+            .AddHealthChecks()
             .AddNpgSql(connectionString, name: "postgresql", tags: ["database"]);
 
         return services;
@@ -55,14 +65,17 @@ public static class PersistenceServiceCollectionExtensions
     internal static void ConfigurePostgresDbContext(
         DbContextOptionsBuilder options,
         string connectionString,
-        TransactionDefaultsOptions transactionDefaults)
+        TransactionDefaultsOptions transactionDefaults
+    )
     {
         _ = transactionDefaults;
         options.UseNpgsql(connectionString);
     }
 
     public static IServiceCollection AddMongoDB(
-        this IServiceCollection services, IConfiguration configuration)
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
         var mongoSettings = configuration.GetSection("MongoDB").Get<MongoDbSettings>()!;
 
@@ -70,24 +83,32 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton<MongoDbContext>();
         services.AddScoped<IProductDataRepository, ProductDataRepository>();
 
-        services.AddResiliencePipeline(ResiliencePipelineKeys.MongoProductDataDelete, builder =>
-        {
-            builder.AddRetry(new()
+        services.AddResiliencePipeline(
+            ResiliencePipelineKeys.MongoProductDataDelete,
+            builder =>
             {
-                MaxRetryAttempts = 3,
-                BackoffType = DelayBackoffType.Exponential,
-                Delay = TimeSpan.FromSeconds(1),
-                UseJitter = true
-            });
-        });
+                builder.AddRetry(
+                    new()
+                    {
+                        MaxRetryAttempts = 3,
+                        BackoffType = DelayBackoffType.Exponential,
+                        Delay = TimeSpan.FromSeconds(1),
+                        UseJitter = true,
+                    }
+                );
+            }
+        );
 
         services.AddMongoMigrations(
             mongoSettings.ConnectionString,
             new MigrationOptions(mongoSettings.DatabaseName),
-            config => config.LoadMigrationsFromAssembly(typeof(PersistenceServiceCollectionExtensions).Assembly));
+            config =>
+                config.LoadMigrationsFromAssembly(
+                    typeof(PersistenceServiceCollectionExtensions).Assembly
+                )
+        );
 
-        services.AddHealthChecks()
-            .AddCheck<MongoDbHealthCheck>("mongodb", tags: ["database"]);
+        services.AddHealthChecks().AddCheck<MongoDbHealthCheck>("mongodb", tags: ["database"]);
 
         return services;
     }

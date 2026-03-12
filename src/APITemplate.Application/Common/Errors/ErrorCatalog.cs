@@ -1,4 +1,5 @@
 namespace APITemplate.Application.Common.Errors;
+
 public static class ErrorCatalog
 {
     public static class General
@@ -43,5 +44,11 @@ public static class ErrorCatalog
         public const string NotFound = "USR-0404";
         public const string EmailAlreadyExists = "USR-0409-EMAIL";
         public const string UsernameAlreadyExists = "USR-0409-USERNAME";
+    }
+
+    public static class Tenants
+    {
+        public const string NotFound = "TNT-0404";
+        public const string CodeAlreadyExists = "TNT-0409-CODE";
     }
 }

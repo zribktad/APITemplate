@@ -42,15 +42,33 @@ public static class Permission
         public const string Delete = "Users.Delete";
     }
 
+    public static class Tenants
+    {
+        public const string Read = "Tenants.Read";
+        public const string Create = "Tenants.Create";
+        public const string Delete = "Tenants.Delete";
+    }
+
     private static readonly Lazy<IReadOnlySet<string>> LazyAll = new(() =>
     {
         var permissions = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var nestedType in typeof(Permission).GetNestedTypes(BindingFlags.Public | BindingFlags.Static))
+        foreach (
+            var nestedType in typeof(Permission).GetNestedTypes(
+                BindingFlags.Public | BindingFlags.Static
+            )
+        )
         {
-            foreach (var field in nestedType.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
+            foreach (
+                var field in nestedType.GetFields(
+                    BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy
+                )
+            )
             {
-                if (field.IsLiteral && field.FieldType == typeof(string) &&
-                    field.GetRawConstantValue() is string value)
+                if (
+                    field.IsLiteral
+                    && field.FieldType == typeof(string)
+                    && field.GetRawConstantValue() is string value
+                )
                 {
                     permissions.Add(value);
                 }

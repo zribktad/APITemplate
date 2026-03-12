@@ -11,5 +11,7 @@ global using APITemplate.Application.Features.ProductData;
 global using APITemplate.Application.Features.ProductData.DTOs;
 global using APITemplate.Application.Features.ProductReview;
 global using APITemplate.Application.Features.ProductReview.DTOs;
+global using APITemplate.Application.Features.Tenant;
+global using APITemplate.Application.Features.Tenant.DTOs;
 global using APITemplate.Application.Features.User;
 global using APITemplate.Application.Features.User.DTOs;

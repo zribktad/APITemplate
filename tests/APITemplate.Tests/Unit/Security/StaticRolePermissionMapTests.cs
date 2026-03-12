@@ -84,7 +84,7 @@ public class StaticRolePermissionMapTests
     [Fact]
     public void PermissionAll_ContainsExpectedCount()
     {
-        // 4 Products + 4 Categories + 3 ProductReviews + 3 ProductData + 4 Users = 18
-        Permission.All.Count.ShouldBe(18);
+        // 4 Products + 4 Categories + 3 ProductReviews + 3 ProductData + 4 Users + 3 Tenants = 21
+        Permission.All.Count.ShouldBe(21);
     }
 }
