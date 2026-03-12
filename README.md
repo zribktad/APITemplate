@@ -23,6 +23,7 @@ Step-by-step guides for the most common workflows in this project:
 | [Scalar & GraphQL UI](docs/scalar-and-graphql-ui.md) | Use the Scalar REST explorer and Nitro GraphQL playground                   |
 | [Testing](docs/testing.md)                           | Write unit tests (services, validators, repositories) and integration tests |
 | [Observability](docs/observability.md)               | Run OpenTelemetry locally with Aspire Dashboard or Grafana LGTM             |
+| [Caching](docs/CACHING.md)                           | Configure output caching, rate limiting, and Valkey backing store           |
 | [Result Pattern](docs/result-pattern.md)             | Guidelines for introducing selective `Result<T>` flow in phase 2            |
 | [Git Hooks](docs/GIT_HOOKS.md)                       | Auto-install Husky.Net hooks and format staged C# files with CSharpier      |
 
@@ -51,7 +52,8 @@ Step-by-step guides for the most common workflows in this project:
     *   **Data Redaction:** Sensitive log properties (PII, secrets) are classified with `Microsoft.Extensions.Compliance` (`[PersonalData]`, `[SensitiveData]`) and HMAC-redacted before writing.
     *   **Authentication:** Pre-configured Keycloak JWT + BFF Cookie dual-auth with production hardening: secure-only cookies in production, server-side session store (`ValkeyTicketStore`) backed by Valkey, silent token refresh before expiry, and CSRF protection (`X-CSRF: 1` header required for cookie-authenticated mutations).
     *   **Observability:** Health Checks (`/health`) natively tracking PostgreSQL, MongoDB, and Valkey state.
-*   **Robust Testing Engine:** Provides isolated internal `Integration` tests using `UseInMemoryDatabase` combined with `WebApplicationFactory`, plus a comprehensive `Unit` test suite.
+*   **Role-Based Access Control:** Three-tier role model (`PlatformAdmin`, `TenantAdmin`, `User`) enforced via Keycloak claims and ASP.NET Core policy-based authorization. `PermissionRequirement` handlers gate controller actions and GraphQL mutations by role.
+*   **Robust Testing Engine:** Provides isolated `Integration` tests using `UseInMemoryDatabase` combined with `WebApplicationFactory` for fast feedback, **Testcontainers PostgreSQL** for high-fidelity tenant isolation and transaction tests, plus a comprehensive `Unit` test suite (Moq, Shouldly, FluentValidation.TestHelper).
 
 ---
 
@@ -242,48 +244,97 @@ classDiagram
 ## 🛠 Technology Stack
 
 *   **Runtime:** `.NET 10.0` Web SDK
-*   **Relational Database:** PostgreSQL 17 (`Npgsql`)
+*   **Relational Database:** PostgreSQL 18 (`Npgsql`)
 *   **Document Database:** MongoDB 8 (`MongoDB.Driver`)
-*   **Cache / Rate Limit Backing Store:** Valkey 8 (Redis-compatible, `StackExchange.Redis`)
+*   **Cache / Rate Limit Backing Store:** Valkey 9 (Redis-compatible, `StackExchange.Redis`)
 *   **ORM:** Entity Framework Core (`Microsoft.EntityFrameworkCore.Design`, `10.0`)
 *   **API Toolkit:** ASP.NET Core, Asp.Versioning, `Scalar.AspNetCore`
 *   **GraphQL Core:** HotChocolate `15.1`
 *   **Auth:** Keycloak 26 (JWT Bearer + BFF Cookie via OIDC)
 *   **Utilities:** `Serilog.AspNetCore`, `FluentValidation`, `Ardalis.Specification`, `Kot.MongoDB.Migrations`
-*   **Test Suite:** xUnit, `Microsoft.AspNetCore.Mvc.Testing`, Moq, `MockQueryable.Moq`, `FluentValidation.TestHelper`
+*   **Test Suite:** xUnit 3, `Microsoft.AspNetCore.Mvc.Testing`, Moq, Shouldly, `FluentValidation.TestHelper`, Testcontainers.PostgreSql, Respawn
 
 ---
 
 ## 📂 Project Structure
 
-This architecture now uses a strict four-project Clean Architecture split with CQRS/MediatR:
+The solution follows a strict **four-project Clean Architecture** split. Each project has a single, well-defined responsibility and a one-way dependency rule: outer layers depend on inner layers — never the reverse.
+
+```
+APITemplate.Domain  ←  APITemplate.Application  ←  APITemplate.Infrastructure
+                    ←                            ←  APITemplate.Api
+```
+
+### Project responsibilities
+
+| Project | Role | Key rule |
+|---------|------|----------|
+| `APITemplate.Domain` | Core business model — entities, enums, domain exceptions, repository interfaces | No dependencies on any other project or NuGet package except .NET BCL |
+| `APITemplate.Application` | Use-case layer — MediatR commands/queries/handlers, DTOs, FluentValidation validators, pipeline behaviors, specifications | Depends only on Domain; never references EF Core, ASP.NET, or any infrastructure detail |
+| `APITemplate.Infrastructure` | Technical implementations — EF Core `AppDbContext`, MongoDB context, repository classes, Unit of Work, migrations, security services, observability | Depends on Domain (implements interfaces) and Application (reads options) |
+| `APITemplate.Api` | Presentation entry point — REST controllers, GraphQL types/queries/mutations/DataLoaders, middleware, DI composition root, `Program.cs` | Depends on all other projects; owns `ISender` dispatch and HTTP/GraphQL mapping |
+| `APITemplate.Tests` | Test suite — unit tests (Moq), in-memory integration tests (`WebApplicationFactory`), Testcontainers PostgreSQL tests (Respawn) | References all production projects; never ships to production |
+
+### Folder layout
 
 ```text
 src/APITemplate.Api/
-├── Api/              # Presentation tier (REST controllers, GraphQL, middleware, cache, exception handling)
-├── Extensions/       # Composition root and startup bootstrappers
+├── Api/
+│   ├── Controllers/V1/        # REST endpoints (ProductsController, CategoriesController, …)
+│   ├── GraphQL/               # Types, Queries, Mutations, DataLoaders
+│   ├── Middleware/            # RequestContextMiddleware, CsrfValidationMiddleware
+│   ├── Authorization/         # PermissionRequirement, BffAuthenticationSchemes
+│   ├── Cache/                 # TenantAwareOutputCachePolicy, CacheInvalidationNotificationHandler
+│   ├── OpenApi/               # Scalar OAuth2 transformer
+│   └── ExceptionHandling/     # ApiExceptionHandler → RFC 7807 ProblemDetails
+├── Extensions/                # AddApplicationServices, AddPersistence, AddGraphQLConfiguration, …
 ├── Program.cs
 └── appsettings*.json
+
 src/APITemplate.Application/
-├── Common/           # Cross-cutting application concerns (validation, security, behaviors, options)
-├── Features/         # Vertical slices with commands, queries, handlers, DTOs, mappings, validators
-└── Options/
+├── Features/
+│   ├── Product/               # GetProductsQuery, CreateProductCommand, ProductRequestHandlers, DTOs, validators
+│   ├── Category/              # same vertical slice structure
+│   ├── ProductReview/
+│   ├── ProductData/
+│   └── User/
+├── Common/
+│   ├── Behaviors/             # ValidationBehavior<TRequest,TResponse> (IPipelineBehavior)
+│   ├── Events/                # ProductsChangedNotification, CategoriesChangedNotification, …
+│   ├── Options/               # BffOptions, RateLimitingOptions, CachingOptions, …
+│   └── Security/              # Permission constants, custom claim types
+
 src/APITemplate.Domain/
-├── Entities/
-├── Enums/
-├── Exceptions/
-└── Interfaces/
+├── Entities/                  # Tenant, AppUser, Category, Product, ProductReview, ProductData, …
+├── Enums/                     # UserRole
+├── Exceptions/                # NotFoundException, ValidationException, ConflictException, …
+└── Interfaces/                # IProductRepository, ICategoryRepository, IUnitOfWork, …
+
 src/APITemplate.Infrastructure/
-├── Persistence/      # EF Core / Mongo persistence and Unit of Work
-├── Repositories/
-├── StoredProcedures/
-├── Security/
-├── Observability/
-└── Migrations/
+├── Persistence/               # AppDbContext (EF Core), MongoDbContext, UnitOfWork
+├── Repositories/              # ProductRepository, CategoryRepository, ProductDataRepository, …
+├── Migrations/                # EF Core migrations + Kot.MongoDB.Migrations
+├── Database/                  # Embedded SQL stored-procedure scripts
+├── Security/                  # ValkeyTicketStore, CookieSessionRefresher, KeycloakClaimMapper, CsrfValidationMiddleware
+└── Observability/             # Health checks (PostgreSQL, MongoDB, Valkey, Keycloak)
+
 tests/APITemplate.Tests/
-├── Integration/      # End-to-end HTTP and data-integrity tests
-└── Unit/             # Isolated handler, repository, middleware and infrastructure tests
+├── Integration/               # CustomWebApplicationFactory (InMemory DB + mocked infra)
+│   ├── Postgres/              # PostgresWebApplicationFactory (Testcontainers + Respawn)
+│   └── *.cs                   # REST, GraphQL, BFF/CSRF integration tests
+└── Unit/
+    ├── Services/
+    ├── Repositories/
+    ├── Validators/
+    ├── Middleware/
+    └── ExceptionHandling/
 ```
+
+### Dependency rule in practice
+
+- A handler in `APITemplate.Application` calls `IProductRepository` (Domain interface) — it never imports `ProductRepository` (Infrastructure class).
+- `APITemplate.Infrastructure` implements `IProductRepository` and registers it in DI inside `APITemplate.Api`'s composition root.
+- `APITemplate.Api` controllers reference only `ISender` (MediatR) — they have no direct dependency on any Application service or Infrastructure class.
 
 ---
 
@@ -333,6 +384,17 @@ All versioned REST resource endpoints sit under the base path `api/v{version}`. 
 | `POST`   | `/api/v1/product-data/image` |       ✅       | Create image media metadata                |
 | `POST`   | `/api/v1/product-data/video` |       ✅       | Create video media metadata                |
 | `DELETE` | `/api/v1/product-data/{id}`  |       ✅       | Delete by MongoDB ObjectId                 |
+
+### Users
+
+| Method  | Path                              | Auth Required | Description                                      |
+| ------- | --------------------------------- | :-----------: | ------------------------------------------------ |
+| `GET`   | `/api/v1/Users`                   |       ✅       | List all users (PlatformAdmin only)              |
+| `GET`   | `/api/v1/Users/{id}`              |       ✅       | Get a user by GUID                               |
+| `POST`  | `/api/v1/Users/register`          |       ❌       | Register a new user                              |
+| `PUT`   | `/api/v1/Users/{id}/activate`     |       ✅       | Activate a user (TenantAdmin / PlatformAdmin)    |
+| `PUT`   | `/api/v1/Users/{id}/deactivate`   |       ✅       | Deactivate a user (TenantAdmin / PlatformAdmin)  |
+| `PUT`   | `/api/v1/Users/{id}/role`         |       ✅       | Assign a role to a user (TenantAdmin / PlatformAdmin) |
 
 ### Utility
 
@@ -740,6 +802,139 @@ Only the compiled artefacts from Stage 2 are copied into the slim Stage 3 runtim
 | Polymorphic document hierarchies    | MongoDB                       |
 | Media metadata, logs, audit events  | MongoDB                       |
 
+### 14 — Mediator + CQRS Pattern (MediatR)
+
+All application logic is dispatched through **MediatR**. Controllers and GraphQL resolvers never call services directly — they send a typed command or query object through `ISender`, and MediatR routes it to the correct handler.
+
+```
+Controller / GraphQL Resolver
+        │  _sender.Send(new GetProductsQuery(filter))
+        ▼
+    MediatR pipeline
+        │  ValidationBehavior<TRequest,TResponse>  ← FluentValidation runs here
+        ▼
+    IRequestHandler (e.g. ProductRequestHandlers)
+        │  calls IProductRepository, IUnitOfWork, IPublisher
+        ▼
+    Response returned to caller
+```
+
+#### Commands and Queries
+
+Each feature vertical defines its own requests and a single handler class that implements all of them:
+
+```csharp
+// Application/Features/Product/Handlers/ProductRequestHandlers.cs
+
+// Queries (read-only, no side-effects)
+public sealed record GetProductsQuery(ProductFilter Filter)      : IRequest<ProductsResponse>;
+public sealed record GetProductByIdQuery(Guid Id)                : IRequest<ProductResponse?>;
+
+// Commands (write operations)
+public sealed record CreateProductCommand(CreateProductRequest Request) : IRequest<ProductResponse>;
+public sealed record UpdateProductCommand(Guid Id, UpdateProductRequest Request) : IRequest;
+public sealed record DeleteProductCommand(Guid Id)               : IRequest;
+
+public sealed class ProductRequestHandlers :
+    IRequestHandler<GetProductsQuery,    ProductsResponse>,
+    IRequestHandler<GetProductByIdQuery, ProductResponse?>,
+    IRequestHandler<CreateProductCommand, ProductResponse>,
+    IRequestHandler<UpdateProductCommand>,
+    IRequestHandler<DeleteProductCommand>
+{ ... }
+```
+
+The same pattern applies to `CategoryRequestHandlers`, `ProductReviewRequestHandlers`, `UserRequestHandlers`, and `ProductDataRequestHandlers`.
+
+#### Controller dispatch via ISender
+
+Controllers inject only `ISender` — they have no reference to any service or repository:
+
+```csharp
+public sealed class ProductsController : ControllerBase
+{
+    private readonly ISender _sender;
+
+    [HttpGet]
+    public async Task<ActionResult<ProductsResponse>> GetAll(
+        [FromQuery] ProductFilter filter, CancellationToken ct)
+        => Ok(await _sender.Send(new GetProductsQuery(filter), ct));
+
+    [HttpPost]
+    public async Task<ActionResult<ProductResponse>> Create(
+        CreateProductRequest request, CancellationToken ct)
+    {
+        var product = await _sender.Send(new CreateProductCommand(request), ct);
+        return CreatedAtAction(nameof(GetById), new { id = product.Id, version = "1.0" }, product);
+    }
+}
+```
+
+GraphQL resolvers and DataLoaders follow the same pattern using `[Service] ISender sender` parameter injection.
+
+#### Notifications for cache invalidation
+
+Write handlers publish `INotification` events after a successful mutation. `CacheInvalidationNotificationHandler` listens and evicts the affected output-cache tags — keeping the mutation handler decoupled from any caching concern:
+
+```csharp
+// Application/Common/Events/CacheEvents.cs
+public sealed record ProductsChangedNotification  : INotification;
+public sealed record CategoriesChangedNotification : INotification;
+public sealed record ProductReviewsChangedNotification : INotification;
+
+// Api/Cache/CacheInvalidationNotificationHandler.cs
+public sealed class CacheInvalidationNotificationHandler :
+    INotificationHandler<ProductsChangedNotification>,
+    INotificationHandler<CategoriesChangedNotification>,
+    INotificationHandler<ProductReviewsChangedNotification>
+{
+    public Task Handle(ProductsChangedNotification n, CancellationToken ct)
+        => _outputCacheInvalidationService.EvictAsync(CachePolicyNames.Products, ct);
+    // ...
+}
+```
+
+#### ValidationBehavior pipeline
+
+`ValidationBehavior<TRequest, TResponse>` is registered as an `IPipelineBehavior` and runs before every handler. It collects all `FluentValidation` failures for the request (including nested objects and collection items) and throws a domain `ValidationException` if any fail — so handler code never receives invalid input:
+
+```csharp
+// Application/Common/Behaviors/ValidationBehavior.cs
+public sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+{
+    public async Task<TResponse> Handle(
+        TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    {
+        var failures = await ValidateAsync(request, _requestValidators, ct);
+        // also validates nested objects and collection items...
+
+        if (failures.Count > 0)
+            throw new ValidationException(...);
+
+        return await next();   // proceed to the handler
+    }
+}
+```
+
+#### DI registration
+
+Handlers and behaviors are registered via assembly scanning — no manual per-handler registration needed:
+
+```csharp
+services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssemblyContaining<CreateProductCommand>();           // Application handlers
+    cfg.RegisterServicesFromAssemblyContaining<CacheInvalidationNotificationHandler>(); // API notification handlers
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));                          // pipeline behavior
+});
+```
+
+**Benefits:**
+- Controllers and GraphQL resolvers are free of business logic — they only translate HTTP/GraphQL inputs to commands/queries.
+- Adding a new cross-cutting concern (logging, authorisation checks, timing) requires only a new `IPipelineBehavior` — no changes to any handler.
+- Each command or query is an explicit, named contract; the full request/response shape is visible at a glance.
+- Handler classes are independently unit-testable by directly instantiating them with mocked repositories.
+
 ---
 
 ## 🗄 Stored Procedure Pattern (EF Core + PostgreSQL)
@@ -975,6 +1170,7 @@ The repository maintains an inclusive combination of **Unit Tests** and **Integr
 | `tests/APITemplate.Tests/Unit/Validators/`        | xUnit + FluentValidation.TestHelper | Validator rules per DTO                                                                |
 | `tests/APITemplate.Tests/Unit/ExceptionHandling/` | xUnit + Moq                         | Explicit `errorCode` mapping and exception-to-HTTP conversion in `ApiExceptionHandler` |
 | `tests/APITemplate.Tests/Integration/`            | xUnit + `WebApplicationFactory`     | Full HTTP round-trips over in-memory database                                          |
+| `tests/APITemplate.Tests/Integration/Postgres/`   | xUnit + Testcontainers.PostgreSql   | Tenant isolation and transaction behaviour against a real PostgreSQL instance          |
 
 ### Integration test isolation
 
@@ -996,8 +1192,11 @@ dotnet test
 # Run only unit tests
 dotnet test --filter "FullyQualifiedName~Unit"
 
-# Run only integration tests
-dotnet test --filter "FullyQualifiedName~Integration"
+# Run only integration tests (in-memory, no external dependencies)
+dotnet test --filter "FullyQualifiedName~Integration&Category!=Integration.Postgres"
+
+# Run Testcontainers PostgreSQL tests (requires Docker)
+dotnet test --filter "Category=Integration.Postgres"
 ```
 
 ---

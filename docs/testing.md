@@ -2,11 +2,13 @@
 
 This guide explains how to add unit tests and integration tests for this project, using the patterns already established in the test suite.
 
-**Test framework:** xUnit  
-**Assertion library:** Shouldly  
-**Mocking library:** Moq  
-**Integration testing:** `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`)  
+**Test framework:** xUnit
+**Assertion library:** Shouldly
+**Mocking library:** Moq
+**Integration testing:** `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`)
 **In-memory database:** `Microsoft.EntityFrameworkCore.InMemory`
+**PostgreSQL integration:** Testcontainers.PostgreSql
+**Database reset:** Respawn (resets PostgreSQL to a clean state between tests without re-creating the schema)
 
 Run all tests:
 
@@ -565,6 +567,7 @@ The suite uses a hybrid approach:
 
 1. Docker daemon must be running (Testcontainers starts/stops PostgreSQL automatically).
 2. Do not run app under debugger while running tests, otherwise `APITemplate.dll` may be file-locked.
+3. **Respawn** resets all table data between individual test runs (via `Respawner.ResetAsync()`) without dropping or re-creating the schema, so migrations run only once per test session.
 
 ### Targeted execution commands
 
