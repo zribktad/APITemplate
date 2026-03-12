@@ -410,36 +410,87 @@ All versioned REST resource endpoints sit under the base path `api/v{version}`. 
 
 All configuration lives in `appsettings.json` (production defaults) and is overridden by `appsettings.Development.json` locally or by environment variables at runtime.
 
-| Key                                   | Example Value                                                                       | Description                                                                                            |
-| ------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `ConnectionStrings:DefaultConnection` | `Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres` | PostgreSQL connection string                                                                           |
-| `MongoDB:ConnectionString`            | `mongodb://localhost:27017`                                                         | MongoDB connection string                                                                              |
-| `MongoDB:DatabaseName`                | `apitemplate`                                                                       | MongoDB database name                                                                                  |
-| `Valkey:ConnectionString`             | `localhost:6379`                                                                    | Valkey (Redis-compatible) connection string for distributed output cache. Omit to use in-memory cache. |
-| `Keycloak:auth-server-url`            | `http://localhost:8180/`                                                            | Keycloak base URL                                                                                      |
-| `Keycloak:realm`                      | `api-template`                                                                      | Keycloak realm name                                                                                    |
-| `Keycloak:resource`                   | `api-template`                                                                      | Keycloak client ID                                                                                     |
-| `Keycloak:credentials:secret`         | `dev-client-secret`                                                                 | Keycloak client secret — **never commit a real secret**                                                |
-| `Keycloak:SkipReadinessCheck`         | `false`                                                                             | Set to `true` to skip the startup Keycloak reachability check                                          |
-| `Bff:CookieName`                      | `.APITemplate.Auth`                                                                 | BFF session cookie name                                                                                |
-| `Bff:SessionTimeoutMinutes`           | `60`                                                                                | BFF cookie session lifetime                                                                            |
-| `Bff:PostLogoutRedirectUri`           | `/`                                                                                 | Redirect URI after BFF logout                                                                          |
-| `Bff:Scopes`                          | `["openid","profile","email","offline_access"]`                                     | OIDC scopes requested during BFF login                                                                 |
-| `Bff:TokenRefreshThresholdMinutes`    | `2`                                                                                 | Refresh the access token this many minutes before expiry                                               |
-| `RateLimiting:Fixed:PermitLimit`      | `100`                                                                               | Maximum requests allowed per window                                                                    |
-| `RateLimiting:Fixed:WindowMinutes`    | `1`                                                                                 | Fixed window duration in minutes                                                                       |
-| `Caching:ProductsExpirationSeconds`   | `30`                                                                                | Output cache TTL for the Products policy                                                               |
-| `Caching:CategoriesExpirationSeconds` | `60`                                                                                | Output cache TTL for the Categories policy                                                             |
-| `Caching:ReviewsExpirationSeconds`    | `30`                                                                                | Output cache TTL for the Reviews policy                                                                |
-| `Persistence:Transactions:IsolationLevel` | `ReadCommitted`                                                                  | Default isolation level for explicit `UnitOfWork` transactions                                         |
-| `Persistence:Transactions:TimeoutSeconds` | `30`                                                                             | Default command timeout applied while an explicit `UnitOfWork` transaction is running                  |
-| `Persistence:Transactions:RetryEnabled` | `true`                                                                             | Enables transient PostgreSQL retry behavior for EF Core/Npgsql                                         |
-| `Persistence:Transactions:RetryCount` | `3`                                                                                 | Maximum retry attempts for transient PostgreSQL failures                                               |
-| `Persistence:Transactions:RetryDelaySeconds` | `5`                                                                           | Maximum delay between transient PostgreSQL retry attempts in seconds                                   |
-| `SystemIdentity:DefaultActorId`       | `00000000-0000-0000-0000-000000000000`                                              | Default actor GUID used when no request actor context is available                                     |
-| `Bootstrap:Tenant:Code`               | `default`                                                                           | Bootstrap tenant code seeded at startup                                                                |
-| `Bootstrap:Tenant:Name`               | `Default Tenant`                                                                    | Bootstrap tenant display name                                                                          |
-| `Cors:AllowedOrigins`                 | `["http://localhost:3000","http://localhost:5173"]`                                 | Allowed origins for the default CORS policy                                                            |
+**Override priority (highest → lowest):**
+1. Environment variables (e.g. `ConnectionStrings__DefaultConnection=...`)
+2. `appsettings.Development.json` (local development)
+3. `appsettings.json` (production baseline — committed to source control, must not contain real secrets)
+
+> **Security note:** Never commit real secrets to `appsettings.json`. Supply `Keycloak:credentials:secret`, database passwords, and any other sensitive values via environment variables, Docker secrets, or a secret manager such as Azure Key Vault.
+
+Configuration sections are bound to strongly-typed `IOptions<T>` classes registered in DI (e.g. `RateLimitingOptions`, `CachingOptions`, `BffOptions`), so every setting is validated at startup and injectable into any service without raw `IConfiguration` access.
+
+### Databases
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `ConnectionStrings:DefaultConnection` | `Host=localhost;Port=5432;Database=apitemplate;Username=postgres;Password=postgres` | Npgsql connection string for the primary PostgreSQL database. Used by EF Core `AppDbContext` for all relational data (tenants, users, products, categories, reviews). |
+| `MongoDB:ConnectionString` | `mongodb://localhost:27017` | MongoDB connection string. Used by `MongoDbContext` for the `product_data` collection (polymorphic media metadata). |
+| `MongoDB:DatabaseName` | `apitemplate` | Name of the MongoDB database. All MongoDB collections are created inside this database. |
+
+### Cache & Session
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Valkey:ConnectionString` | `localhost:6379` | StackExchange.Redis connection string pointing to a Valkey instance. Used for three purposes: distributed output cache (GET responses), server-side BFF session store (`ValkeyTicketStore`), and shared DataProtection key ring. **Omit or leave empty** to fall back to in-memory cache — suitable for single-instance development only. |
+
+### Authentication — Keycloak
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Keycloak:auth-server-url` | `http://localhost:8180/` | Base URL of the Keycloak server. Used for JWT token validation (OIDC discovery endpoint) and BFF OIDC login flow. |
+| `Keycloak:realm` | `api-template` | Name of the Keycloak realm that issues tokens for this application. |
+| `Keycloak:resource` | `api-template` | Keycloak client ID. Must match the client configured in the realm. Used as the JWT `aud` (audience) claim. |
+| `Keycloak:credentials:secret` | `dev-client-secret` | Keycloak client secret for the confidential client. Required for BFF OIDC code exchange and token refresh. **Never commit a real secret** — supply via environment variable or secret manager in production. |
+| `Keycloak:SkipReadinessCheck` | `false` | When `true`, the startup `WaitForKeycloakAsync()` probe is skipped. Useful in CI environments where Keycloak is not available. |
+
+### BFF Cookie Session
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Bff:CookieName` | `.APITemplate.Auth` | Name of the `httpOnly` session cookie issued after a successful BFF login. The cookie contains only a session key — the actual auth ticket is stored in Valkey. |
+| `Bff:SessionTimeoutMinutes` | `60` | How long the BFF session cookie remains valid after the last activity. |
+| `Bff:PostLogoutRedirectUri` | `/` | URI the browser is redirected to after `GET /api/v1/bff/logout` completes the Keycloak back-channel logout. |
+| `Bff:Scopes` | `["openid","profile","email","offline_access"]` | OIDC scopes requested from Keycloak during the BFF login flow. `offline_access` is required for silent token refresh via refresh token. |
+| `Bff:TokenRefreshThresholdMinutes` | `2` | `CookieSessionRefresher` exchanges the refresh token with Keycloak when the access token will expire within this many minutes. Prevents mid-request token expiry without requiring a full re-login. |
+
+### Rate Limiting
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `RateLimiting:Fixed:PermitLimit` | `100` | Maximum number of requests allowed per client within a single window. Partition key: JWT username → remote IP → `"anonymous"`. Exceeded requests receive HTTP 429. |
+| `RateLimiting:Fixed:WindowMinutes` | `1` | Duration of the fixed rate-limit window in minutes. The counter resets at the end of each window. |
+
+### Output Caching
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Caching:ProductsExpirationSeconds` | `30` | Cache TTL for the `Products` output-cache policy applied to `GET /api/v1/Products` and `GET /api/v1/Products/{id}`. Entries are also evicted immediately when any product mutation publishes `ProductsChangedNotification`. |
+| `Caching:CategoriesExpirationSeconds` | `60` | Cache TTL for the `Categories` output-cache policy. |
+| `Caching:ReviewsExpirationSeconds` | `30` | Cache TTL for the `Reviews` output-cache policy. |
+
+### Persistence & Transactions
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Persistence:Transactions:IsolationLevel` | `ReadCommitted` | Default SQL isolation level for explicit `IUnitOfWork.ExecuteInTransactionAsync(...)` calls. Accepted values: `ReadUncommitted`, `ReadCommitted`, `RepeatableRead`, `Serializable`. Per-call overrides are possible via `TransactionOptions`. |
+| `Persistence:Transactions:TimeoutSeconds` | `30` | Command timeout applied to the database connection while an explicit transaction is active. Prevents long-running transactions from holding locks indefinitely. |
+| `Persistence:Transactions:RetryEnabled` | `true` | Enables the Npgsql EF Core execution strategy that automatically retries the entire transaction block on transient failures (e.g. connection drops, deadlocks). |
+| `Persistence:Transactions:RetryCount` | `3` | Maximum number of retry attempts before the execution strategy gives up and re-throws. |
+| `Persistence:Transactions:RetryDelaySeconds` | `5` | Maximum back-off delay (in seconds) between retry attempts. Actual delay is randomised up to this value. |
+
+### Bootstrap & Identity
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Bootstrap:Tenant:Code` | `default` | Short code of the seed tenant created automatically on first startup if no tenants exist yet. Used as the default tenant for the seeded admin user. |
+| `Bootstrap:Tenant:Name` | `Default Tenant` | Human-readable display name of the seed tenant. |
+| `SystemIdentity:DefaultActorId` | `00000000-0000-0000-0000-000000000000` | Fallback `CreatedBy` / `UpdatedBy` GUID stamped in audit fields when no authenticated user is present (e.g. during startup seeding). |
+
+### CORS
+
+| Key | Example Value | Description |
+| --- | ------------- | ----------- |
+| `Cors:AllowedOrigins` | `["http://localhost:3000","http://localhost:5173"]` | List of origins permitted by the default CORS policy. Add your SPA development server and production domain here. Requests from unlisted origins will be blocked by the browser preflight check. |
 
 > **Security note:** `Keycloak:credentials:secret` must be supplied via an environment variable or secret manager in production — never from a committed config file.
 
