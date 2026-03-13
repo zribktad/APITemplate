@@ -16,12 +16,32 @@ public sealed class TenantSoftDeleteCascadeRule : ISoftDeleteCascadeRule
         if (entity is not Tenant tenant)
             return [];
 
-        var users = await dbContext
-            .Users.IgnoreQueryFilters(["SoftDelete", "Tenant"])
-            .Where(u => u.TenantId == tenant.Id && !u.IsDeleted)
-            .Cast<IAuditableTenantEntity>()
-            .ToListAsync(cancellationToken);
+        var dependents = new List<IAuditableTenantEntity>();
 
-        return users;
+        dependents.AddRange(
+            await dbContext
+                .Users.IgnoreQueryFilters(["SoftDelete", "Tenant"])
+                .Where(u => u.TenantId == tenant.Id && !u.IsDeleted)
+                .Cast<IAuditableTenantEntity>()
+                .ToListAsync(cancellationToken)
+        );
+
+        dependents.AddRange(
+            await dbContext
+                .Products.IgnoreQueryFilters(["SoftDelete", "Tenant"])
+                .Where(p => p.TenantId == tenant.Id && !p.IsDeleted)
+                .Cast<IAuditableTenantEntity>()
+                .ToListAsync(cancellationToken)
+        );
+
+        dependents.AddRange(
+            await dbContext
+                .Categories.IgnoreQueryFilters(["SoftDelete", "Tenant"])
+                .Where(c => c.TenantId == tenant.Id && !c.IsDeleted)
+                .Cast<IAuditableTenantEntity>()
+                .ToListAsync(cancellationToken)
+        );
+
+        return dependents;
     }
 }

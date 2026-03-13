@@ -63,9 +63,11 @@ public sealed class TenantRequestHandlers
         var tenant = await _unitOfWork.ExecuteInTransactionAsync(
             async () =>
             {
+                var id = Guid.NewGuid();
                 var entity = new TenantEntity
                 {
-                    Id = Guid.NewGuid(),
+                    Id = id,
+                    TenantId = id,
                     Code = command.Request.Code,
                     Name = command.Request.Name,
                 };

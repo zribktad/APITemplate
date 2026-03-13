@@ -38,14 +38,19 @@ public sealed class TenantRepository : RepositoryBase<Tenant>, ITenantRepository
     )
         where TId : default
     {
-        return await UnfilteredTenants.FirstOrDefaultAsync(
-            t => t.Id == (Guid)(object)id,
-            cancellationToken
-        );
+        if (id is not Guid guid)
+            throw new ArgumentException(
+                $"Expected Guid but received {typeof(TId).Name}.",
+                nameof(id)
+            );
+
+        return await UnfilteredTenants.FirstOrDefaultAsync(t => t.Id == guid, cancellationToken);
     }
 
     public Task<bool> CodeExistsAsync(string code, CancellationToken ct = default)
     {
-        return UnfilteredTenants.AnyAsync(t => t.Code == code, ct);
+        return AppDb
+            .Tenants.IgnoreQueryFilters(["Tenant", "SoftDelete"])
+            .AnyAsync(t => t.Code == code, ct);
     }
 }

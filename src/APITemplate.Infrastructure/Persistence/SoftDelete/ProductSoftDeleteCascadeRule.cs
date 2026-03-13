@@ -23,17 +23,34 @@ public sealed class ProductSoftDeleteCascadeRule : ISoftDeleteCascadeRule
     public async Task<IReadOnlyCollection<IAuditableTenantEntity>> GetDependentsAsync(
         AppDbContext dbContext,
         IAuditableTenantEntity entity,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (entity is not Product product)
             return [];
 
-        var reviews = await dbContext.ProductReviews
-            .IgnoreQueryFilters(["SoftDelete", "Tenant"])
-            .Where(r => r.ProductId == product.Id && r.TenantId == product.TenantId && !r.IsDeleted)
-            .Cast<IAuditableTenantEntity>()
-            .ToListAsync(cancellationToken);
+        var dependents = new List<IAuditableTenantEntity>();
 
-        return reviews;
+        dependents.AddRange(
+            await dbContext
+                .ProductReviews.IgnoreQueryFilters(["SoftDelete", "Tenant"])
+                .Where(r =>
+                    r.ProductId == product.Id && r.TenantId == product.TenantId && !r.IsDeleted
+                )
+                .Cast<IAuditableTenantEntity>()
+                .ToListAsync(cancellationToken)
+        );
+
+        dependents.AddRange(
+            await dbContext
+                .ProductDataLinks.IgnoreQueryFilters(["SoftDelete", "Tenant"])
+                .Where(d =>
+                    d.ProductId == product.Id && d.TenantId == product.TenantId && !d.IsDeleted
+                )
+                .Cast<IAuditableTenantEntity>()
+                .ToListAsync(cancellationToken)
+        );
+
+        return dependents;
     }
 }
