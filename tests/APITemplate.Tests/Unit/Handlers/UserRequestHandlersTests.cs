@@ -1,3 +1,4 @@
+using APITemplate.Application.Common.Events;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Features.User;
 using APITemplate.Application.Features.User.DTOs;
@@ -7,6 +8,7 @@ using APITemplate.Domain.Enums;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -19,6 +21,7 @@ public class UserRequestHandlersTests
     private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IPublisher> _publisherMock;
+    private readonly Mock<ILogger<UserRequestHandlers>> _loggerMock;
     private readonly UserRequestHandlers _sut;
 
     public UserRequestHandlersTests()
@@ -27,6 +30,7 @@ public class UserRequestHandlersTests
         _passwordHasherMock = new Mock<IPasswordHasher>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _publisherMock = new Mock<IPublisher>();
+        _loggerMock = new Mock<ILogger<UserRequestHandlers>>();
 
         _passwordHasherMock.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed_password");
 
@@ -34,7 +38,8 @@ public class UserRequestHandlersTests
             _repositoryMock.Object,
             _passwordHasherMock.Object,
             _unitOfWorkMock.Object,
-            _publisherMock.Object
+            _publisherMock.Object,
+            _loggerMock.Object
         );
     }
 
@@ -160,6 +165,10 @@ public class UserRequestHandlersTests
             Times.Once
         );
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _publisherMock.Verify(
+            p => p.Publish(It.IsAny<UserRegisteredNotification>(), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
     }
 
     [Fact]
@@ -368,6 +377,10 @@ public class UserRequestHandlersTests
         user.Role.ShouldBe(UserRole.PlatformAdmin);
         _repositoryMock.Verify(r => r.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _publisherMock.Verify(
+            p => p.Publish(It.IsAny<UserRoleChangedNotification>(), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
     }
 
     [Fact]

@@ -114,6 +114,7 @@ public sealed class TenantInvitationRequestHandlers
         {
             Id = Guid.NewGuid(),
             Email = command.Request.Email.Trim(),
+            NormalizedEmail = normalizedEmail,
             TokenHash = tokenHash,
             ExpiresAtUtc = _timeProvider
                 .GetUtcNow()

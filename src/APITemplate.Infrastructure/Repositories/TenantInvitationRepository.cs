@@ -27,7 +27,7 @@ public sealed class TenantInvitationRepository
         CancellationToken ct = default
     ) =>
         AppDb.TenantInvitations.AnyAsync(
-            i => i.Email.ToUpper() == normalizedEmail && i.Status == InvitationStatus.Pending,
+            i => i.NormalizedEmail == normalizedEmail && i.Status == InvitationStatus.Pending,
             ct
         );
 }

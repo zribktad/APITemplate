@@ -6,6 +6,7 @@ using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace APITemplate.Application.Features.User;
 
@@ -39,18 +40,21 @@ public sealed class UserRequestHandlers
     private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPublisher _publisher;
+    private readonly ILogger<UserRequestHandlers> _logger;
 
     public UserRequestHandlers(
         IUserRepository repository,
         IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
-        IPublisher publisher
+        IPublisher publisher,
+        ILogger<UserRequestHandlers> logger
     )
     {
         _repository = repository;
         _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
         _publisher = publisher;
+        _logger = logger;
     }
 
     public async Task<PagedResponse<UserResponse>> Handle(
@@ -90,10 +94,17 @@ public sealed class UserRequestHandlers
         await _repository.AddAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
 
-        await _publisher.Publish(
-            new UserRegisteredNotification(user.Id, user.Email, user.Username),
-            ct
-        );
+        try
+        {
+            await _publisher.Publish(
+                new UserRegisteredNotification(user.Id, user.Email, user.Username),
+                ct
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish UserRegisteredNotification for user {UserId}.", user.Id);
+        }
 
         return user.ToResponse();
     }
@@ -131,16 +142,23 @@ public sealed class UserRequestHandlers
         await _repository.UpdateAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
 
-        await _publisher.Publish(
-            new UserRoleChangedNotification(
-                user.Id,
-                user.Email,
-                user.Username,
-                oldRole,
-                command.Request.Role.ToString()
-            ),
-            ct
-        );
+        try
+        {
+            await _publisher.Publish(
+                new UserRoleChangedNotification(
+                    user.Id,
+                    user.Email,
+                    user.Username,
+                    oldRole,
+                    command.Request.Role.ToString()
+                ),
+                ct
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish UserRoleChangedNotification for user {UserId}.", user.Id);
+        }
     }
 
     public async Task Handle(DeleteUserCommand command, CancellationToken ct)
