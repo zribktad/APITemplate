@@ -92,6 +92,7 @@ public sealed class TenantRequestHandlers
             ct
         );
 
+        await _publisher.Publish(new TenantsChangedNotification(), ct);
         return tenant.ToResponse();
     }
 
@@ -113,5 +114,7 @@ public sealed class TenantRequestHandlers
             ),
             ct
         );
+
+        await _publisher.Publish(new TenantsChangedNotification(), ct);
     }
 }

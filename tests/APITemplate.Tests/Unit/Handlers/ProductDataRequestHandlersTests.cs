@@ -1,10 +1,11 @@
+using APITemplate.Application.Common.Context;
+using APITemplate.Application.Common.Resilience;
+using APITemplate.Application.Features.ProductData;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using APITemplate.Domain.Options;
-using APITemplate.Application.Common.Context;
-using APITemplate.Application.Common.Resilience;
-using APITemplate.Application.Features.ProductData;
+using MediatR;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Polly;
@@ -21,6 +22,7 @@ public class ProductDataRequestHandlersTests
     private readonly Mock<ITenantProvider> _tenantProviderMock;
     private readonly Mock<IActorProvider> _actorProviderMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IPublisher> _publisherMock;
     private readonly Mock<ILogger<ProductDataRequestHandlers>> _loggerMock;
     private readonly ProductDataRequestHandlers _sut;
     private readonly Guid _tenantId = Guid.NewGuid();
@@ -32,6 +34,7 @@ public class ProductDataRequestHandlersTests
         _tenantProviderMock = new Mock<ITenantProvider>();
         _actorProviderMock = new Mock<IActorProvider>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _publisherMock = new Mock<IPublisher>();
         _loggerMock = new Mock<ILogger<ProductDataRequestHandlers>>();
         _tenantProviderMock.SetupGet(x => x.TenantId).Returns(_tenantId);
         _actorProviderMock.SetupGet(x => x.ActorId).Returns(Guid.NewGuid());
@@ -46,9 +49,11 @@ public class ProductDataRequestHandlersTests
             _tenantProviderMock.Object,
             _actorProviderMock.Object,
             _unitOfWorkMock.Object,
+            _publisherMock.Object,
             TimeProvider.System,
             registry,
-            _loggerMock.Object);
+            _loggerMock.Object
+        );
     }
 
     [Fact]
@@ -57,8 +62,22 @@ public class ProductDataRequestHandlersTests
         var ct = TestContext.Current.CancellationToken;
         var items = new List<ProductData>
         {
-            new ImageProductData { Title = "Photo", Width = 1920, Height = 1080, Format = "jpg", FileSizeBytes = 500000 },
-            new VideoProductData { Title = "Clip", DurationSeconds = 30, Resolution = "1080p", Format = "mp4", FileSizeBytes = 5000000 }
+            new ImageProductData
+            {
+                Title = "Photo",
+                Width = 1920,
+                Height = 1080,
+                Format = "jpg",
+                FileSizeBytes = 500000,
+            },
+            new VideoProductData
+            {
+                Title = "Clip",
+                DurationSeconds = 30,
+                Resolution = "1080p",
+                Format = "mp4",
+                FileSizeBytes = 5000000,
+            },
         };
 
         _repositoryMock
@@ -78,13 +97,25 @@ public class ProductDataRequestHandlersTests
         var ct = TestContext.Current.CancellationToken;
         _repositoryMock
             .Setup(r => r.GetAllAsync("image", It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new ImageProductData { Title = "Photo", Width = 100, Height = 100, Format = "png", FileSizeBytes = 1000 }]);
+            .ReturnsAsync([
+                new ImageProductData
+                {
+                    Title = "Photo",
+                    Width = 100,
+                    Height = 100,
+                    Format = "png",
+                    FileSizeBytes = 1000,
+                },
+            ]);
 
         var result = await _sut.Handle(new GetProductDataQuery("image"), ct);
 
         result.Count.ShouldBe(1);
         result[0].Type.ShouldBe("image");
-        _repositoryMock.Verify(r => r.GetAllAsync("image", It.IsAny<CancellationToken>()), Times.Once);
+        _repositoryMock.Verify(
+            r => r.GetAllAsync("image", It.IsAny<CancellationToken>()),
+            Times.Once
+        );
     }
 
     [Fact]
@@ -111,7 +142,7 @@ public class ProductDataRequestHandlersTests
             Width = 800,
             Height = 600,
             Format = "jpg",
-            FileSizeBytes = 200000
+            FileSizeBytes = 200000,
         };
 
         _repositoryMock
@@ -146,7 +177,14 @@ public class ProductDataRequestHandlersTests
     public async Task CreateImageAsync_CreatesAndReturnsImageResponse()
     {
         var ct = TestContext.Current.CancellationToken;
-        var request = new CreateImageProductDataRequest("Banner", "A banner", 1920, 1080, "jpg", 500000);
+        var request = new CreateImageProductDataRequest(
+            "Banner",
+            "A banner",
+            1920,
+            1080,
+            "jpg",
+            500000
+        );
 
         _repositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<ImageProductData>(), It.IsAny<CancellationToken>()))
@@ -165,15 +203,27 @@ public class ProductDataRequestHandlersTests
         imageResult.FileSizeBytes.ShouldBe(500000);
 
         _repositoryMock.Verify(
-            r => r.CreateAsync(It.Is<ImageProductData>(e => e.Title == "Banner" && e.TenantId == _tenantId), It.IsAny<CancellationToken>()),
-            Times.Once);
+            r =>
+                r.CreateAsync(
+                    It.Is<ImageProductData>(e => e.Title == "Banner" && e.TenantId == _tenantId),
+                    It.IsAny<CancellationToken>()
+                ),
+            Times.Once
+        );
     }
 
     [Fact]
     public async Task CreateVideoAsync_CreatesAndReturnsVideoResponse()
     {
         var ct = TestContext.Current.CancellationToken;
-        var request = new CreateVideoProductDataRequest("Intro", null, 60, "1080p", "mp4", 10000000);
+        var request = new CreateVideoProductDataRequest(
+            "Intro",
+            null,
+            60,
+            "1080p",
+            "mp4",
+            10000000
+        );
 
         _repositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<VideoProductData>(), It.IsAny<CancellationToken>()))
@@ -192,8 +242,13 @@ public class ProductDataRequestHandlersTests
         videoResult.FileSizeBytes.ShouldBe(10000000);
 
         _repositoryMock.Verify(
-            r => r.CreateAsync(It.Is<VideoProductData>(e => e.Title == "Intro" && e.TenantId == _tenantId), It.IsAny<CancellationToken>()),
-            Times.Once);
+            r =>
+                r.CreateAsync(
+                    It.Is<VideoProductData>(e => e.Title == "Intro" && e.TenantId == _tenantId),
+                    It.IsAny<CancellationToken>()
+                ),
+            Times.Once
+        );
     }
 
     [Fact]
@@ -203,7 +258,12 @@ public class ProductDataRequestHandlersTests
             .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ProductData?)null);
 
-        await Should.ThrowAsync<NotFoundException>(() => _sut.Handle(new DeleteProductDataCommand(Guid.NewGuid()), TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<NotFoundException>(() =>
+            _sut.Handle(
+                new DeleteProductDataCommand(Guid.NewGuid()),
+                TestContext.Current.CancellationToken
+            )
+        );
     }
 
     [Fact]
@@ -212,19 +272,40 @@ public class ProductDataRequestHandlersTests
         var id = Guid.NewGuid();
         _repositoryMock
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ImageProductData { Id = id, TenantId = _tenantId, Title = "Image" });
+            .ReturnsAsync(
+                new ImageProductData
+                {
+                    Id = id,
+                    TenantId = _tenantId,
+                    Title = "Image",
+                }
+            );
 
         await _sut.Handle(new DeleteProductDataCommand(id), TestContext.Current.CancellationToken);
 
         _productDataLinkRepositoryMock.Verify(
             r => r.SoftDeleteActiveLinksForProductDataAsync(id, It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Once
+        );
         _repositoryMock.Verify(
-            r => r.SoftDeleteAsync(id, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+            r =>
+                r.SoftDeleteAsync(
+                    id,
+                    It.IsAny<Guid>(),
+                    It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()
+                ),
+            Times.Once
+        );
         _unitOfWorkMock.Verify(
-            u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<CancellationToken>(), It.IsAny<TransactionOptions?>()),
-            Times.Once);
+            u =>
+                u.ExecuteInTransactionAsync(
+                    It.IsAny<Func<Task>>(),
+                    It.IsAny<CancellationToken>(),
+                    It.IsAny<TransactionOptions?>()
+                ),
+            Times.Once
+        );
     }
 
     [Fact]
@@ -233,23 +314,44 @@ public class ProductDataRequestHandlersTests
         var id = Guid.NewGuid();
         _repositoryMock
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ImageProductData { Id = id, TenantId = _tenantId, Title = "Image" });
+            .ReturnsAsync(
+                new ImageProductData
+                {
+                    Id = id,
+                    TenantId = _tenantId,
+                    Title = "Image",
+                }
+            );
         _repositoryMock
-            .Setup(r => r.SoftDeleteAsync(id, It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .Setup(r =>
+                r.SoftDeleteAsync(
+                    id,
+                    It.IsAny<Guid>(),
+                    It.IsAny<DateTime>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
             .ThrowsAsync(new InvalidOperationException("mongo failed"));
 
-        var act = () => _sut.Handle(new DeleteProductDataCommand(id), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(new DeleteProductDataCommand(id), TestContext.Current.CancellationToken);
 
         var ex = await Should.ThrowAsync<InvalidOperationException>(act);
 
         ex.Message.ShouldBe("mongo failed");
         _loggerMock.Verify(
-            logger => logger.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("Failed to soft-delete ProductData document")),
-                It.IsAny<InvalidOperationException>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            Times.Once);
+            logger =>
+                logger.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>(
+                        (state, _) =>
+                            state.ToString()!.Contains("Failed to soft-delete ProductData document")
+                    ),
+                    It.IsAny<InvalidOperationException>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()
+                ),
+            Times.Once
+        );
     }
 }

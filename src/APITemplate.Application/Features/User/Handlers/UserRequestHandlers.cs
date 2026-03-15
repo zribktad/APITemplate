@@ -73,7 +73,8 @@ public sealed class UserRequestHandlers
             await itemsTask,
             await countTask,
             request.Filter.PageNumber,
-            request.Filter.PageSize);
+            request.Filter.PageSize
+        );
     }
 
     public async Task<UserResponse?> Handle(GetUserByIdQuery request, CancellationToken ct) =>
@@ -83,7 +84,8 @@ public sealed class UserRequestHandlers
     {
         await Task.WhenAll(
             ValidateEmailUniqueAsync(command.Request.Email, ct),
-            ValidateUsernameUniqueAsync(command.Request.Username, ct));
+            ValidateUsernameUniqueAsync(command.Request.Username, ct)
+        );
 
         var keycloakUserId = await _keycloakAdmin.CreateUserAsync(
             command.Request.Username,
@@ -113,21 +115,34 @@ public sealed class UserRequestHandlers
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "Failed to publish UserRegisteredNotification for user {UserId}.", user.Id);
+                _logger.LogWarning(
+                    ex,
+                    "Failed to publish UserRegisteredNotification for user {UserId}.",
+                    user.Id
+                );
             }
 
+            await _publisher.Publish(new UsersChangedNotification(), ct);
             return user.ToResponse();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "DB save failed after creating Keycloak user {KeycloakUserId}. Attempting compensating delete.", keycloakUserId);
+            _logger.LogError(
+                ex,
+                "DB save failed after creating Keycloak user {KeycloakUserId}. Attempting compensating delete.",
+                keycloakUserId
+            );
             try
             {
                 await _keycloakAdmin.DeleteUserAsync(keycloakUserId, CancellationToken.None);
             }
             catch (Exception compensationEx)
             {
-                _logger.LogError(compensationEx, "Compensating Keycloak delete failed for user {KeycloakUserId}. Manual cleanup required.", keycloakUserId);
+                _logger.LogError(
+                    compensationEx,
+                    "Compensating Keycloak delete failed for user {KeycloakUserId}. Manual cleanup required.",
+                    keycloakUserId
+                );
             }
             throw;
         }
@@ -149,6 +164,8 @@ public sealed class UserRequestHandlers
 
         await _repository.UpdateAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new UsersChangedNotification(), ct);
     }
 
     public async Task Handle(ActivateUserCommand command, CancellationToken ct)
@@ -161,6 +178,8 @@ public sealed class UserRequestHandlers
         user.IsActive = true;
         await _repository.UpdateAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new UsersChangedNotification(), ct);
     }
 
     public async Task Handle(DeactivateUserCommand command, CancellationToken ct)
@@ -173,6 +192,8 @@ public sealed class UserRequestHandlers
         user.IsActive = false;
         await _repository.UpdateAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new UsersChangedNotification(), ct);
     }
 
     public async Task Handle(ChangeUserRoleCommand command, CancellationToken ct)
@@ -199,8 +220,14 @@ public sealed class UserRequestHandlers
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to publish UserRoleChangedNotification for user {UserId}.", user.Id);
+            _logger.LogWarning(
+                ex,
+                "Failed to publish UserRoleChangedNotification for user {UserId}.",
+                user.Id
+            );
         }
+
+        await _publisher.Publish(new UsersChangedNotification(), ct);
     }
 
     public async Task Handle(DeleteUserCommand command, CancellationToken ct)
@@ -215,6 +242,8 @@ public sealed class UserRequestHandlers
 
         await _repository.DeleteAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new UsersChangedNotification(), ct);
     }
 
     public async Task Handle(KeycloakPasswordResetCommand command, CancellationToken ct)
@@ -230,7 +259,11 @@ public sealed class UserRequestHandlers
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to send password reset email for user {UserId}.", user.Id);
+            _logger.LogWarning(
+                ex,
+                "Failed to send password reset email for user {UserId}.",
+                user.Id
+            );
         }
     }
 

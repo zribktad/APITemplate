@@ -1,8 +1,10 @@
 using APITemplate.Api.Authorization;
+using APITemplate.Api.Cache;
 using APITemplate.Application.Common.Security;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace APITemplate.Api.Controllers.V1;
 
@@ -20,6 +22,7 @@ public sealed class TenantsController : ControllerBase
 
     [HttpGet]
     [RequirePermission(Permission.Tenants.Read)]
+    [OutputCache(PolicyName = CachePolicyNames.Tenants)]
     public async Task<ActionResult<PagedResponse<TenantResponse>>> GetAll(
         [FromQuery] TenantFilter filter,
         CancellationToken ct
@@ -31,6 +34,7 @@ public sealed class TenantsController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [RequirePermission(Permission.Tenants.Read)]
+    [OutputCache(PolicyName = CachePolicyNames.Tenants)]
     public async Task<ActionResult<TenantResponse>> GetById(Guid id, CancellationToken ct)
     {
         var tenant = await _sender.Send(new GetTenantByIdQuery(id), ct);

@@ -267,6 +267,52 @@ public static class ApiServiceCollectionExtensions
                                 )
                                 .Tag(CachePolicyNames.Reviews)
                     );
+
+                    options.AddPolicy(
+                        CachePolicyNames.ProductData,
+                        builder =>
+                            builder
+                                .AddPolicy<TenantAwareOutputCachePolicy>()
+                                .Expire(
+                                    TimeSpan.FromSeconds(
+                                        cachingOptions.ProductDataExpirationSeconds
+                                    )
+                                )
+                                .Tag(CachePolicyNames.ProductData)
+                    );
+
+                    options.AddPolicy(
+                        CachePolicyNames.Tenants,
+                        builder =>
+                            builder
+                                .AddPolicy<TenantAwareOutputCachePolicy>()
+                                .Expire(
+                                    TimeSpan.FromSeconds(cachingOptions.TenantsExpirationSeconds)
+                                )
+                                .Tag(CachePolicyNames.Tenants)
+                    );
+
+                    options.AddPolicy(
+                        CachePolicyNames.TenantInvitations,
+                        builder =>
+                            builder
+                                .AddPolicy<TenantAwareOutputCachePolicy>()
+                                .Expire(
+                                    TimeSpan.FromSeconds(
+                                        cachingOptions.TenantInvitationsExpirationSeconds
+                                    )
+                                )
+                                .Tag(CachePolicyNames.TenantInvitations)
+                    );
+
+                    options.AddPolicy(
+                        CachePolicyNames.Users,
+                        builder =>
+                            builder
+                                .AddPolicy<TenantAwareOutputCachePolicy>()
+                                .Expire(TimeSpan.FromSeconds(cachingOptions.UsersExpirationSeconds))
+                                .Tag(CachePolicyNames.Users)
+                    );
                 }
             );
         });

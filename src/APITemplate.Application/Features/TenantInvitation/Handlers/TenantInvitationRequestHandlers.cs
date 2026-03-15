@@ -142,9 +142,14 @@ public sealed class TenantInvitationRequestHandlers
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.", invitation.Id);
+            _logger.LogWarning(
+                ex,
+                "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.",
+                invitation.Id
+            );
         }
 
+        await _publisher.Publish(new TenantInvitationsChangedNotification(), ct);
         return invitation.ToResponse();
     }
 
@@ -175,6 +180,8 @@ public sealed class TenantInvitationRequestHandlers
         invitation.Status = InvitationStatus.Accepted;
         await _invitationRepository.UpdateAsync(invitation, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new TenantInvitationsChangedNotification(), ct);
     }
 
     public async Task Handle(RevokeTenantInvitationCommand command, CancellationToken ct)
@@ -190,6 +197,8 @@ public sealed class TenantInvitationRequestHandlers
         invitation.Status = InvitationStatus.Revoked;
         await _invitationRepository.UpdateAsync(invitation, ct);
         await _unitOfWork.CommitAsync(ct);
+
+        await _publisher.Publish(new TenantInvitationsChangedNotification(), ct);
     }
 
     public async Task Handle(ResendTenantInvitationCommand command, CancellationToken ct)
@@ -244,7 +253,13 @@ public sealed class TenantInvitationRequestHandlers
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.", invitation.Id);
+            _logger.LogWarning(
+                ex,
+                "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.",
+                invitation.Id
+            );
         }
+
+        await _publisher.Publish(new TenantInvitationsChangedNotification(), ct);
     }
 }

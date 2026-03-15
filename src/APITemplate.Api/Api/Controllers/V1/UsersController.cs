@@ -27,6 +27,7 @@ public sealed class UsersController : ControllerBase
 
     [HttpGet]
     [RequirePermission(Permission.Users.Read)]
+    [OutputCache(PolicyName = CachePolicyNames.Users)]
     public async Task<ActionResult<PagedResponse<UserResponse>>> GetAll(
         [FromQuery] UserFilter filter,
         CancellationToken ct
@@ -38,6 +39,7 @@ public sealed class UsersController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [RequirePermission(Permission.Users.Read)]
+    [OutputCache(PolicyName = CachePolicyNames.Users)]
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken ct)
     {
         var user = await _sender.Send(new GetUserByIdQuery(id), ct);

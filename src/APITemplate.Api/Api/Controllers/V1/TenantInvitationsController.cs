@@ -1,4 +1,5 @@
 using APITemplate.Api.Authorization;
+using APITemplate.Api.Cache;
 using APITemplate.Application.Common.DTOs;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Features.TenantInvitation;
@@ -7,6 +8,7 @@ using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace APITemplate.Api.Controllers.V1;
 
@@ -24,6 +26,7 @@ public sealed class TenantInvitationsController : ControllerBase
 
     [HttpGet]
     [RequirePermission(Permission.Invitations.Read)]
+    [OutputCache(PolicyName = CachePolicyNames.TenantInvitations)]
     public async Task<ActionResult<PagedResponse<TenantInvitationResponse>>> GetAll(
         [FromQuery] TenantInvitationFilter filter,
         CancellationToken ct
