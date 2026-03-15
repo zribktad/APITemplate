@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
 using APITemplate.Infrastructure.Observability;
@@ -96,11 +95,13 @@ public static class CookieSessionRefresher
         return !string.IsNullOrEmpty(refreshToken);
     }
 
-    private static async Task<TokenResponse?> TryRefreshSessionAsync(
+    private static async Task<KeycloakTokenResponse?> TryRefreshSessionAsync(
         CookieValidatePrincipalContext context,
         RefreshRequest refreshRequest)
     {
-        var tokenEndpoint = BuildTokenEndpoint(refreshRequest.KeycloakOptions);
+        var tokenEndpoint = KeycloakUrlHelper.BuildTokenEndpoint(
+            refreshRequest.KeycloakOptions.AuthServerUrl,
+            refreshRequest.KeycloakOptions.Realm);
         using var client = CreateTokenClient(context);
 
         try
@@ -117,7 +118,7 @@ public static class CookieSessionRefresher
                 return null;
             }
 
-            return await response.Content.ReadFromJsonAsync<TokenResponse>(context.HttpContext.RequestAborted);
+            return await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>(context.HttpContext.RequestAborted);
         }
         catch (Exception ex)
         {
@@ -152,11 +153,6 @@ public static class CookieSessionRefresher
             .GetRequiredService<IOptions<KeycloakOptions>>().Value;
     }
 
-    private static string BuildTokenEndpoint(KeycloakOptions keycloakOptions)
-    {
-        var authority = KeycloakUrlHelper.BuildAuthority(keycloakOptions.AuthServerUrl, keycloakOptions.Realm);
-        return $"{authority.TrimEnd('/')}/{AuthConstants.OpenIdConnect.TokenEndpointPath}";
-    }
 
     private static FormUrlEncodedContent BuildRefreshRequestContent(
         KeycloakOptions keycloakOptions,
@@ -177,7 +173,7 @@ public static class CookieSessionRefresher
 
     private static void ApplyRefreshedSession(
         CookieValidatePrincipalContext context,
-        TokenResponse tokenResponse,
+        KeycloakTokenResponse tokenResponse,
         string refreshToken)
     {
         context.Properties.UpdateTokenValue(AuthConstants.CookieTokenNames.AccessToken, tokenResponse.AccessToken);
@@ -196,10 +192,6 @@ public static class CookieSessionRefresher
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(nameof(CookieSessionRefresher));
     }
-    private sealed record TokenResponse(
-        [property: JsonPropertyName(AuthConstants.CookieTokenNames.AccessToken)] string AccessToken,
-        [property: JsonPropertyName(AuthConstants.CookieTokenNames.RefreshToken)] string? RefreshToken,
-        [property: JsonPropertyName(AuthConstants.CookieTokenNames.ExpiresIn)] int ExpiresIn);
 
     private readonly record struct RefreshRequest(
         KeycloakOptions KeycloakOptions,

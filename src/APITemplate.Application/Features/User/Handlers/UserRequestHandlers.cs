@@ -66,17 +66,14 @@ public sealed class UserRequestHandlers
         CancellationToken ct
     )
     {
-        var items = await _repository.ListAsync(new UserFilterSpecification(request.Filter), ct);
-        var totalCount = await _repository.CountAsync(
-            new UserCountSpecification(request.Filter),
-            ct
-        );
+        var itemsTask = _repository.ListAsync(new UserFilterSpecification(request.Filter), ct);
+        var countTask = _repository.CountAsync(new UserCountSpecification(request.Filter), ct);
+
         return new PagedResponse<UserResponse>(
-            items,
-            totalCount,
+            await itemsTask,
+            await countTask,
             request.Filter.PageNumber,
-            request.Filter.PageSize
-        );
+            request.Filter.PageSize);
     }
 
     public async Task<UserResponse?> Handle(GetUserByIdQuery request, CancellationToken ct) =>
@@ -84,8 +81,9 @@ public sealed class UserRequestHandlers
 
     public async Task<UserResponse> Handle(CreateUserCommand command, CancellationToken ct)
     {
-        await ValidateEmailUniqueAsync(command.Request.Email, ct);
-        await ValidateUsernameUniqueAsync(command.Request.Username, ct);
+        await Task.WhenAll(
+            ValidateEmailUniqueAsync(command.Request.Email, ct),
+            ValidateUsernameUniqueAsync(command.Request.Username, ct));
 
         var keycloakUserId = await _keycloakAdmin.CreateUserAsync(
             command.Request.Username,

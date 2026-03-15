@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
 using Microsoft.Extensions.Logging;
@@ -61,10 +60,10 @@ public sealed class KeycloakAdminTokenProvider : IDisposable
         }
     }
 
-    private async Task<TokenResponse> FetchTokenAsync(CancellationToken cancellationToken)
+    private async Task<KeycloakTokenResponse> FetchTokenAsync(CancellationToken cancellationToken)
     {
         var keycloak = _keycloakOptions.Value;
-        var tokenEndpoint = BuildTokenEndpoint(keycloak);
+        var tokenEndpoint = KeycloakUrlHelper.BuildTokenEndpoint(keycloak.AuthServerUrl, keycloak.Realm);
 
         using var client = _httpClientFactory.CreateClient(AuthConstants.HttpClients.KeycloakToken);
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -86,24 +85,16 @@ public sealed class KeycloakAdminTokenProvider : IDisposable
             response.EnsureSuccessStatusCode(); // throws
         }
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken)
+        var token = await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Keycloak token endpoint returned empty body.");
 
         return token;
     }
 
-    private static string BuildTokenEndpoint(KeycloakOptions keycloak)
-    {
-        var authority = KeycloakUrlHelper.BuildAuthority(keycloak.AuthServerUrl, keycloak.Realm);
-        return $"{authority.TrimEnd('/')}/{AuthConstants.OpenIdConnect.TokenEndpointPath}";
-    }
 
     private bool IsTokenValid() =>
         _cachedToken is not null && DateTimeOffset.UtcNow < _tokenExpiresAt - ExpiryMargin;
 
     public void Dispose() => _lock.Dispose();
 
-    private sealed record TokenResponse(
-        [property: JsonPropertyName("access_token")] string AccessToken,
-        [property: JsonPropertyName("expires_in")] int ExpiresIn);
 }
