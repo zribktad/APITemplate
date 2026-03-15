@@ -23,8 +23,8 @@ public sealed class PostgresTenantIsolationTests(SharedPostgresContainer postgre
         var tenantB = new Tenant { Id = Guid.NewGuid(), Code = $"tenant-b-{Guid.NewGuid():N}", Name = "Tenant B" };
         var categoryA = new Category { Id = Guid.NewGuid(), TenantId = tenantA.Id, Name = $"Category-A-{Guid.NewGuid():N}" };
         var categoryB = new Category { Id = Guid.NewGuid(), TenantId = tenantB.Id, Name = $"Category-B-{Guid.NewGuid():N}" };
-        var userA = new AppUser { Id = Guid.NewGuid(), TenantId = tenantA.Id, Username = $"usera-{Guid.NewGuid():N}", Email = $"a-{Guid.NewGuid():N}@example.com", PasswordHash = "hash" };
-        var userB = new AppUser { Id = Guid.NewGuid(), TenantId = tenantB.Id, Username = $"userb-{Guid.NewGuid():N}", Email = $"b-{Guid.NewGuid():N}@example.com", PasswordHash = "hash" };
+        var userA = new AppUser { Id = Guid.NewGuid(), TenantId = tenantA.Id, Username = $"usera-{Guid.NewGuid():N}", Email = $"a-{Guid.NewGuid():N}@example.com" };
+        var userB = new AppUser { Id = Guid.NewGuid(), TenantId = tenantB.Id, Username = $"userb-{Guid.NewGuid():N}", Email = $"b-{Guid.NewGuid():N}@example.com" };
         var productA = new Product { Id = Guid.NewGuid(), TenantId = tenantA.Id, Name = $"Product-A-{Guid.NewGuid():N}", Price = 10m, CategoryId = categoryA.Id };
         var productB = new Product { Id = Guid.NewGuid(), TenantId = tenantB.Id, Name = $"Product-B-{Guid.NewGuid():N}", Price = 20m, CategoryId = categoryB.Id };
         var reviewA = new ProductReview { Id = Guid.NewGuid(), TenantId = tenantA.Id, ProductId = productA.Id, UserId = userA.Id, Rating = 5 };
@@ -78,14 +78,12 @@ public sealed class PostgresTenantIsolationTests(SharedPostgresContainer postgre
             _factory.Services,
             usernameA,
             $"{usernameA}@example.com",
-            "pass-a",
             ct: ct);
 
         var (tenantB, userB) = await IntegrationAuthHelper.SeedTenantUserAsync(
             _factory.Services,
             usernameB,
             $"{usernameB}@example.com",
-            "pass-b",
             ct: ct);
 
         Guid categoryAId;
@@ -222,7 +220,6 @@ public sealed class PostgresTenantIsolationTests(SharedPostgresContainer postgre
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-smoke",
             ct: ct);
 
         Guid categoryId;

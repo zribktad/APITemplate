@@ -26,7 +26,6 @@ public class UsersControllerTests : IClassFixture<CustomWebApplicationFactory>
             _factory.Services,
             username: "regular-user",
             email: "regular-user@example.com",
-            password: "Password1!",
             ct: ct);
 
         IntegrationAuthHelper.Authenticate(_client, user.Id, tenant.Id, user.Username, UserRole.User);

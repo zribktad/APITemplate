@@ -9,7 +9,6 @@ public sealed class EmailOptions
     public string SenderName { get; set; } = string.Empty;
     public string? Username { get; set; }
     public string? Password { get; set; }
-    public int PasswordResetTokenExpiryMinutes { get; set; } = 60;
     public int InvitationTokenExpiryHours { get; set; } = 72;
     public string BaseUrl { get; set; } = string.Empty;
     public int MaxRetryAttempts { get; set; } = 3;

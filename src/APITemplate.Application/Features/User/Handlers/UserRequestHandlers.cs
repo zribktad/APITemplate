@@ -1,5 +1,6 @@
 using APITemplate.Application.Common.Events;
 using APITemplate.Application.Common.Security;
+using APITemplate.Application.Features.User.DTOs;
 using APITemplate.Application.Features.User.Mappings;
 using APITemplate.Application.Features.User.Specifications;
 using APITemplate.Domain.Entities;
@@ -26,6 +27,8 @@ public sealed record ChangeUserRoleCommand(Guid Id, ChangeUserRoleRequest Reques
 
 public sealed record DeleteUserCommand(Guid Id) : IRequest;
 
+public sealed record KeycloakPasswordResetCommand(RequestPasswordResetRequest Request) : IRequest;
+
 public sealed class UserRequestHandlers
     : IRequestHandler<GetUsersQuery, PagedResponse<UserResponse>>,
         IRequestHandler<GetUserByIdQuery, UserResponse?>,
@@ -34,27 +37,28 @@ public sealed class UserRequestHandlers
         IRequestHandler<ActivateUserCommand>,
         IRequestHandler<DeactivateUserCommand>,
         IRequestHandler<ChangeUserRoleCommand>,
-        IRequestHandler<DeleteUserCommand>
+        IRequestHandler<DeleteUserCommand>,
+        IRequestHandler<KeycloakPasswordResetCommand>
 {
     private readonly IUserRepository _repository;
-    private readonly IPasswordHasher _passwordHasher;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPublisher _publisher;
     private readonly ILogger<UserRequestHandlers> _logger;
+    private readonly IKeycloakAdminService _keycloakAdmin;
 
     public UserRequestHandlers(
         IUserRepository repository,
-        IPasswordHasher passwordHasher,
         IUnitOfWork unitOfWork,
         IPublisher publisher,
-        ILogger<UserRequestHandlers> logger
+        ILogger<UserRequestHandlers> logger,
+        IKeycloakAdminService keycloakAdmin
     )
     {
         _repository = repository;
-        _passwordHasher = passwordHasher;
         _unitOfWork = unitOfWork;
         _publisher = publisher;
         _logger = logger;
+        _keycloakAdmin = keycloakAdmin;
     }
 
     public async Task<PagedResponse<UserResponse>> Handle(
@@ -83,30 +87,52 @@ public sealed class UserRequestHandlers
         await ValidateEmailUniqueAsync(command.Request.Email, ct);
         await ValidateUsernameUniqueAsync(command.Request.Username, ct);
 
-        var user = new AppUser
-        {
-            Id = Guid.NewGuid(),
-            Username = command.Request.Username,
-            Email = command.Request.Email,
-            PasswordHash = _passwordHasher.Hash(command.Request.Password),
-        };
-
-        await _repository.AddAsync(user, ct);
-        await _unitOfWork.CommitAsync(ct);
+        var keycloakUserId = await _keycloakAdmin.CreateUserAsync(
+            command.Request.Username,
+            command.Request.Email,
+            ct
+        );
 
         try
         {
-            await _publisher.Publish(
-                new UserRegisteredNotification(user.Id, user.Email, user.Username),
-                ct
-            );
+            var user = new AppUser
+            {
+                Id = Guid.NewGuid(),
+                Username = command.Request.Username,
+                Email = command.Request.Email,
+                KeycloakUserId = keycloakUserId,
+            };
+
+            await _repository.AddAsync(user, ct);
+            await _unitOfWork.CommitAsync(ct);
+
+            try
+            {
+                await _publisher.Publish(
+                    new UserRegisteredNotification(user.Id, user.Email, user.Username),
+                    ct
+                );
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Failed to publish UserRegisteredNotification for user {UserId}.", user.Id);
+            }
+
+            return user.ToResponse();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "Failed to publish UserRegisteredNotification for user {UserId}.", user.Id);
+            _logger.LogError(ex, "DB save failed after creating Keycloak user {KeycloakUserId}. Attempting compensating delete.", keycloakUserId);
+            try
+            {
+                await _keycloakAdmin.DeleteUserAsync(keycloakUserId, ct);
+            }
+            catch (Exception compensationEx)
+            {
+                _logger.LogError(compensationEx, "Compensating Keycloak delete failed for user {KeycloakUserId}. Manual cleanup required.", keycloakUserId);
+            }
+            throw;
         }
-
-        return user.ToResponse();
     }
 
     public async Task Handle(UpdateUserCommand command, CancellationToken ct)
@@ -127,11 +153,29 @@ public sealed class UserRequestHandlers
         await _unitOfWork.CommitAsync(ct);
     }
 
-    public async Task Handle(ActivateUserCommand command, CancellationToken ct) =>
-        await UpdateUserAsync(command.Id, user => user.IsActive = true, ct);
+    public async Task Handle(ActivateUserCommand command, CancellationToken ct)
+    {
+        var user = await GetUserOrThrowAsync(command.Id, ct);
 
-    public async Task Handle(DeactivateUserCommand command, CancellationToken ct) =>
-        await UpdateUserAsync(command.Id, user => user.IsActive = false, ct);
+        if (user.KeycloakUserId is not null)
+            await _keycloakAdmin.SetUserEnabledAsync(user.KeycloakUserId, true, ct);
+
+        user.IsActive = true;
+        await _repository.UpdateAsync(user, ct);
+        await _unitOfWork.CommitAsync(ct);
+    }
+
+    public async Task Handle(DeactivateUserCommand command, CancellationToken ct)
+    {
+        var user = await GetUserOrThrowAsync(command.Id, ct);
+
+        if (user.KeycloakUserId is not null)
+            await _keycloakAdmin.SetUserEnabledAsync(user.KeycloakUserId, false, ct);
+
+        user.IsActive = false;
+        await _repository.UpdateAsync(user, ct);
+        await _unitOfWork.CommitAsync(ct);
+    }
 
     public async Task Handle(ChangeUserRoleCommand command, CancellationToken ct)
     {
@@ -164,22 +208,38 @@ public sealed class UserRequestHandlers
     public async Task Handle(DeleteUserCommand command, CancellationToken ct)
     {
         var user = await GetUserOrThrowAsync(command.Id, ct);
+
+        // Keycloak-first delete: if this succeeds but CommitAsync fails, the user no longer
+        // exists in Keycloak. On retry, DeleteUserAsync should tolerate a 404 (already deleted).
+        // See KeycloakAdminService.DeleteUserAsync — it propagates HttpRequestException for non-2xx.
+        if (user.KeycloakUserId is not null)
+            await _keycloakAdmin.DeleteUserAsync(user.KeycloakUserId, ct);
+
         await _repository.DeleteAsync(user, ct);
         await _unitOfWork.CommitAsync(ct);
+    }
+
+    public async Task Handle(KeycloakPasswordResetCommand command, CancellationToken ct)
+    {
+        var user = await _repository.FindByEmailAsync(command.Request.Email, ct);
+
+        if (user is null || user.KeycloakUserId is null)
+            return;
+
+        try
+        {
+            await _keycloakAdmin.SendPasswordResetEmailAsync(user.KeycloakUserId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to send password reset email for user {UserId}.", user.Id);
+        }
     }
 
     private async Task<AppUser> GetUserOrThrowAsync(Guid id, CancellationToken ct)
     {
         return await _repository.GetByIdAsync(id, ct)
             ?? throw new NotFoundException(nameof(AppUser), id, ErrorCatalog.Users.NotFound);
-    }
-
-    private async Task UpdateUserAsync(Guid id, Action<AppUser> applyUpdate, CancellationToken ct)
-    {
-        var user = await GetUserOrThrowAsync(id, ct);
-        applyUpdate(user);
-        await _repository.UpdateAsync(user, ct);
-        await _unitOfWork.CommitAsync(ct);
     }
 
     private async Task ValidateEmailUniqueAsync(string email, CancellationToken ct)

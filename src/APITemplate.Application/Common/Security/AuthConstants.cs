@@ -8,6 +8,7 @@ public static class AuthConstants
     public static class HttpClients
     {
         public const string KeycloakToken = "KeycloakTokenClient";
+        public const string KeycloakAdmin = "KeycloakAdminClient";
     }
 
     public static class OpenIdConnect

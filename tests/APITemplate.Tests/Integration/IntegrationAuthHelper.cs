@@ -2,11 +2,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using APITemplate.Application.Common.Security;
 using APITemplate.Domain.Entities;
 using APITemplate.Domain.Enums;
 using APITemplate.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
@@ -81,7 +79,6 @@ internal static class IntegrationAuthHelper
         IServiceProvider services,
         string username,
         string email,
-        string password,
         bool userIsActive = true,
         bool tenantIsActive = true,
         CancellationToken ct = default)
@@ -102,15 +99,12 @@ internal static class IntegrationAuthHelper
         {
             Id = Guid.NewGuid(),
             TenantId = tenant.Id,
+            KeycloakUserId = $"kc-{Guid.NewGuid():N}",
             Username = username,
             Email = email,
-            PasswordHash = string.Empty,
             IsActive = userIsActive,
             Role = UserRole.User
         };
-
-        var hasher = new PasswordHasher<AppUser>();
-        user.PasswordHash = hasher.HashPassword(user, password);
 
         dbContext.Tenants.Add(tenant);
         dbContext.Users.Add(user);

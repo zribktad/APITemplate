@@ -24,6 +24,7 @@ try
     builder.Services.AddEmailServices(builder.Configuration); // Register email sending infrastructure (SMTP, templates, queue, background service).
     builder.Services.AddMongoDB(builder.Configuration); // Register Mongo context/services + Mongo health checks.
     builder.Services.AddKeycloakBffAuthentication(builder.Configuration, builder.Environment); // Register Keycloak hybrid JWT + BFF authentication.
+    builder.Services.AddKeycloakAdminService(); // Register Keycloak Admin API client for user management.
     builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.
     builder.Services.AddGraphQLConfiguration(); // Register GraphQL schema and server services.
 

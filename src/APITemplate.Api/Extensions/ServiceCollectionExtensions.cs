@@ -1,9 +1,8 @@
 using APITemplate.Application.Common.Context;
 using APITemplate.Application.Common.Behaviors;
-using APITemplate.Application.Common.Security;
 using APITemplate.Api.Cache;
-using APITemplate.Application.Features.Product;
 using APITemplate.Infrastructure.Security;
+using APITemplate.Application.Features.Product;
 using APITemplate.Application.Features.Product.Validation;
 using Asp.Versioning;
 using FluentValidation;
@@ -18,8 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ITenantProvider, HttpTenantProvider>();
         services.AddScoped<IActorProvider, HttpActorProvider>();
-        services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
-        services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
+services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<CreateProductCommand>();

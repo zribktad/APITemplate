@@ -39,7 +39,6 @@ public sealed class PostgresTenantSoftDeleteCascadeTests(SharedPostgresContainer
             TenantId = tenantId,
             Username = $"user-tnt-{Guid.NewGuid():N}",
             Email = $"tnt-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
         };
         var category = new Category
         {

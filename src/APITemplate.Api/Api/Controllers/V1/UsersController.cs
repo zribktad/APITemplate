@@ -3,6 +3,7 @@ using System.Security.Claims;
 using APITemplate.Api.Authorization;
 using APITemplate.Application.Common.DTOs;
 using APITemplate.Application.Common.Security;
+using APITemplate.Application.Features.User.DTOs;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -100,5 +101,14 @@ public sealed class UsersController : ControllerBase
     {
         await _sender.Send(new DeleteUserCommand(id), ct);
         return NoContent();
+    }
+
+    [HttpPost("password-reset")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RequestPasswordReset(
+        RequestPasswordResetRequest request, CancellationToken ct)
+    {
+        await _sender.Send(new KeycloakPasswordResetCommand(request), ct);
+        return Ok();
     }
 }

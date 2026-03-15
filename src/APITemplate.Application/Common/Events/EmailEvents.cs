@@ -12,9 +12,6 @@ public sealed record TenantInvitationCreatedNotification(
     string Token
 ) : INotification;
 
-public sealed record PasswordResetRequestedNotification(string Email, string Username, string Token)
-    : INotification;
-
 public sealed record UserRoleChangedNotification(
     Guid UserId,
     string Email,

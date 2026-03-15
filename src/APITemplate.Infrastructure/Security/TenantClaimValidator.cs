@@ -24,11 +24,14 @@ public static class TenantClaimValidator
     /// </summary>
     /// <param name="context">The JWT token validation context.</param>
     /// <returns>A completed task.</returns>
-    public static Task OnTokenValidated(JwtTokenValidatedContext context)
+    public static async Task OnTokenValidated(JwtTokenValidatedContext context)
     {
         var identity = context.Principal?.Identity as ClaimsIdentity;
         if (identity != null)
             KeycloakClaimMapper.MapKeycloakClaims(identity);
+
+        if (!IsServiceAccount(context.Principal))
+            await TryProvisionUserAsync(context.HttpContext, context.Principal);
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
@@ -37,8 +40,6 @@ public static class TenantClaimValidator
         }
 
         LogTokenValidated(context.HttpContext, context.Principal, JwtBearerDefaults.AuthenticationScheme);
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -47,11 +48,14 @@ public static class TenantClaimValidator
     /// </summary>
     /// <param name="context">The OIDC token validation context.</param>
     /// <returns>A completed task.</returns>
-    public static Task OnTokenValidated(OidcTokenValidatedContext context)
+    public static async Task OnTokenValidated(OidcTokenValidatedContext context)
     {
         var identity = context.Principal?.Identity as ClaimsIdentity;
         if (identity != null)
             KeycloakClaimMapper.MapKeycloakClaims(identity);
+
+        if (!IsServiceAccount(context.Principal))
+            await TryProvisionUserAsync(context.HttpContext, context.Principal);
 
         if (!HasValidTenantClaim(context.Principal) && !IsServiceAccount(context.Principal))
         {
@@ -60,8 +64,6 @@ public static class TenantClaimValidator
         }
 
         LogTokenValidated(context.HttpContext, context.Principal, OpenIdConnectDefaults.AuthenticationScheme);
-
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -75,6 +77,32 @@ public static class TenantClaimValidator
             c => c.Type == CustomClaimTypes.TenantId
                  && Guid.TryParse(c.Value, out var tenantId)
                  && tenantId != Guid.Empty) == true;
+    }
+
+    private static async Task TryProvisionUserAsync(HttpContext httpContext, ClaimsPrincipal? principal)
+    {
+        try
+        {
+            var sub = principal?.FindFirstValue(AuthConstants.Claims.Subject);
+            var email = principal?.FindFirstValue(ClaimTypes.Email);
+            var username = principal?.FindFirstValue(AuthConstants.Claims.PreferredUsername);
+
+            if (string.IsNullOrEmpty(sub) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(username))
+                return;
+
+            var provisioningService = httpContext.RequestServices
+                .GetRequiredService<IUserProvisioningService>();
+
+            await provisioningService.ProvisionIfNeededAsync(sub, email, username);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var logger = httpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger(typeof(TenantClaimValidator));
+
+            logger.UserProvisioningFailed(ex);
+        }
     }
 
     private static bool IsServiceAccount(ClaimsPrincipal? principal)

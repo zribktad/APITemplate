@@ -26,7 +26,6 @@ public sealed class PostgresTransactionTests(SharedPostgresContainer postgres) :
             _factory.Services,
             username,
             $"{username}@example.com",
-            "secret-pass",
             ct: ct);
 
         await using var scope1 = _factory.Services.CreateAsyncScope();
@@ -66,7 +65,6 @@ public sealed class PostgresTransactionTests(SharedPostgresContainer postgres) :
             TenantId = tenantId,
             Username = $"tx-user-{Guid.NewGuid():N}",
             Email = $"tx-user-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "not-relevant"
         };
 
         await using (var seedContext = await CreateDbContextAsync(hasTenant: false, Guid.Empty, actorId, ct))
