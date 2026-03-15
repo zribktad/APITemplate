@@ -59,3 +59,6 @@ coverage/
 # Published output
 publish/
 
+
+# Git worktrees
+.worktrees/
