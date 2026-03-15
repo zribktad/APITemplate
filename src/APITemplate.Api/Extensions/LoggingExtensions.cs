@@ -21,7 +21,7 @@ public static class LoggingExtensions
                 options =>
                 {
                     var redactionOptions =
-                        builder.Configuration.GetSection("Redaction").Get<RedactionOptions>()
+                        builder.Configuration.SectionFor<RedactionOptions>().Get<RedactionOptions>()
                         ?? new RedactionOptions();
                     Validator.ValidateObject(
                         redactionOptions,

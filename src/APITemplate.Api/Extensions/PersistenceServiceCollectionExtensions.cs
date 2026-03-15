@@ -20,20 +20,21 @@ namespace APITemplate.Extensions;
 
 public static class PersistenceServiceCollectionExtensions
 {
-    public const string TransactionsSectionName = "Persistence:Transactions";
-
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
         IConfiguration configuration
     )
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")!;
+        var connectionString = configuration.GetConnectionString(
+            ConfigurationSections.DefaultConnection
+        )!;
+
         var transactionDefaults =
-            configuration.GetSection(TransactionsSectionName).Get<TransactionDefaultsOptions>()
+            configuration.SectionFor<TransactionDefaultsOptions>().Get<TransactionDefaultsOptions>()
             ?? new TransactionDefaultsOptions();
 
         services.Configure<TransactionDefaultsOptions>(
-            configuration.GetSection(TransactionsSectionName)
+            configuration.SectionFor<TransactionDefaultsOptions>()
         );
 
         services.AddDbContext<AppDbContext>(options =>
@@ -90,9 +91,13 @@ public static class PersistenceServiceCollectionExtensions
         IConfiguration configuration
     )
     {
-        var mongoSettings = configuration.GetSection("MongoDB").Get<MongoDbSettings>()!;
+        var mongoSettings = configuration
+            .GetSection(ConfigurationSections.MongoDB)
+            .Get<MongoDbSettings>()!;
 
-        services.Configure<MongoDbSettings>(configuration.GetSection("MongoDB"));
+        services.Configure<MongoDbSettings>(
+            configuration.GetSection(ConfigurationSections.MongoDB)
+        );
         services.AddSingleton<MongoDbContext>();
         services.AddScoped<IProductDataRepository, ProductDataRepository>();
 

@@ -79,7 +79,7 @@ public static class ApiServiceCollectionExtensions
     {
         services
             .AddOptions<RateLimitingOptions>()
-            .Bind(configuration.GetSection("RateLimiting:Fixed"))
+            .Bind(configuration.SectionFor<RateLimitingOptions>())
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -138,7 +138,7 @@ public static class ApiServiceCollectionExtensions
         // so all application instances share the same cache. Without it, falls back to in-memory.
         // Each policy defines an expiration time and a tag used for targeted invalidation
         // via IOutputCacheStore.EvictByTagAsync() in controllers after mutations (Create/Update/Delete).
-        var valkeySection = configuration.GetSection("Valkey");
+        var valkeySection = configuration.SectionFor<ValkeyOptions>();
         var valkeyConnectionString = valkeySection.GetValue<string>("ConnectionString");
 
         if (!string.IsNullOrEmpty(valkeyConnectionString))
@@ -214,7 +214,7 @@ public static class ApiServiceCollectionExtensions
         // Bind expiration settings from "Caching" section with startup validation.
         services
             .AddOptions<CachingOptions>()
-            .Bind(configuration.GetSection("Caching"))
+            .Bind(configuration.SectionFor<CachingOptions>())
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

@@ -14,19 +14,14 @@ namespace APITemplate.Extensions;
 
 public static class ObservabilityServiceCollectionExtensions
 {
-    public const string ObservabilitySectionName = "Observability";
-    public const string AppSectionName = "App";
-
     public static IServiceCollection AddObservability(
         this IServiceCollection services,
         IConfiguration configuration,
         IHostEnvironment environment
     )
     {
-        services.Configure<ObservabilityOptions>(
-            configuration.GetSection(ObservabilitySectionName)
-        );
-        services.Configure<AppOptions>(configuration.GetSection(AppSectionName));
+        services.Configure<ObservabilityOptions>(configuration.SectionFor<ObservabilityOptions>());
+        services.Configure<AppOptions>(configuration.SectionFor<AppOptions>());
         services.AddSingleton<IHealthCheckPublisher, HealthCheckMetricsPublisher>();
         services.Configure<HealthCheckPublisherOptions>(options =>
         {
@@ -211,10 +206,10 @@ public static class ObservabilityServiceCollectionExtensions
         );
 
     internal static ObservabilityOptions GetObservabilityOptions(IConfiguration configuration) =>
-        configuration.GetSection(ObservabilitySectionName).Get<ObservabilityOptions>() ?? new();
+        configuration.SectionFor<ObservabilityOptions>().Get<ObservabilityOptions>() ?? new();
 
     internal static AppOptions GetAppOptions(IConfiguration configuration) =>
-        configuration.GetSection(AppSectionName).Get<AppOptions>() ?? new();
+        configuration.SectionFor<AppOptions>().Get<AppOptions>() ?? new();
 
     internal static Dictionary<string, object> BuildResourceAttributes(
         AppOptions appOptions,

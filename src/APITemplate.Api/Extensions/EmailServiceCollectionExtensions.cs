@@ -14,9 +14,9 @@ public static class EmailServiceCollectionExtensions
         IConfiguration configuration
     )
     {
-        var emailOptions =
-            configuration.GetSection("Email").Get<EmailOptions>() ?? new EmailOptions();
-        services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        var emailSection = configuration.SectionFor<EmailOptions>();
+        var emailOptions = emailSection.Get<EmailOptions>() ?? new EmailOptions();
+        services.Configure<EmailOptions>(emailSection);
 
         var queue = new ChannelEmailQueue();
         services.AddSingleton(queue);

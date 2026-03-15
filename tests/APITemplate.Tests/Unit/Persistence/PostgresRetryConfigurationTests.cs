@@ -19,15 +19,18 @@ public class PostgresRetryConfigurationTests
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=test;Password=test",
-                ["Persistence:Transactions:IsolationLevel"] = "Serializable",
-                ["Persistence:Transactions:TimeoutSeconds"] = "45",
-                ["Persistence:Transactions:RetryEnabled"] = "true",
-                ["Persistence:Transactions:RetryCount"] = "7",
-                ["Persistence:Transactions:RetryDelaySeconds"] = "11"
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] =
+                        "Host=localhost;Database=test;Username=test;Password=test",
+                    ["TransactionDefaults:IsolationLevel"] = "Serializable",
+                    ["TransactionDefaults:TimeoutSeconds"] = "45",
+                    ["TransactionDefaults:RetryEnabled"] = "true",
+                    ["TransactionDefaults:RetryCount"] = "7",
+                    ["TransactionDefaults:RetryDelaySeconds"] = "11",
+                }
+            )
             .Build();
 
         services.AddLogging();
@@ -50,10 +53,13 @@ public class PostgresRetryConfigurationTests
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=test;Password=test"
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] =
+                        "Host=localhost;Database=test;Username=test;Password=test",
+                }
+            )
             .Build();
 
         services.AddLogging();
@@ -78,11 +84,14 @@ public class PostgresRetryConfigurationTests
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=test;Password=test",
-                ["Persistence:Transactions:RetryEnabled"] = retryEnabled.ToString()
-            })
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] =
+                        "Host=localhost;Database=test;Username=test;Password=test",
+                    ["TransactionDefaults:RetryEnabled"] = retryEnabled.ToString(),
+                }
+            )
             .Build();
 
         services.AddLogging();
@@ -105,13 +114,14 @@ public class PostgresRetryConfigurationTests
         int timeoutSeconds,
         int retryCount,
         int retryDelaySeconds,
-        string expectedParameter)
+        string expectedParameter
+    )
     {
         var options = new TransactionDefaultsOptions
         {
             TimeoutSeconds = timeoutSeconds,
             RetryCount = retryCount,
-            RetryDelaySeconds = retryDelaySeconds
+            RetryDelaySeconds = retryDelaySeconds,
         };
 
         var ex = Should.Throw<ArgumentOutOfRangeException>(() => options.Resolve(null));
@@ -127,14 +137,15 @@ public class PostgresRetryConfigurationTests
         int? timeoutSeconds,
         int? retryCount,
         int? retryDelaySeconds,
-        string expectedParameter)
+        string expectedParameter
+    )
     {
         var defaults = new TransactionDefaultsOptions();
         var overrides = new Domain.Options.TransactionOptions
         {
             TimeoutSeconds = timeoutSeconds,
             RetryCount = retryCount,
-            RetryDelaySeconds = retryDelaySeconds
+            RetryDelaySeconds = retryDelaySeconds,
         };
 
         var ex = Should.Throw<ArgumentOutOfRangeException>(() => defaults.Resolve(overrides));

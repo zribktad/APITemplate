@@ -27,16 +27,15 @@ public static class AuthenticationServiceCollectionExtensions
         IHostEnvironment environment
     )
     {
+        var corsSection = configuration.SectionFor<CorsOptions>();
         services
             .AddOptions<CorsOptions>()
-            .Bind(configuration.GetSection("Cors"))
+            .Bind(corsSection)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        var corsOrigins = configuration
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>()
-            ?.Where(origin => !string.IsNullOrWhiteSpace(origin))
+        var corsOrigins = (corsSection.Get<CorsOptions>() ?? new CorsOptions())
+            .AllowedOrigins.Where(origin => !string.IsNullOrWhiteSpace(origin))
             .Select(origin => origin.Trim())
             .ToArray();
 
@@ -57,18 +56,18 @@ public static class AuthenticationServiceCollectionExtensions
 
         services
             .AddOptions<BffOptions>()
-            .Bind(configuration.GetSection("Bff"))
+            .Bind(configuration.SectionFor<BffOptions>())
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
         services
             .AddOptions<SystemIdentityOptions>()
-            .Bind(configuration.GetSection("SystemIdentity"))
+            .Bind(configuration.SectionFor<SystemIdentityOptions>())
             .ValidateOnStart();
 
         services
             .AddOptions<BootstrapTenantOptions>()
-            .Bind(configuration.GetSection("Bootstrap:Tenant"))
+            .Bind(configuration.SectionFor<BootstrapTenantOptions>())
             .ValidateDataAnnotations()
             .Validate(
                 o => !string.IsNullOrWhiteSpace(o.Code) && !string.IsNullOrWhiteSpace(o.Name),
@@ -78,7 +77,7 @@ public static class AuthenticationServiceCollectionExtensions
 
         services
             .AddOptions<KeycloakOptions>()
-            .Bind(configuration.GetSection("Keycloak"))
+            .Bind(configuration.SectionFor<KeycloakOptions>())
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -104,9 +103,10 @@ public static class AuthenticationServiceCollectionExtensions
     private static AuthSettings BuildAuthSettings(IConfiguration configuration)
     {
         var keycloak =
-            configuration.GetSection("Keycloak").Get<KeycloakOptions>()
+            configuration.SectionFor<KeycloakOptions>().Get<KeycloakOptions>()
             ?? throw new InvalidOperationException("Keycloak configuration section is missing.");
-        var bffOptions = configuration.GetSection("Bff").Get<BffOptions>() ?? new BffOptions();
+        var bffOptions =
+            configuration.SectionFor<BffOptions>().Get<BffOptions>() ?? new BffOptions();
         var authority = KeycloakUrlHelper.BuildAuthority(keycloak.AuthServerUrl, keycloak.Realm);
         return new AuthSettings(keycloak, bffOptions, authority);
     }
@@ -227,7 +227,7 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddSingleton<IRolePermissionMap, StaticRolePermissionMap>();
         services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
-        services
+        var authBuilder = services
             .AddKeycloakAuthorization(configuration)
             .AddAuthorizationBuilder()
             .SetFallbackPolicy(
@@ -263,8 +263,22 @@ public static class AuthenticationServiceCollectionExtensions
                             UserRole.TenantAdmin.ToString(),
                             UserRole.PlatformAdmin.ToString()
                         )
-            )
-            .AddPermissionPolicies();
+            );
+
+        foreach (var permission in Permission.All)
+        {
+            authBuilder.AddPolicy(
+                permission,
+                policy =>
+                    policy
+                        .AddAuthenticationSchemes(
+                            JwtBearerDefaults.AuthenticationScheme,
+                            AuthConstants.BffSchemes.Cookie
+                        )
+                        .RequireAuthenticatedUser()
+                        .AddRequirements(new PermissionRequirement(permission))
+            );
+        }
     }
 
     private static void ConfigureKeycloakInfrastructure(
@@ -276,7 +290,7 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddHttpClient(AuthConstants.HttpClients.KeycloakToken);
         services.AddHealthChecks().AddCheck<KeycloakHealthCheck>("keycloak", tags: ["identity"]);
 
-        var keycloakOptions = configuration.GetSection("Keycloak").Get<KeycloakOptions>()!;
+        var keycloakOptions = configuration.SectionFor<KeycloakOptions>().Get<KeycloakOptions>()!;
 
         services.AddResiliencePipeline(
             ResiliencePipelineKeys.KeycloakReadiness,
