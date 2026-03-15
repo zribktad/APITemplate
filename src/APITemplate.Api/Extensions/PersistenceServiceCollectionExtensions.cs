@@ -45,6 +45,8 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
+        services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IDbTransactionProvider, EfCoreTransactionProvider>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IEntityNormalizationService, AppUserEntityNormalizationService>();

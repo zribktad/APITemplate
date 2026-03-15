@@ -4,15 +4,17 @@ namespace APITemplate.Application.Common.Security;
 
 public sealed class StaticRolePermissionMap : IRolePermissionMap
 {
-    private static readonly IReadOnlySet<string> Empty = new HashSet<string>(StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> Empty = new HashSet<string>(
+        StringComparer.Ordinal
+    );
 
     private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> Map = BuildMap();
 
-    public IReadOnlySet<string> GetPermissions(string role)
-        => Map.TryGetValue(role, out var permissions) ? permissions : Empty;
+    public IReadOnlySet<string> GetPermissions(string role) =>
+        Map.TryGetValue(role, out var permissions) ? permissions : Empty;
 
-    public bool HasPermission(string role, string permission)
-        => GetPermissions(role).Contains(permission);
+    public bool HasPermission(string role, string permission) =>
+        GetPermissions(role).Contains(permission);
 
     private static Dictionary<string, IReadOnlySet<string>> BuildMap()
     {
@@ -32,7 +34,10 @@ public sealed class StaticRolePermissionMap : IRolePermissionMap
             Permission.ProductData.Read,
             Permission.ProductData.Create,
             Permission.ProductData.Delete,
-            Permission.Users.Read
+            Permission.Users.Read,
+            Permission.Invitations.Read,
+            Permission.Invitations.Create,
+            Permission.Invitations.Revoke,
         };
 
         var userPermissions = new HashSet<string>(StringComparer.Ordinal)
@@ -41,14 +46,14 @@ public sealed class StaticRolePermissionMap : IRolePermissionMap
             Permission.Categories.Read,
             Permission.ProductReviews.Read,
             Permission.ProductReviews.Create,
-            Permission.ProductData.Read
+            Permission.ProductData.Read,
         };
 
         return new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
             [UserRole.PlatformAdmin.ToString()] = Permission.All,
             [UserRole.TenantAdmin.ToString()] = tenantAdminPermissions,
-            [UserRole.User.ToString()] = userPermissions
+            [UserRole.User.ToString()] = userPermissions,
         };
     }
 }

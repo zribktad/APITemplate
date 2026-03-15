@@ -1,3 +1,4 @@
+using APITemplate.Application.Common.Events;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Features.User;
 using APITemplate.Application.Features.User.DTOs;
@@ -6,6 +7,8 @@ using APITemplate.Domain.Entities;
 using APITemplate.Domain.Enums;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
+using MediatR;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -17,6 +20,8 @@ public class UserRequestHandlersTests
     private readonly Mock<IUserRepository> _repositoryMock;
     private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IPublisher> _publisherMock;
+    private readonly Mock<ILogger<UserRequestHandlers>> _loggerMock;
     private readonly UserRequestHandlers _sut;
 
     public UserRequestHandlersTests()
@@ -24,15 +29,18 @@ public class UserRequestHandlersTests
         _repositoryMock = new Mock<IUserRepository>();
         _passwordHasherMock = new Mock<IPasswordHasher>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _publisherMock = new Mock<IPublisher>();
+        _loggerMock = new Mock<ILogger<UserRequestHandlers>>();
 
-        _passwordHasherMock
-            .Setup(h => h.Hash(It.IsAny<string>()))
-            .Returns("hashed_password");
+        _passwordHasherMock.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed_password");
 
         _sut = new UserRequestHandlers(
             _repositoryMock.Object,
             _passwordHasherMock.Object,
-            _unitOfWorkMock.Object);
+            _unitOfWorkMock.Object,
+            _publisherMock.Object,
+            _loggerMock.Object
+        );
     }
 
     // --- GetByIdAsync ---
@@ -41,10 +49,22 @@ public class UserRequestHandlersTests
     public async Task GetByIdAsync_WhenUserExists_ReturnsUserResponse()
     {
         var ct = TestContext.Current.CancellationToken;
-        var expected = new UserResponse(Guid.NewGuid(), "testuser", "test@example.com", true, UserRole.User, DateTime.UtcNow);
+        var expected = new UserResponse(
+            Guid.NewGuid(),
+            "testuser",
+            "test@example.com",
+            true,
+            UserRole.User,
+            DateTime.UtcNow
+        );
 
         _repositoryMock
-            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdSpecification>(), It.IsAny<CancellationToken>()))
+            .Setup(r =>
+                r.FirstOrDefaultAsync(
+                    It.IsAny<UserByIdSpecification>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
             .ReturnsAsync(expected);
 
         var result = await _sut.Handle(new GetUserByIdQuery(expected.Id), ct);
@@ -58,10 +78,18 @@ public class UserRequestHandlersTests
     public async Task GetByIdAsync_WhenUserDoesNotExist_ReturnsNull()
     {
         _repositoryMock
-            .Setup(r => r.FirstOrDefaultAsync(It.IsAny<UserByIdSpecification>(), It.IsAny<CancellationToken>()))
+            .Setup(r =>
+                r.FirstOrDefaultAsync(
+                    It.IsAny<UserByIdSpecification>(),
+                    It.IsAny<CancellationToken>()
+                )
+            )
             .ReturnsAsync((UserResponse?)null);
 
-        var result = await _sut.Handle(new GetUserByIdQuery(Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var result = await _sut.Handle(
+            new GetUserByIdQuery(Guid.NewGuid()),
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeNull();
     }
@@ -76,14 +104,25 @@ public class UserRequestHandlersTests
         var items = new List<UserResponse>
         {
             new(Guid.NewGuid(), "user1", "user1@test.com", true, UserRole.User, DateTime.UtcNow),
-            new(Guid.NewGuid(), "user2", "user2@test.com", true, UserRole.PlatformAdmin, DateTime.UtcNow)
+            new(
+                Guid.NewGuid(),
+                "user2",
+                "user2@test.com",
+                true,
+                UserRole.PlatformAdmin,
+                DateTime.UtcNow
+            ),
         };
 
         _repositoryMock
-            .Setup(r => r.ListAsync(It.IsAny<UserFilterSpecification>(), It.IsAny<CancellationToken>()))
+            .Setup(r =>
+                r.ListAsync(It.IsAny<UserFilterSpecification>(), It.IsAny<CancellationToken>())
+            )
             .ReturnsAsync(items);
         _repositoryMock
-            .Setup(r => r.CountAsync(It.IsAny<UserCountSpecification>(), It.IsAny<CancellationToken>()))
+            .Setup(r =>
+                r.CountAsync(It.IsAny<UserCountSpecification>(), It.IsAny<CancellationToken>())
+            )
             .ReturnsAsync(2);
 
         var result = await _sut.Handle(new GetUsersQuery(filter), ct);
@@ -102,9 +141,15 @@ public class UserRequestHandlersTests
         var ct = TestContext.Current.CancellationToken;
         var request = new CreateUserRequest("newuser", "new@example.com", "Password1!");
 
-        _repositoryMock.Setup(r => r.ExistsByEmailAsync(request.Email, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repositoryMock.Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repositoryMock.Setup(r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>())).ReturnsAsync((AppUser u, CancellationToken _) => u);
+        _repositoryMock
+            .Setup(r => r.ExistsByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _repositoryMock
+            .Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _repositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppUser u, CancellationToken _) => u);
 
         var result = await _sut.Handle(new CreateUserCommand(request), ct);
 
@@ -115,18 +160,31 @@ public class UserRequestHandlersTests
         result.Role.ShouldBe(UserRole.User);
 
         _passwordHasherMock.Verify(h => h.Hash("Password1!"), Times.Once);
-        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()), Times.Once);
+        _repositoryMock.Verify(
+            r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _publisherMock.Verify(
+            p => p.Publish(It.IsAny<UserRegisteredNotification>(), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
     }
 
     [Fact]
     public async Task CreateAsync_WhenEmailExists_ThrowsConflictException()
     {
-        _repositoryMock.Setup(r => r.ExistsByEmailAsync("existing@test.com", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _repositoryMock
+            .Setup(r => r.ExistsByEmailAsync("existing@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
-        var act = () => _sut.Handle(
-            new CreateUserCommand(new CreateUserRequest("user", "existing@test.com", "Password1!")),
-            TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new CreateUserCommand(
+                    new CreateUserRequest("user", "existing@test.com", "Password1!")
+                ),
+                TestContext.Current.CancellationToken
+            );
 
         var ex = await Should.ThrowAsync<ConflictException>(act);
         ex.ErrorCode.ShouldBe(ErrorCatalog.Users.EmailAlreadyExists);
@@ -135,12 +193,20 @@ public class UserRequestHandlersTests
     [Fact]
     public async Task CreateAsync_WhenUsernameExists_ThrowsConflictException()
     {
-        _repositoryMock.Setup(r => r.ExistsByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repositoryMock.Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _repositoryMock
+            .Setup(r => r.ExistsByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _repositoryMock
+            .Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
-        var act = () => _sut.Handle(
-            new CreateUserCommand(new CreateUserRequest("existinguser", "new@test.com", "Password1!")),
-            TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new CreateUserCommand(
+                    new CreateUserRequest("existinguser", "new@test.com", "Password1!")
+                ),
+                TestContext.Current.CancellationToken
+            );
 
         var ex = await Should.ThrowAsync<ConflictException>(act);
         ex.ErrorCode.ShouldBe(ErrorCatalog.Users.UsernameAlreadyExists);
@@ -154,11 +220,23 @@ public class UserRequestHandlersTests
         var ct = TestContext.Current.CancellationToken;
         var user = CreateTestUser();
 
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-        _repositoryMock.Setup(r => r.ExistsByEmailAsync("updated@test.com", It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _repositoryMock.Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.ExistsByEmailAsync("updated@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        _repositoryMock
+            .Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
-        await _sut.Handle(new UpdateUserCommand(user.Id, new UpdateUserRequest("updateduser", "updated@test.com")), ct);
+        await _sut.Handle(
+            new UpdateUserCommand(
+                user.Id,
+                new UpdateUserRequest("updateduser", "updated@test.com")
+            ),
+            ct
+        );
 
         user.Username.ShouldBe("updateduser");
         user.Email.ShouldBe("updated@test.com");
@@ -171,20 +249,37 @@ public class UserRequestHandlersTests
     {
         var user = CreateTestUser();
 
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
-        await _sut.Handle(new UpdateUserCommand(user.Id, new UpdateUserRequest(user.Username, user.Email)), TestContext.Current.CancellationToken);
+        await _sut.Handle(
+            new UpdateUserCommand(user.Id, new UpdateUserRequest(user.Username, user.Email)),
+            TestContext.Current.CancellationToken
+        );
 
-        _repositoryMock.Verify(r => r.ExistsByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _repositoryMock.Verify(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(
+            r => r.ExistsByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never
+        );
+        _repositoryMock.Verify(
+            r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never
+        );
     }
 
     [Fact]
     public async Task UpdateAsync_WhenUserNotFound_ThrowsNotFoundException()
     {
-        _repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((AppUser?)null);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppUser?)null);
 
-        var act = () => _sut.Handle(new UpdateUserCommand(Guid.NewGuid(), new UpdateUserRequest("name", "e@e.com")), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new UpdateUserCommand(Guid.NewGuid(), new UpdateUserRequest("name", "e@e.com")),
+                TestContext.Current.CancellationToken
+            );
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -193,10 +288,21 @@ public class UserRequestHandlersTests
     public async Task UpdateAsync_WhenNewEmailExists_ThrowsConflictException()
     {
         var user = CreateTestUser();
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
-        _repositoryMock.Setup(r => r.ExistsByEmailAsync("taken@test.com", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.ExistsByEmailAsync("taken@test.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
-        var act = () => _sut.Handle(new UpdateUserCommand(user.Id, new UpdateUserRequest(user.Username, "taken@test.com")), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new UpdateUserCommand(
+                    user.Id,
+                    new UpdateUserRequest(user.Username, "taken@test.com")
+                ),
+                TestContext.Current.CancellationToken
+            );
 
         var ex = await Should.ThrowAsync<ConflictException>(act);
         ex.ErrorCode.ShouldBe(ErrorCatalog.Users.EmailAlreadyExists);
@@ -208,7 +314,9 @@ public class UserRequestHandlersTests
     public async Task ActivateAsync_SetsIsActiveToTrue()
     {
         var user = CreateTestUser(isActive: false);
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         await _sut.Handle(new ActivateUserCommand(user.Id), TestContext.Current.CancellationToken);
 
@@ -221,9 +329,14 @@ public class UserRequestHandlersTests
     public async Task DeactivateAsync_SetsIsActiveToFalse()
     {
         var user = CreateTestUser(isActive: true);
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
-        await _sut.Handle(new DeactivateUserCommand(user.Id), TestContext.Current.CancellationToken);
+        await _sut.Handle(
+            new DeactivateUserCommand(user.Id),
+            TestContext.Current.CancellationToken
+        );
 
         user.IsActive.ShouldBeFalse();
         _repositoryMock.Verify(r => r.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
@@ -233,9 +346,15 @@ public class UserRequestHandlersTests
     [Fact]
     public async Task ActivateAsync_WhenUserNotFound_ThrowsNotFoundException()
     {
-        _repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((AppUser?)null);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppUser?)null);
 
-        var act = () => _sut.Handle(new ActivateUserCommand(Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new ActivateUserCommand(Guid.NewGuid()),
+                TestContext.Current.CancellationToken
+            );
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -246,21 +365,39 @@ public class UserRequestHandlersTests
     public async Task ChangeRoleAsync_ChangesUserRole()
     {
         var user = CreateTestUser();
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
-        await _sut.Handle(new ChangeUserRoleCommand(user.Id, new ChangeUserRoleRequest(UserRole.PlatformAdmin)), TestContext.Current.CancellationToken);
+        await _sut.Handle(
+            new ChangeUserRoleCommand(user.Id, new ChangeUserRoleRequest(UserRole.PlatformAdmin)),
+            TestContext.Current.CancellationToken
+        );
 
         user.Role.ShouldBe(UserRole.PlatformAdmin);
         _repositoryMock.Verify(r => r.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _publisherMock.Verify(
+            p => p.Publish(It.IsAny<UserRoleChangedNotification>(), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
     }
 
     [Fact]
     public async Task ChangeRoleAsync_WhenUserNotFound_ThrowsNotFoundException()
     {
-        _repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((AppUser?)null);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppUser?)null);
 
-        var act = () => _sut.Handle(new ChangeUserRoleCommand(Guid.NewGuid(), new ChangeUserRoleRequest(UserRole.PlatformAdmin)), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new ChangeUserRoleCommand(
+                    Guid.NewGuid(),
+                    new ChangeUserRoleRequest(UserRole.PlatformAdmin)
+                ),
+                TestContext.Current.CancellationToken
+            );
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -271,7 +408,9 @@ public class UserRequestHandlersTests
     public async Task DeleteAsync_CallsRepositoryDeleteAndCommits()
     {
         var user = CreateTestUser();
-        _repositoryMock.Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>())).ReturnsAsync(user);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
 
         await _sut.Handle(new DeleteUserCommand(user.Id), TestContext.Current.CancellationToken);
 
@@ -282,9 +421,15 @@ public class UserRequestHandlersTests
     [Fact]
     public async Task DeleteAsync_WhenUserNotFound_ThrowsNotFoundException()
     {
-        _repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((AppUser?)null);
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AppUser?)null);
 
-        var act = () => _sut.Handle(new DeleteUserCommand(Guid.NewGuid()), TestContext.Current.CancellationToken);
+        var act = () =>
+            _sut.Handle(
+                new DeleteUserCommand(Guid.NewGuid()),
+                TestContext.Current.CancellationToken
+            );
 
         await Should.ThrowAsync<NotFoundException>(act);
     }
@@ -304,7 +449,7 @@ public class UserRequestHandlersTests
             IsActive = isActive,
             Role = role,
             TenantId = Guid.NewGuid(),
-            Audit = new() { CreatedAtUtc = DateTime.UtcNow }
+            Audit = new() { CreatedAtUtc = DateTime.UtcNow },
         };
     }
 }

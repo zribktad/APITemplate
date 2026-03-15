@@ -51,4 +51,20 @@ public static class ErrorCatalog
         public const string NotFound = "TNT-0404";
         public const string CodeAlreadyExists = "TNT-0409-CODE";
     }
+
+    public static class PasswordReset
+    {
+        public const string TokenNotFound = "PWR-0404";
+        public const string TokenExpired = "PWR-0410";
+        public const string TokenAlreadyUsed = "PWR-0409";
+    }
+
+    public static class Invitations
+    {
+        public const string NotFound = "INV-0404";
+        public const string AlreadyPending = "INV-0409-PENDING";
+        public const string Expired = "INV-0410";
+        public const string AlreadyAccepted = "INV-0409-ACCEPTED";
+        public const string NotPending = "INV-0409-NOT-PENDING";
+    }
 }

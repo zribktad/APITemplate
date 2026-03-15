@@ -18,6 +18,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Database\Procedures\**\*.sql" />
     <EmbeddedResource Include="Database\Triggers\**\*.sql" />
+    <EmbeddedResource Include="Email\Templates\**\*.liquid" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,6 +27,8 @@
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" />
     <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="Fluid.Core" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Kot.MongoDB.Migrations" />
     <PackageReference Include="Kot.MongoDB.Migrations.DI" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />

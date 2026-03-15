@@ -10,6 +10,7 @@ using APITemplate.Domain.Enums;
 using APITemplate.Domain.Exceptions;
 using APITemplate.Domain.Interfaces;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TenantInvitationEntity = APITemplate.Domain.Entities.TenantInvitation;
 
@@ -42,6 +43,7 @@ public sealed class TenantInvitationRequestHandlers
     private readonly ITenantProvider _tenantProvider;
     private readonly TimeProvider _timeProvider;
     private readonly EmailOptions _emailOptions;
+    private readonly ILogger<TenantInvitationRequestHandlers> _logger;
 
     public TenantInvitationRequestHandlers(
         ITenantInvitationRepository invitationRepository,
@@ -51,7 +53,8 @@ public sealed class TenantInvitationRequestHandlers
         IPublisher publisher,
         ITenantProvider tenantProvider,
         TimeProvider timeProvider,
-        IOptions<EmailOptions> emailOptions
+        IOptions<EmailOptions> emailOptions,
+        ILogger<TenantInvitationRequestHandlers> logger
     )
     {
         _invitationRepository = invitationRepository;
@@ -62,6 +65,7 @@ public sealed class TenantInvitationRequestHandlers
         _tenantProvider = tenantProvider;
         _timeProvider = timeProvider;
         _emailOptions = emailOptions.Value;
+        _logger = logger;
     }
 
     public async Task<PagedResponse<TenantInvitationResponse>> Handle(
@@ -114,6 +118,7 @@ public sealed class TenantInvitationRequestHandlers
         {
             Id = Guid.NewGuid(),
             Email = command.Request.Email.Trim(),
+            NormalizedEmail = normalizedEmail,
             TokenHash = tokenHash,
             ExpiresAtUtc = _timeProvider
                 .GetUtcNow()
@@ -123,15 +128,22 @@ public sealed class TenantInvitationRequestHandlers
         await _invitationRepository.AddAsync(invitation, ct);
         await _unitOfWork.CommitAsync(ct);
 
-        await _publisher.Publish(
-            new TenantInvitationCreatedNotification(
-                invitation.Id,
-                invitation.Email,
-                tenant.Name,
-                rawToken
-            ),
-            ct
-        );
+        try
+        {
+            await _publisher.Publish(
+                new TenantInvitationCreatedNotification(
+                    invitation.Id,
+                    invitation.Email,
+                    tenant.Name,
+                    rawToken
+                ),
+                ct
+            );
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.", invitation.Id);
+        }
 
         return invitation.ToResponse();
     }
@@ -218,14 +230,21 @@ public sealed class TenantInvitationRequestHandlers
         await _invitationRepository.UpdateAsync(invitation, ct);
         await _unitOfWork.CommitAsync(ct);
 
-        await _publisher.Publish(
-            new TenantInvitationCreatedNotification(
-                invitation.Id,
-                invitation.Email,
-                tenant.Name,
-                rawToken
-            ),
-            ct
-        );
+        try
+        {
+            await _publisher.Publish(
+                new TenantInvitationCreatedNotification(
+                    invitation.Id,
+                    invitation.Email,
+                    tenant.Name,
+                    rawToken
+                ),
+                ct
+            );
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to publish TenantInvitationCreatedNotification for invitation {InvitationId}.", invitation.Id);
+        }
     }
 }

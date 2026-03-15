@@ -13,6 +13,7 @@ public sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<Ten
         builder.ConfigureTenantAuditable();
 
         builder.Property(i => i.Email).IsRequired().HasMaxLength(320);
+        builder.Property(i => i.NormalizedEmail).IsRequired().HasMaxLength(320);
 
         builder.Property(i => i.TokenHash).IsRequired().HasMaxLength(128);
 
@@ -36,6 +37,6 @@ public sealed class TenantInvitationConfiguration : IEntityTypeConfiguration<Ten
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(i => i.TokenHash);
-        builder.HasIndex(i => new { i.TenantId, i.Email });
+        builder.HasIndex(i => new { i.TenantId, i.NormalizedEmail });
     }
 }

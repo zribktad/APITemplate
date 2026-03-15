@@ -6,19 +6,22 @@ try
     var builder = WebApplication.CreateBuilder(args); // Build host, configuration, and DI container.
     builder.AddApplicationRedaction();
 
-    builder.Host.UseSerilog((context, services, loggerConfiguration) =>
-    {
-        loggerConfiguration
-            .ReadFrom.Configuration(context.Configuration)
-            .ReadFrom.Services(services)
-            .AddOpenTelemetrySinks(context.Configuration, context.HostingEnvironment);
-    });
+    builder.Host.UseSerilog(
+        (context, services, loggerConfiguration) =>
+        {
+            loggerConfiguration
+                .ReadFrom.Configuration(context.Configuration)
+                .ReadFrom.Services(services)
+                .AddOpenTelemetrySinks(context.Configuration, context.HostingEnvironment);
+        }
+    );
 
     builder.Services.AddApiFoundation(builder.Configuration); // Registers exception handling services (AddExceptionHandler + ProblemDetails), activated later in UseApiPipeline.
     builder.Services.AddObservability(builder.Configuration, builder.Environment); // Register OpenTelemetry tracing/metrics and environment-specific exporters.
     builder.Services.AddAuthenticationOptions(builder.Configuration, builder.Environment);
     builder.Services.AddPersistence(builder.Configuration); // Register EF Core + repositories + relational health checks.
     builder.Services.AddApplicationServices(); // Register application services + validators.
+    builder.Services.AddEmailServices(builder.Configuration); // Register email sending infrastructure (SMTP, templates, queue, background service).
     builder.Services.AddMongoDB(builder.Configuration); // Register Mongo context/services + Mongo health checks.
     builder.Services.AddKeycloakBffAuthentication(builder.Configuration, builder.Environment); // Register Keycloak hybrid JWT + BFF authentication.
     builder.Services.AddApiVersioningConfiguration(); // Register API versioning and explorer metadata.

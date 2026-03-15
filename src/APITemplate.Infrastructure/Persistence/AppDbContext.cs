@@ -55,7 +55,9 @@ public sealed class AppDbContext : DbContext
         IEnumerable<ISoftDeleteCascadeRule> softDeleteCascadeRules,
         IEntityNormalizationService entityNormalizationService,
         IAuditableEntityStateManager entityStateManager,
-        ISoftDeleteProcessor softDeleteProcessor) : base(options)
+        ISoftDeleteProcessor softDeleteProcessor
+    )
+        : base(options)
     {
         _tenantProvider = tenantProvider;
         _actorProvider = actorProvider;
@@ -72,6 +74,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
     /// <summary>
     /// Keyless entity — no backing table.
@@ -96,14 +100,18 @@ public sealed class AppDbContext : DbContext
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         throw new NotSupportedException(
-            "Use SaveChangesAsync to avoid deadlocks from async soft-delete cascade rules. " +
-            "All application paths should go through IUnitOfWork.CommitAsync().");
+            "Use SaveChangesAsync to avoid deadlocks from async soft-delete cascade rules. "
+                + "All application paths should go through IUnitOfWork.CommitAsync()."
+        );
     }
 
     /// <summary>
     /// Applies audit/soft-delete rules before committing changes asynchronously.
     /// </summary>
-    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default
+    )
     {
         await ApplyEntityAuditingAsync(cancellationToken);
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -117,14 +125,20 @@ public sealed class AppDbContext : DbContext
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (!typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType) ||
-                !typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+            if (
+                !typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType)
+                || !typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType)
+            )
             {
                 continue;
             }
 
             var method = typeof(AppDbContext)
-                .GetMethod(nameof(SetGlobalFilter), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .GetMethod(
+                    nameof(SetGlobalFilter),
+                    System.Reflection.BindingFlags.Instance
+                        | System.Reflection.BindingFlags.NonPublic
+                )!
                 .MakeGenericMethod(entityType.ClrType);
 
             method.Invoke(this, [modelBuilder]);
@@ -134,7 +148,8 @@ public sealed class AppDbContext : DbContext
     private void SetGlobalFilter<TEntity>(ModelBuilder modelBuilder)
         where TEntity : class, ITenantEntity, ISoftDeletable
     {
-        modelBuilder.Entity<TEntity>()
+        modelBuilder
+            .Entity<TEntity>()
             .HasQueryFilter("SoftDelete", entity => !entity.IsDeleted)
             .HasQueryFilter("Tenant", entity => HasTenant && entity.TenantId == CurrentTenantId);
     }
@@ -147,14 +162,26 @@ public sealed class AppDbContext : DbContext
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         var actor = _actorProvider.ActorId;
 
-        foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is IAuditableTenantEntity).ToList())
+        foreach (
+            var entry in ChangeTracker
+                .Entries()
+                .Where(e => e.Entity is IAuditableTenantEntity)
+                .ToList()
+        )
         {
             var entity = (IAuditableTenantEntity)entry.Entity;
             switch (entry.State)
             {
                 case EntityState.Added:
                     _entityNormalizationService.Normalize(entity);
-                    _entityStateManager.StampAdded(entry, entity, now, actor, HasTenant, CurrentTenantId);
+                    _entityStateManager.StampAdded(
+                        entry,
+                        entity,
+                        now,
+                        actor,
+                        HasTenant,
+                        CurrentTenantId
+                    );
                     break;
                 case EntityState.Modified:
                     _entityNormalizationService.Normalize(entity);
@@ -168,7 +195,8 @@ public sealed class AppDbContext : DbContext
                         now,
                         actor,
                         _softDeleteCascadeRules,
-                        cancellationToken);
+                        cancellationToken
+                    );
                     break;
             }
         }

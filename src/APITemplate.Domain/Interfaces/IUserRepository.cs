@@ -6,4 +6,5 @@ public interface IUserRepository : IRepository<AppUser>
 {
     Task<bool> ExistsByEmailAsync(string email, CancellationToken ct = default);
     Task<bool> ExistsByUsernameAsync(string normalizedUsername, CancellationToken ct = default);
+    Task<AppUser?> FindByEmailAsync(string email, CancellationToken ct = default);
 }

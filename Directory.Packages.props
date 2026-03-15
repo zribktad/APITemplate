@@ -13,6 +13,7 @@
     <PackageVersion Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.1.0" />
     <PackageVersion Include="DotNet.Testcontainers" Version="1.6.0" />
+    <PackageVersion Include="Fluid.Core" Version="2.13.0" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="HotChocolate.AspNetCore" Version="15.1.12" />
     <PackageVersion Include="HotChocolate.AspNetCore.Authorization" Version="15.1.12" />
@@ -36,6 +37,7 @@
     <PackageVersion Include="Microsoft.Extensions.Compliance.Redaction" Version="10.3.0" />
     <PackageVersion Include="Microsoft.Extensions.Telemetry" Version="10.3.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageVersion Include="MailKit" Version="4.12.1" />
     <PackageVersion Include="MediatR" Version="14.1.0" />
     <PackageVersion Include="MockQueryable.Moq" Version="10.0.2" />
     <PackageVersion Include="MongoDB.Bson" Version="3.7.0" />
