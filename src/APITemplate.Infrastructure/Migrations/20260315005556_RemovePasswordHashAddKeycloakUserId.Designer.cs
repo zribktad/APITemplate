@@ -3,6 +3,7 @@ using System;
 using APITemplate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace APITemplate.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260315005556_RemovePasswordHashAddKeycloakUserId")]
+    partial class RemovePasswordHashAddKeycloakUserId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -158,6 +161,64 @@ namespace APITemplate.Migrations
                     b.ToTable("Categories", t =>
                         {
                             t.HasCheckConstraint("CK_Categories_SoftDeleteConsistency", "\"IsDeleted\" OR (\"DeletedAtUtc\" IS NULL AND \"DeletedBy\" IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("APITemplate.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsUsed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "IsDeleted");
+
+                    b.ToTable("PasswordResetTokens", t =>
+                        {
+                            t.HasCheckConstraint("CK_PasswordResetTokens_SoftDeleteConsistency", "\"IsDeleted\" OR (\"DeletedAtUtc\" IS NULL AND \"DeletedBy\" IS NULL)");
                         });
                 });
 
@@ -570,6 +631,57 @@ namespace APITemplate.Migrations
 
                     b.Navigation("Audit")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("APITemplate.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("APITemplate.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("APITemplate.Domain.Entities.AuditInfo", "Audit", b1 =>
+                        {
+                            b1.Property<Guid>("PasswordResetTokenId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<DateTime>("CreatedAtUtc")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("CreatedAtUtc")
+                                .HasDefaultValueSql("now()");
+
+                            b1.Property<Guid>("CreatedBy")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                                .HasColumnName("CreatedBy");
+
+                            b1.Property<DateTime>("UpdatedAtUtc")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("UpdatedAtUtc")
+                                .HasDefaultValueSql("now()");
+
+                            b1.Property<Guid>("UpdatedBy")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("uuid")
+                                .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                                .HasColumnName("UpdatedBy");
+
+                            b1.HasKey("PasswordResetTokenId");
+
+                            b1.ToTable("PasswordResetTokens");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PasswordResetTokenId");
+                        });
+
+                    b.Navigation("Audit")
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("APITemplate.Domain.Entities.Product", b =>

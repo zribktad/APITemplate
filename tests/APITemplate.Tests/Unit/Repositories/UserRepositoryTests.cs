@@ -163,7 +163,6 @@ public class UserRepositoryTests : IDisposable
             Username = username,
             NormalizedUsername = AppUser.NormalizeUsername(username),
             Email = email,
-            PasswordHash = "hashed",
             IsActive = true,
             Role = UserRole.User,
             TenantId = TestTenantId,

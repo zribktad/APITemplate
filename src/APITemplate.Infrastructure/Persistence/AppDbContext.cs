@@ -74,8 +74,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<AppUser> Users => Set<AppUser>();
-    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
-    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
+public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
 
     /// <summary>
     /// Keyless entity — no backing table.

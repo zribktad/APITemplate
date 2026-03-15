@@ -8,7 +8,6 @@ namespace APITemplate.Application.Common.Events;
 public sealed class EmailNotificationHandler
     : INotificationHandler<UserRegisteredNotification>,
         INotificationHandler<TenantInvitationCreatedNotification>,
-        INotificationHandler<PasswordResetRequestedNotification>,
         INotificationHandler<UserRoleChangedNotification>
 {
     private readonly IEmailTemplateRenderer _templateRenderer;
@@ -65,25 +64,6 @@ public sealed class EmailNotificationHandler
                 $"You've been invited to {notification.TenantName}",
                 html
             ),
-            ct
-        );
-    }
-
-    public async Task Handle(PasswordResetRequestedNotification notification, CancellationToken ct)
-    {
-        var html = await _templateRenderer.RenderAsync(
-            EmailTemplateNames.PasswordReset,
-            new
-            {
-                notification.Username,
-                ResetUrl = $"{_options.BaseUrl}/password-reset/confirm?token={notification.Token}",
-                ExpiryMinutes = _options.PasswordResetTokenExpiryMinutes,
-            },
-            ct
-        );
-
-        await _emailQueue.EnqueueAsync(
-            new EmailMessage(notification.Email, "Password Reset Request", html),
             ct
         );
     }

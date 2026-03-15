@@ -26,7 +26,12 @@ public sealed class AppUser : IAuditableTenantEntity
     /// Used for fast database indexing, case-insensitive uniqueness checks (preventing impersonation), and reliable logins.
     /// </summary>
     public string NormalizedEmail { get; set; } = string.Empty;
-    public required string PasswordHash { get; set; }
+
+    /// <summary>
+    /// The user's subject ID in Keycloak. Nullable — existing users may not have one yet.
+    /// </summary>
+    public string? KeycloakUserId { get; set; }
+
     public bool IsActive { get; set; } = true;
     public UserRole Role { get; set; } = UserRole.User;
 

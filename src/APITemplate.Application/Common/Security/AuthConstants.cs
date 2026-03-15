@@ -8,6 +8,7 @@ public static class AuthConstants
     public static class HttpClients
     {
         public const string KeycloakToken = "KeycloakTokenClient";
+        public const string KeycloakAdmin = "KeycloakAdminClient";
     }
 
     public static class OpenIdConnect
@@ -49,7 +50,14 @@ public static class AuthConstants
 
     public static class OAuth2GrantTypes
     {
+        public const string ClientCredentials = "client_credentials";
         public const string RefreshToken = "refresh_token";
+    }
+
+    public static class KeycloakActions
+    {
+        public const string VerifyEmail = "VERIFY_EMAIL";
+        public const string UpdatePassword = "UPDATE_PASSWORD";
     }
 
     public static class Claims

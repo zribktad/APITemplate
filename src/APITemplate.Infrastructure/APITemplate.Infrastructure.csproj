@@ -26,8 +26,8 @@
     <PackageReference Include="AspNetCore.HealthChecks.MongoDb" />
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" />
-    <PackageReference Include="BCrypt.Net-Next" />
-    <PackageReference Include="Fluid.Core" />
+<PackageReference Include="Fluid.Core" />
+    <PackageReference Include="Keycloak.AuthServices.Sdk" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="Kot.MongoDB.Migrations" />
     <PackageReference Include="Kot.MongoDB.Migrations.DI" />

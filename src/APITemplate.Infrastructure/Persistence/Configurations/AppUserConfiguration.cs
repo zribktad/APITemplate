@@ -28,9 +28,14 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .IsRequired()
             .HasMaxLength(320);
 
-        builder.Property(u => u.PasswordHash)
-            .IsRequired()
-            .HasMaxLength(1000);
+        builder.Property(u => u.KeycloakUserId)
+            .HasMaxLength(256);
+
+        // Global uniqueness (not tenant-scoped): a Keycloak user ID is a system-wide identity.
+        // A user can only belong to one tenant, so no TenantId prefix is needed.
+        builder.HasIndex(u => u.KeycloakUserId)
+            .IsUnique()
+            .HasFilter("\"KeycloakUserId\" IS NOT NULL");
 
         builder.Property(u => u.IsActive)
             .IsRequired()

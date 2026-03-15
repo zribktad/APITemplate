@@ -1,3 +1,4 @@
+using System.Net.Http;
 using APITemplate.Application.Common.Events;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Features.User;
@@ -18,28 +19,26 @@ namespace APITemplate.Tests.Unit.Handlers;
 public class UserRequestHandlersTests
 {
     private readonly Mock<IUserRepository> _repositoryMock;
-    private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IPublisher> _publisherMock;
     private readonly Mock<ILogger<UserRequestHandlers>> _loggerMock;
+    private readonly Mock<IKeycloakAdminService> _keycloakAdminMock;
     private readonly UserRequestHandlers _sut;
 
     public UserRequestHandlersTests()
     {
         _repositoryMock = new Mock<IUserRepository>();
-        _passwordHasherMock = new Mock<IPasswordHasher>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _publisherMock = new Mock<IPublisher>();
         _loggerMock = new Mock<ILogger<UserRequestHandlers>>();
-
-        _passwordHasherMock.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed_password");
+        _keycloakAdminMock = new Mock<IKeycloakAdminService>();
 
         _sut = new UserRequestHandlers(
             _repositoryMock.Object,
-            _passwordHasherMock.Object,
             _unitOfWorkMock.Object,
             _publisherMock.Object,
-            _loggerMock.Object
+            _loggerMock.Object,
+            _keycloakAdminMock.Object
         );
     }
 
@@ -139,7 +138,8 @@ public class UserRequestHandlersTests
     public async Task CreateAsync_ReturnsCreatedUser()
     {
         var ct = TestContext.Current.CancellationToken;
-        var request = new CreateUserRequest("newuser", "new@example.com", "Password1!");
+        var request = new CreateUserRequest("newuser", "new@example.com");
+        var keycloakId = "keycloak-user-id-123";
 
         _repositoryMock
             .Setup(r => r.ExistsByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
@@ -147,6 +147,9 @@ public class UserRequestHandlersTests
         _repositoryMock
             .Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
+        _keycloakAdminMock
+            .Setup(k => k.CreateUserAsync(request.Username, request.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(keycloakId);
         _repositoryMock
             .Setup(r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((AppUser u, CancellationToken _) => u);
@@ -159,7 +162,10 @@ public class UserRequestHandlersTests
         result.IsActive.ShouldBeTrue();
         result.Role.ShouldBe(UserRole.User);
 
-        _passwordHasherMock.Verify(h => h.Hash("Password1!"), Times.Once);
+        _keycloakAdminMock.Verify(
+            k => k.CreateUserAsync(request.Username, request.Email, It.IsAny<CancellationToken>()),
+            Times.Once
+        );
         _repositoryMock.Verify(
             r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()),
             Times.Once
@@ -172,6 +178,24 @@ public class UserRequestHandlersTests
     }
 
     [Fact]
+    public async Task CreateAsync_WhenKeycloakFails_ThrowsAndDoesNotSaveUser()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var request = new CreateUserRequest("failuser", "fail@example.com");
+
+        _repositoryMock.Setup(r => r.ExistsByEmailAsync(request.Email, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _repositoryMock.Setup(r => r.ExistsByUsernameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _keycloakAdminMock.Setup(k => k.CreateUserAsync(request.Username, request.Email, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Keycloak unavailable"));
+
+        await Should.ThrowAsync<HttpRequestException>(
+            () => _sut.Handle(new CreateUserCommand(request), ct));
+
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()), Times.Never);
+        _unitOfWorkMock.Verify(u => u.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenEmailExists_ThrowsConflictException()
     {
         _repositoryMock
@@ -181,7 +205,7 @@ public class UserRequestHandlersTests
         var act = () =>
             _sut.Handle(
                 new CreateUserCommand(
-                    new CreateUserRequest("user", "existing@test.com", "Password1!")
+                    new CreateUserRequest("user", "existing@test.com")
                 ),
                 TestContext.Current.CancellationToken
             );
@@ -203,7 +227,7 @@ public class UserRequestHandlersTests
         var act = () =>
             _sut.Handle(
                 new CreateUserCommand(
-                    new CreateUserRequest("existinguser", "new@test.com", "Password1!")
+                    new CreateUserRequest("existinguser", "new@test.com")
                 ),
                 TestContext.Current.CancellationToken
             );
@@ -445,7 +469,6 @@ public class UserRequestHandlersTests
             NormalizedUsername = AppUser.NormalizeUsername("testuser"),
             Email = "test@example.com",
             NormalizedEmail = AppUser.NormalizeEmail("test@example.com"),
-            PasswordHash = "hashed",
             IsActive = isActive,
             Role = role,
             TenantId = Guid.NewGuid(),

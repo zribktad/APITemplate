@@ -28,7 +28,6 @@ public sealed class PostgresSoftDeleteTests(SharedPostgresContainer postgres) : 
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-cascade",
             ct: ct);
 
         Guid productId;
@@ -122,7 +121,6 @@ public sealed class PostgresSoftDeleteTests(SharedPostgresContainer postgres) : 
             TenantId = tenantId,
             Username = $"user-soft-{Guid.NewGuid():N}",
             Email = $"soft-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash"
         };
         var category = new Category { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Category-Soft-{Guid.NewGuid():N}" };
         var product = new Product { Id = Guid.NewGuid(), TenantId = tenantId, Name = $"Product-Soft-{Guid.NewGuid():N}", Price = 50m, CategoryId = category.Id };

@@ -21,7 +21,6 @@ public sealed class PostgresSearchTests(SharedPostgresContainer postgres) : Post
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-search",
             ct: ct);
 
         var otherTenant = new Tenant
@@ -126,7 +125,6 @@ public sealed class PostgresSearchTests(SharedPostgresContainer postgres) : Post
             _factory.Services,
             username,
             $"{username}@example.com",
-            "pass-graphql-search",
             ct: ct);
 
         await using (var scope = _factory.Services.CreateAsyncScope())

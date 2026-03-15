@@ -33,4 +33,12 @@ internal static partial class TenantClaimValidatorLogs
         [PersonalData] string? user,
         [SensitiveData] string? tenantId,
         string roles);
+
+    [LoggerMessage(
+        EventId = 2004,
+        Level = LogLevel.Warning,
+        Message = "User provisioning failed during token validation — authentication will continue")]
+    public static partial void UserProvisioningFailed(
+        this ILogger logger,
+        Exception exception);
 }
