@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using APITemplate.Api.Cache;
 using APITemplate.Application.Common.Options;
 using APITemplate.Application.Common.Security;
 using APITemplate.Application.Features.Bff.DTOs;
@@ -7,7 +6,6 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Options;
 
 namespace APITemplate.Api.Controllers.V1;
@@ -16,7 +14,6 @@ namespace APITemplate.Api.Controllers.V1;
 [ApiController]
 [Route("api/v{version:apiVersion}/bff")]
 [Authorize(AuthenticationSchemes = BffAuthenticationSchemes.Cookie)]
-[OutputCache(PolicyName = CachePolicyNames.NoCache)]
 public sealed class BffController : ControllerBase
 {
     private readonly BffOptions _bffOptions;

@@ -223,96 +223,36 @@ public static class ApiServiceCollectionExtensions
             return new ConfigureOptions<Microsoft.AspNetCore.OutputCaching.OutputCacheOptions>(
                 options =>
                 {
-                    // All GET/HEAD endpoints are cached by default with tenant isolation.
-                    // Endpoints that must not be cached use the explicit NoCache policy.
-                    options.AddBasePolicy(builder =>
-                        builder
-                            .AddPolicy<TenantAwareOutputCachePolicy>()
-                            .Expire(TimeSpan.FromSeconds(cachingOptions.DefaultExpirationSeconds))
-                    );
+                    // No caching by default — only endpoints with explicit [OutputCache] attributes are cached.
+                    options.AddBasePolicy(builder => builder.NoCache());
 
-                    // Opt-out policy for endpoints like BFF or user-specific data (e.g. /users/me).
-                    options.AddPolicy(CachePolicyNames.NoCache, builder => builder.NoCache());
+                    // Each named policy uses tenant-aware isolation, a configurable expiration,
+                    // and a tag matching the policy name for targeted invalidation.
+                    ReadOnlySpan<(string Name, int ExpirationSeconds)> policies =
+                    [
+                        (CachePolicyNames.Products, cachingOptions.ProductsExpirationSeconds),
+                        (CachePolicyNames.Categories, cachingOptions.CategoriesExpirationSeconds),
+                        (CachePolicyNames.Reviews, cachingOptions.ReviewsExpirationSeconds),
+                        (CachePolicyNames.ProductData, cachingOptions.ProductDataExpirationSeconds),
+                        (CachePolicyNames.Tenants, cachingOptions.TenantsExpirationSeconds),
+                        (
+                            CachePolicyNames.TenantInvitations,
+                            cachingOptions.TenantInvitationsExpirationSeconds
+                        ),
+                        (CachePolicyNames.Users, cachingOptions.UsersExpirationSeconds),
+                    ];
 
-                    // Domain-specific policies with individual expirations and tags for targeted invalidation.
-                    options.AddPolicy(
-                        CachePolicyNames.Products,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(cachingOptions.ProductsExpirationSeconds)
-                                )
-                                .Tag(CachePolicyNames.Products)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.Categories,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(cachingOptions.CategoriesExpirationSeconds)
-                                )
-                                .Tag(CachePolicyNames.Categories)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.Reviews,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(cachingOptions.ReviewsExpirationSeconds)
-                                )
-                                .Tag(CachePolicyNames.Reviews)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.ProductData,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(
-                                        cachingOptions.ProductDataExpirationSeconds
-                                    )
-                                )
-                                .Tag(CachePolicyNames.ProductData)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.Tenants,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(cachingOptions.TenantsExpirationSeconds)
-                                )
-                                .Tag(CachePolicyNames.Tenants)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.TenantInvitations,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(
-                                    TimeSpan.FromSeconds(
-                                        cachingOptions.TenantInvitationsExpirationSeconds
-                                    )
-                                )
-                                .Tag(CachePolicyNames.TenantInvitations)
-                    );
-
-                    options.AddPolicy(
-                        CachePolicyNames.Users,
-                        builder =>
-                            builder
-                                .AddPolicy<TenantAwareOutputCachePolicy>()
-                                .Expire(TimeSpan.FromSeconds(cachingOptions.UsersExpirationSeconds))
-                                .Tag(CachePolicyNames.Users)
-                    );
+                    foreach (var (name, expirationSeconds) in policies)
+                    {
+                        options.AddPolicy(
+                            name,
+                            builder =>
+                                builder
+                                    .AddPolicy<TenantAwareOutputCachePolicy>()
+                                    .Expire(TimeSpan.FromSeconds(expirationSeconds))
+                                    .Tag(name)
+                        );
+                    }
                 }
             );
         });

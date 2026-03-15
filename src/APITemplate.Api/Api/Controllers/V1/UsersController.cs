@@ -47,7 +47,6 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpGet("me")]
-    [OutputCache(PolicyName = CachePolicyNames.NoCache)]
     public async Task<ActionResult<UserResponse>> GetMe(CancellationToken ct)
     {
         var userId =
