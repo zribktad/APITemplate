@@ -101,7 +101,7 @@ public sealed class UserRequestHandlers
                 ct
             );
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to publish UserRegisteredNotification for user {UserId}.", user.Id);
         }
@@ -155,7 +155,7 @@ public sealed class UserRequestHandlers
                 ct
             );
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to publish UserRoleChangedNotification for user {UserId}.", user.Id);
         }
